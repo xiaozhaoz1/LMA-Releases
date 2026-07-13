@@ -1,0 +1,17 @@
+{
+  "man": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:man", "stream": true}
+    ]
+  },
+  "manbaout": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:manbaout", "stream": true}
+    ]
+  },
+  "whatcanisay": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:whatcanisay", "stream": true}
+    ]
+  }
+}

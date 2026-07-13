@@ -1,0 +1,52 @@
+{
+  "id": 7,
+  "name": "预设-肘击",
+  "enabled": false,
+  "eventId": "maid_hurt_target_pre",
+  "chance": 0.5,
+  "cooldown": 200,
+  "priority": 100,
+  "matchMode": "ALL",
+  "conditions": [
+    {
+      "key": "damage_type",
+      "op": ":=:",
+      "val": "melee",
+      "params": {}
+    }
+  ],
+  "actions": [
+    {
+      "type": "cancel_event"
+    },
+    {
+      "type": "dash",
+      "params": {
+        "toward_target": "true"
+      }
+    },
+    {
+      "type": "play_sound",
+      "params": {
+        "volume": "1.0",
+        "pitch": "1.0",
+        "sound_id": "littlemaidmoreaction:man,littlemaidmoreaction:manbaout,littlemaidmoreaction:whatcanisay"
+      }
+    },
+    {
+      "type": "play_anim",
+      "params": {
+        "auto_wait": "true",
+        "anim": "animation.man",
+        "mode": "INSTANT"
+      }
+    },
+    {
+      "type": "deal_damage",
+      "params": {
+        "amount": "10.0",
+        "damage_type": "mob_attack"
+      }
+    }
+  ]
+}

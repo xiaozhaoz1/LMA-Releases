@@ -1,0 +1,23 @@
+{
+  "id": -1,
+  "name": "altar_craft任务",
+  "enabled": false,
+  "eventId": "maid_tick",
+  "chance": 1.0,
+  "cooldown": 10,
+  "priority": 100,
+  "matchMode": "ALL",
+  "conditions": [
+    { "key": "task_active", "params": { "task_type": "altar_craft", "task_id": "{{task_id}}" } }
+  ],
+  "actions": [
+    {
+      "type": "place_altar_item",
+      "params": {
+        "target": "{{target}}",
+        "target_count": "{{target_count}}"
+      }
+    }
+  ],
+  "compat": []
+}

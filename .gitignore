@@ -1,0 +1,11 @@
+.gradle/
+build/
+*.lock
+.idea/
+*.iml
+out/
+.vscode/
+run/
+runs/
+logs/
+hs_err_pid*

@@ -1,0 +1,14 @@
+{
+  "task.littlemaidmoreaction.altar_craft": "祭坛合成",
+  "task.littlemaidmoreaction.craft_chain": "配方链合成",
+  "task.littlemaidmoreaction.furnace": "熔炉烧炼",
+  "task.littlemaidmoreaction.brewing": "炼药",
+  "task.littlemaidmoreaction.bell_ring": "敲钟",
+  "task.littlemaidmoreaction.jukebox": "唱片机",
+  "task.littlemaidmoreaction.collect_wood": "采集木材",
+  "task.littlemaidmoreaction.go_to_bed": "去睡觉",
+  "task.littlemaidmoreaction.flow_task": "流程任务",
+
+  "overlay.lma.task_can_execute": "可直接执行",
+  "overlay.lma.task_needs_ai_content": "需要 AI 设定内容"
+}

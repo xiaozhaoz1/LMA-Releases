@@ -1,0 +1,30 @@
+{
+  "id": 5,
+  "name": "预设-守护主人",
+  "enabled": true,
+  "eventId": "maid_tick",
+  "chance": 1.0,
+  "cooldown": 20,
+  "priority": 10,
+  "matchMode": "ALL",
+  "conditions": [
+    {
+      "key": "maid_task",
+      "op": ":=:",
+      "val": "touhou_little_maid:attack",
+      "params": {}
+    },
+    {
+      "key": "is_owner_target",
+      "params": {}
+    }
+  ],
+  "actions": [
+    {
+      "type": "force_target",
+      "params": {
+        "mode": "owner_attacker"
+      }
+    }
+  ]
+}

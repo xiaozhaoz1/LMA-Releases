@@ -1,0 +1,18 @@
+{
+  "id": 200,
+  "name": "YSM-变身",
+  "compat": ["ysm"],
+  "enabled": true,
+  "eventId": "maid_interact",
+  "chance": 1.0,
+  "cooldown": 0,
+  "priority": 50,
+  "matchMode": "ALL",
+  "conditions": [
+    { "key": "owner_holding_item", "op": ":=:", "val": "minecraft:nether_star", "params": {} }
+  ],
+  "actions": [
+    { "type": "cancel_event" },
+    { "type": "set_ysm_model", "params": { "mode": "ysm女仆模型" } }
+  ]
+}

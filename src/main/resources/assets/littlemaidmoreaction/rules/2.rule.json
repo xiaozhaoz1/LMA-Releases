@@ -1,0 +1,44 @@
+{
+  "id": 2,
+  "name": "预设-弹反",
+  "enabled": true,
+  "eventId": "maid_attack",
+  "chance": 0.15,
+  "cooldown": 100,
+  "priority": 75,
+  "matchMode": "ALL",
+  "conditions": [
+    {
+      "key": "damage_type",
+      "op": ":=:",
+      "val": "ranged",
+      "params": {}
+    },
+    {
+      "key": "maid_has_shield",
+      "params": {}
+    }
+  ],
+  "actions": [
+    {
+      "type": "cancel_event"
+    },
+    {
+      "type": "play_anim",
+      "params": {
+        "auto_wait": "true",
+        "anim": "parry",
+        "mode": "INSTANT"
+      }
+    },
+    {
+      "type": "apply_effect",
+      "params": {
+        "target": "self",
+        "amplifier": "1",
+        "effect_id": "minecraft:strength",
+        "duration": "200"
+      }
+    }
+  ]
+}

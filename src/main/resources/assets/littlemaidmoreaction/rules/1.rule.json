@@ -1,0 +1,54 @@
+{
+  "id": 1,
+  "name": "预设-闪避",
+  "enabled": true,
+  "eventId": "maid_attack",
+  "chance": 0.1,
+  "cooldown": 60,
+  "priority": 50,
+  "matchMode": "ALL",
+  "conditions": [
+    {
+      "key": "damage_type",
+      "op": ":=:",
+      "val": "ranged",
+      "params": {}
+    }
+  ],
+  "actions": [
+    {
+      "type": "cancel_event"
+    },
+    {
+      "type": "teleport",
+      "params": {
+        "offset_x": "0.5",
+        "mode": "offset",
+        "target": "self"
+      }
+    },
+    {
+      "type": "play_anim",
+      "params": {
+        "auto_wait": "true",
+        "anim": "animation.flash1",
+        "mode": "INSTANT"
+      }
+    },
+    {
+      "type": "random",
+      "params": {
+        "chance": "0.3",
+        "skip": "2"
+      }
+    },
+    {
+      "type": "play_anim",
+      "params": {
+        "auto_wait": "true",
+        "anim": "animation.Mock1",
+        "mode": "INSTANT"
+      }
+    }
+  ]
+}

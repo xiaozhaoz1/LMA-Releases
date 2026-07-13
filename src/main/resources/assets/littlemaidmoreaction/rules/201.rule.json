@@ -1,0 +1,18 @@
+{
+  "id": 201,
+  "name": "YSM-轮盘",
+  "compat": ["ysm"],
+  "enabled": true,
+  "eventId": "maid_interact",
+  "chance": 1.0,
+  "cooldown": 100,
+  "priority": 50,
+  "matchMode": "ALL",
+  "conditions": [
+    { "key": "owner_holding_item", "op": ":=:", "val": "minecraft:feather", "params": {} }
+  ],
+  "actions": [
+    { "type": "cancel_event" },
+    { "type": "play_ysm_roulette", "params": { "anim_name": "default" } }
+  ]
+}

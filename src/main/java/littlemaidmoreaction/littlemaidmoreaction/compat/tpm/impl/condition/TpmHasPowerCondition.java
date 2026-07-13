@@ -1,0 +1,16 @@
+package littlemaidmoreaction.littlemaidmoreaction.compat.tpm.impl.condition;
+import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
+import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleCondition;
+import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.*;
+import net.mrqx.slashblade.maidpower.item.SlashBladeMaidBauble;
+import java.util.Map;
+
+/** 力量饰品 — 好感≥3时永久启用 PowerBlade 状态。 */
+@RuleCondition
+public final class TpmHasPowerCondition implements ICondition {
+    @Override public String key() { return "tpm_has_power"; }
+    @Override public String displayName() { return "TPM力量饰品"; }
+    @Override public ConditionCategory category() { return ConditionCategory.MAID; }
+    @Override public ConditionValueType valueType() { return ConditionValueType.BOOL; }
+    @Override public String evaluate(RuleContext c, Map<String,String> r) { return String.valueOf(SlashBladeMaidBauble.Power.checkBauble(c.maid())); }
+}
