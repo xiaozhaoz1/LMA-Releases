@@ -1,5 +1,49 @@
 # Changelog
 
+## [v29] — 2026-07-13 — I/O 架构完善
+
+- **I/O 方法**: 95→346 (MaidStateReader 120, MaidStateWriter 53, CombatOutput 24, WorldOutput 24, MovementOutput 16, VisualOutput 12, ItemOutput 15, 等)
+- **动作委托率**: 43→55/110 (41%→74%)
+- **Execute 类**: +5 (PlaceBlockExecute, AltarExecute, AnimExecute, ContainerExecute, SmeltExecute)
+- **抽象层**: +4 (ItemResolver, BrainHelper, BaseStateMachine, ContainerOutput)
+- **Compat**: +3 Writer (SlashBladeWriter, YsmWriter, TpmWriter) + 12 动作委托
+- **TLM API 编目**: SchedulePos(5), FavorabilityManager(3), ChatBubbleManager(2), Config(2)
+- **API 文档**: `doc/IO-API-REFERENCE.md` — 346 方法完整参考
+- **Bug 修复**: 30 bug (P0×5, P1×10), 错题集 84→95
+- **40 commits** | 32 新文件 | 153 测试绿色
+
+## [v28] — 2026-07-13 — I/O 原语架构迁移
+
+- Phase 4: +30 I/O 方法 (MaidStateReader+17, MaidStateWriter+6 等)
+- Phase 5: 14 动作委托 → ParamExtractor + Output
+- Phase 6: 15 条件委托 → Reader
+- 条件委托率: 83→98/131 (63%→75%), 动作委托率: 28→43/105 (27%→41%)
+- GUI 修复 + 唱片机四连修复 + P1 爆炸源 + NBT 异常
+
+## [v27] — 2026-07-13 — 消反射
+
+- BuiltinRegistrar: FQCN 字符串 + Class.forName → 直接 new XxxAction()
+- 零反射, 编译器验证, 覆盖 231 内置扩展
+
+## [v26] — 2026-07-13 — ParamExtractor
+
+- ParamExtractor 新建: rawParams ↔ typed values 桥接
+- CombatOutput +6 新方法 (damageByRatio/magicDamage/genericDamage/healByRatio/knockbackWithVertical/shieldEffect)
+
+## [v25] — 2026-07-13 — 条件委托
+
+- 83/120 条件 → I/O Reader (MaidStateReader 56/77, TargetStateReader 17/22, WorldStateReader 10/21)
+
+## [v16] — 2026-07-10 — 任务系统重置
+
+- 17 工具→6 工具 | 双轨→单轨 | 5 Pipeline + 8 Service
+- AI 唯一入口: `lma_start_task(task_type, target, target_count)`
+
+## [v12.7] — 2026-07-08 — Brain Memory
+
+- Brain Memory 替代 PersistentData 导航
+- Brain Memory: 类型安全, Activity 切换自动清除, 不跨会话持久化
+
 ## [v10.0] — 2026-07-04 — 8 阶段重构完成 ✅
 
 ### v10 重构总结
