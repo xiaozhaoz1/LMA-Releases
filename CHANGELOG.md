@@ -1,7 +1,8 @@
 # Changelog
 
-## [v29] — 2026-07-13 — I/O 架构完善
+## [v29] — 2026-07-14 — Execute 层优化 + TaskHandler 注册机制
 
+### 2026-07-13 — I/O 架构完善
 - **I/O 方法**: 95→346 (MaidStateReader 120, MaidStateWriter 53, CombatOutput 24, WorldOutput 24, MovementOutput 16, VisualOutput 12, ItemOutput 15, 等)
 - **动作委托率**: 43→55/110 (41%→74%)
 - **Execute 类**: +5 (PlaceBlockExecute, AltarExecute, AnimExecute, ContainerExecute, SmeltExecute)
@@ -11,6 +12,15 @@
 - **API 文档**: `doc/IO-API-REFERENCE.md` — 346 方法完整参考
 - **Bug 修复**: 30 bug (P0×5, P1×10), 错题集 84→95
 - **40 commits** | 32 新文件 | 153 测试绿色
+
+### 2026-07-14 — Execute 层优化 + TaskHandler Registry
+- **新增**: ItemMover (tryExtract/tryInsert/transfer 原语), VanillaConstants (集中常量)
+- **新增**: TaskResult (SUCCESS/CONTINUE/FAILED), TaskHandlerRegistry (5 任务注册)
+- **P0 修复**: PlaceBlockExecute check place() return, JukeboxOutput spawn overflow, CraftExecute pre-verify
+- **重构**: JukeboxExecute String→enum 状态机 + Math.abs 防时间回退
+- **重构**: FurnaceExecute 伪状态机→enum + void→boolean
+- **重构**: LmaFlowCoordinationBehavior 3 switch → TaskHandlerRegistry (-40行)
+- **统一**: BellExecute/FurnaceExecute void→boolean, VanillaTasks 同步
 
 ## [v28] — 2026-07-13 — I/O 原语架构迁移
 
