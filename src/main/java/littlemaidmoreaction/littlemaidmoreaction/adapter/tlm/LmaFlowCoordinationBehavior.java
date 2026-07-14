@@ -4,28 +4,24 @@ import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidCheckRa
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.google.common.collect.ImmutableMap;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.VanillaTasks;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.TaskHandlerRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.TaskResult;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.search.BlockSearch;
 import littlemaidmoreaction.littlemaidmoreaction.core.memory.LmaTaskMemory;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
-import net.minecraft.world.level.block.BellBlock;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraftforge.registries.ForgeRegistries;
 
-import java.util.*;
-
-/** v22: 薄化 — 只做状态机编排, 任务执行委托 VanillaTasks */
+/** v29: 状态机编排 — 任务分发委托 TaskHandlerRegistry */
 public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
 
-    private static final int CHECK_INTERVAL = 100;
-    private static final int NAV_TIMEOUT_TICKS = 600;
-    private static final double ARRIVE_DIST_SQR = 9.0;
+    private static final int CHECK_INTERVAL = VanillaConstants.NAV_CHECK_INTERVAL;
+    private static final int NAV_TIMEOUT_TICKS = VanillaConstants.NAV_TIMEOUT_TICKS;
+    private static final double ARRIVE_DIST_SQR = VanillaConstants.ARRIVE_DIST_SQR;
 
     public LmaFlowCoordinationBehavior() {
         super(ImmutableMap.of());
@@ -36,13 +32,11 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
     protected boolean checkExtraStartConditions(ServerLevel world, EntityMaid maid) {
         if (!super.checkExtraStartConditions(world, maid)) return false;
 
-        // 1. 先检查 PersistentData (AI StartTaskTool 路径)
         String task = LmaFlowTask.getCurrentFlowTaskType(maid);
         if (!task.isEmpty() && !"none".equals(task)) {
             return "in_progress".equals(maid.getPersistentData().getString("lma_flow_state"));
         }
 
-        // 2. Fallback: GUI 手动分配路径 — 从 Brain 当前任务提取类型并初始化 PersistentData
         var maidTask = maid.getTask();
         if (!LmaFlowTask.isLmaTask(maidTask)) return false;
         String taskType = LmaTaskTypeRegistry.extractTaskType(maidTask.getUid().getPath());
@@ -52,7 +46,7 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         data.putString("lma_flow_task", taskType);
         data.putString("lma_flow_state", "in_progress");
         data.putLong("lma_flow_tick", world.getGameTime());
-        LittleMaidMoreAction.LOGGER.debug("[V28] GUI-init task '{}' — initialized PersistentData", taskType);
+        LittleMaidMoreAction.LOGGER.debug("[V29] GUI-init task '{}' — initialized PersistentData", taskType);
         return true;
     }
 
@@ -62,15 +56,18 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         String taskType = data.getString("lma_flow_task");
         if (taskType.isEmpty()) return;
 
+        var handler = TaskHandlerRegistry.get(taskType);
+        if (handler == null) { failTask(maid, "未知任务类型: " + taskType); return; }
+
         BlockPos navTarget = LmaTaskMemory.getNavTarget(maid);
         if (navTarget != null) {
             if (gameTime - LmaTaskMemory.getNavStartTick(maid) > NAV_TIMEOUT_TICKS) {
                 LmaTaskMemory.clearAllNav(maid);
-            } else if (isBlockValid(world, navTarget, taskType)) {
+            } else if (isBlockValid(world, navTarget, handler)) {
                 if (navTarget.distSqr(maid.blockPosition()) < ARRIVE_DIST_SQR) {
                     LmaTaskMemory.clearAllNav(maid);
                     maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
-                    executeInteract(world, maid, navTarget, taskType);
+                    doExecute(world, maid, navTarget, handler);
                     return;
                 }
                 BehaviorUtils.setWalkAndLookTargetMemories(maid, navTarget, 1.0F, 2);
@@ -80,13 +77,13 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
             }
         }
 
-        BlockPos nearest = searchTargetBlock(world, maid, taskType);
+        BlockPos nearest = searchBlock(world, maid, handler);
         if (nearest == null) {
             failTask(maid, "找不到" + taskType + "方块");
             return;
         }
         if (nearest.distSqr(maid.blockPosition()) < ARRIVE_DIST_SQR) {
-            executeInteract(world, maid, nearest, taskType);
+            doExecute(world, maid, nearest, handler);
             return;
         }
         LmaTaskMemory.setNavTarget(maid, nearest);
@@ -100,9 +97,12 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         if (navTarget == null) return;
         if (navTarget.distSqr(maid.blockPosition()) < ARRIVE_DIST_SQR) {
             if ("in_progress".equals(maid.getPersistentData().getString("lma_flow_state"))) {
+                String taskType = maid.getPersistentData().getString("lma_flow_task");
+                var handler = TaskHandlerRegistry.get(taskType);
+                if (handler == null) return;
                 LmaTaskMemory.clearAllNav(maid);
                 maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
-                executeInteract(world, maid, navTarget, maid.getPersistentData().getString("lma_flow_task"));
+                doExecute(world, maid, navTarget, handler);
             }
         }
     }
@@ -112,56 +112,46 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         maid.getBrain().eraseMemory(MemoryModuleType.LOOK_TARGET);
     }
 
-    private void executeInteract(ServerLevel world, EntityMaid maid, BlockPos pos, String taskType) {
-        CompoundTag data = maid.getPersistentData();
-        String target = data.getString("lma_task_target");
-        String input = data.getString("lma_task_input");
+    // -- private helpers --
 
-        switch (taskType) {
-            case "craft_chain" -> { if (VanillaTasks.craft(world, maid, pos, target)) completeTask(maid); else failTask(maid, "无法合成"); }
-            case "furnace"     -> { VanillaTasks.furnace(world, maid, pos, input); completeTask(maid); }
-            case "jukebox"     -> { VanillaTasks.jukebox(world, maid, pos, target); }
-            case "bell_ring"   -> { VanillaTasks.bell(world, maid, pos); completeTask(maid); }
-            case "altar_craft" -> doAltarCraft(world, maid, pos, target);
+    private void doExecute(ServerLevel world, EntityMaid maid, BlockPos pos,
+                           TaskHandlerRegistry.TaskHandler handler) {
+        TaskResult result = handler.executor().execute(world, maid, pos, maid.getPersistentData());
+        switch (result) {
+            case SUCCESS -> completeTask(maid);
+            case FAILED -> failTask(maid, handler.taskType() + " 执行失败");
+            case CONTINUE -> { /* 任务继续, 不调 complete/fail */ }
         }
     }
 
-    private void doAltarCraft(ServerLevel world, EntityMaid maid, BlockPos pos, String target) {
-        var action = new littlemaidmoreaction.littlemaidmoreaction.impl.action.world.PlaceAltarItemAction();
-        Map<String, String> params = new HashMap<>();
-        params.put("item_id", target.isEmpty() ? "minecraft:coal" : target);
-        params.put("range", String.valueOf((int) maid.getRestrictRadius()));
-        action.execute(new littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext(maid), params);
-        completeTask(maid);
-    }
-
-    private static BlockPos searchTargetBlock(ServerLevel world, EntityMaid maid, String taskType) {
-        String blockId = switch (taskType) {
-            case "craft_chain" -> "minecraft:crafting_table";
-            case "furnace" -> "minecraft:furnace";
-            case "jukebox" -> "minecraft:jukebox";
-            case "bell_ring" -> "minecraft:bell";
-            case "altar_craft" -> "touhou_little_maid:altar";
-            default -> null;
-        };
-        if (blockId == null) return null;
-        var block = ForgeRegistries.BLOCKS.getValue(ResourceLocation.tryParse(blockId));
-        if (block == null) return null;
-        var matches = BlockSearch.findBlocks(world, maid.blockPosition(), (int) maid.getRestrictRadius(), 4, (p, s) -> s.is(block));
+    private static BlockPos searchBlock(ServerLevel world, EntityMaid maid,
+                                         TaskHandlerRegistry.TaskHandler handler) {
+        var block = handler.targetBlock();
+        if (block == null) {
+            // altar: 搜索 TileEntityAltar
+            var matches = BlockSearch.findBlocks(world, maid.blockPosition(),
+                (int) maid.getRestrictRadius(), VanillaConstants.SEARCH_VERTICAL,
+                (p, s) -> world.getBlockEntity(p) instanceof
+                    com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar);
+            return matches.isEmpty() ? null : matches.get(0).pos();
+        }
+        var matches = BlockSearch.findBlocks(world, maid.blockPosition(),
+            (int) maid.getRestrictRadius(), VanillaConstants.SEARCH_VERTICAL,
+            (p, s) -> s.is(block));
         return matches.isEmpty() ? null : matches.get(0).pos();
     }
 
-    private static boolean isBlockValid(ServerLevel world, BlockPos pos, String taskType) {
+    private static boolean isBlockValid(ServerLevel world, BlockPos pos,
+                                         TaskHandlerRegistry.TaskHandler handler) {
         BlockState state = world.getBlockState(pos);
         if (state.isAir()) return false;
-        return switch (taskType) {
-            case "craft_chain" -> state.is(Blocks.CRAFTING_TABLE);
-            case "furnace" -> state.is(Blocks.FURNACE) || state.is(Blocks.BLAST_FURNACE) || state.is(Blocks.SMOKER);
-            case "jukebox" -> state.is(Blocks.JUKEBOX);
-            case "bell_ring" -> state.getBlock() instanceof BellBlock;
-            case "altar_craft" -> world.getBlockEntity(pos) instanceof com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
-            default -> false;
-        };
+        if (!handler.isValid().test(state)) return false;
+        // altar: 额外检查 BlockEntity
+        if (handler.targetBlock() == null) {
+            return world.getBlockEntity(pos) instanceof
+                com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
+        }
+        return true;
     }
 
     static void completeTask(EntityMaid maid) {
@@ -178,7 +168,7 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         data.putLong("lma_flow_tick", maid.level().getGameTime());
         data.remove("lma_flow_cached");
         data.putString("lma_fail_reason", reason);
-        LittleMaidMoreAction.LOGGER.warn("[V18] task '{}' failed: {}", data.getString("lma_flow_task"), reason);
+        LittleMaidMoreAction.LOGGER.warn("[V29] task '{}' failed: {}", data.getString("lma_flow_task"), reason);
     }
 
     @Deprecated

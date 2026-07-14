@@ -7,24 +7,47 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
-/** v23: 熔炉编排 — 状态机驱动, 委托 FurnaceOutput 执行 */
+/** v29: 熔炉编排 — 枚举状态机, COLLECT→INPUT→FUEL→COLLECT 循环 */
 public final class FurnaceExecute {
     private FurnaceExecute() {}
 
-    public static void execute(ServerLevel world, EntityMaid maid, BlockPos pos, String inputItemId) {
+    enum Phase {
+        COLLECT_RESULT, ADD_INPUT, ADD_FUEL;
+        private static final Phase[] VALUES = values();
+        static Phase fromOrdinal(int ord) {
+            if (ord < 0 || ord >= VALUES.length) return COLLECT_RESULT;
+            return VALUES[ord];
+        }
+    }
+
+    /** @return true if meaningful work was performed */
+    public static boolean execute(ServerLevel world, EntityMaid maid, BlockPos pos, String inputItemId) {
         BlockEntity be = world.getBlockEntity(pos);
-        if (!(be instanceof AbstractFurnaceBlockEntity furnace)) return;
+        if (!(be instanceof AbstractFurnaceBlockEntity furnace)) return false;
 
-        // State 1: 取产物
-        if (FurnaceOutput.collectResult(furnace, maid)) return;
+        var data = maid.getPersistentData();
+        Phase phase = Phase.fromOrdinal(data.getInt("lma_furnace_phase"));
+        boolean meaningful = false;
 
-        // State 2: 加材料
-        FurnaceOutput.addInput(furnace, maid, inputItemId);
+        switch (phase) {
+            case COLLECT_RESULT -> {
+                meaningful = FurnaceOutput.collectResult(furnace, maid);
+                if (!meaningful) data.putInt("lma_furnace_phase", Phase.ADD_INPUT.ordinal());
+                // 有产物则停留在 COLLECT_RESULT 继续收集
+            }
+            case ADD_INPUT -> {
+                if (furnace.getItem(0).isEmpty())
+                    meaningful = FurnaceOutput.addInput(furnace, maid, inputItemId);
+                data.putInt("lma_furnace_phase", Phase.ADD_FUEL.ordinal());
+            }
+            case ADD_FUEL -> {
+                if (furnace.getItem(1).isEmpty())
+                    meaningful = FurnaceOutput.addFuel(furnace, maid, inputItemId);
+                data.putInt("lma_furnace_phase", Phase.COLLECT_RESULT.ordinal());
+            }
+        }
 
-        // State 3: 加燃料(排除原料)
-        FurnaceOutput.addFuel(furnace, maid, inputItemId);
-
-        // State 4: WAIT — 更新 tick 防 TaskEngine 超时
-        maid.getPersistentData().putLong("lma_flow_tick", world.getGameTime());
+        data.putLong("lma_flow_tick", world.getGameTime());
+        return meaningful;
     }
 }

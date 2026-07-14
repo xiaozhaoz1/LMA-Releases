@@ -15,13 +15,13 @@ public final class VanillaTasks {
     public static boolean craft(ServerLevel world, EntityMaid maid, BlockPos pos, String target) {
         return CraftExecute.execute(world, maid, pos, target);
     }
-    public static void furnace(ServerLevel world, EntityMaid maid, BlockPos pos, String inputItemId) {
-        FurnaceExecute.execute(world, maid, pos, inputItemId);
+    public static boolean furnace(ServerLevel world, EntityMaid maid, BlockPos pos, String inputItemId) {
+        return FurnaceExecute.execute(world, maid, pos, inputItemId);
     }
     public static boolean jukebox(ServerLevel world, EntityMaid maid, BlockPos pos, String target) {
         return JukeboxExecute.execute(world, maid, pos, target);
     }
-    public static void bell(ServerLevel world, EntityMaid maid, BlockPos pos) {
-        BellExecute.execute(world, maid, pos);
+    public static boolean bell(ServerLevel world, EntityMaid maid, BlockPos pos) {
+        return BellExecute.execute(world, maid, pos);
     }
 }

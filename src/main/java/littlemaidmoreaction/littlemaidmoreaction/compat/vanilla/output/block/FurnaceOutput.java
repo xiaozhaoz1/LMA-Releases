@@ -16,9 +16,10 @@ public final class FurnaceOutput {
     public static boolean collectResult(AbstractFurnaceBlockEntity furnace, EntityMaid maid) {
         ItemStack result = furnace.getItem(2);
         if (result.isEmpty()) return false;
+        ItemStack copy = result.copy();
         furnace.setItem(2, ItemStack.EMPTY);
         furnace.setChanged();
-        ItemSpawner.spawnForPickup(maid, result);
+        ItemSpawner.spawnForPickup(maid, copy);
         return true;
     }
 

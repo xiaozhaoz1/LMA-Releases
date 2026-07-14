@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.craft;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaInputRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaOutputRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.recipe.RecipeIndex;
@@ -18,7 +19,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 
 import java.util.*;
 
-/** v24: 合成任务编排 — 通过 Registry 聚合 input/output providers */
+/** v29: 合成任务编排 — pre-verify + constants */
 public final class CraftExecute {
     private CraftExecute() {}
 
@@ -29,42 +30,37 @@ public final class CraftExecute {
         Item targetItem = ForgeRegistries.ITEMS.getValue(rl);
         if (targetItem == null) return false;
 
-        // === input: 读材料 (Registry聚合) ===
         Map<Item, Integer> available = VanillaInputRegistry.readAllItems(maid);
         available.remove(targetItem);
 
         IItemHandler maidInv = maid.getAvailableInv(true);
         var idx = RecipeIndex.get(world);
 
-        // === 计算材料上限 ===
-        var probe = RecipeTreeResolver.resolve(
-            targetItem, 1, available, idx, 10, world.registryAccess());
-        if (probe == null || probe.cost().isEmpty()) return false;
-
-        int materialBatches = Integer.MAX_VALUE;
-        for (var e : probe.cost().entrySet()) {
-            if (e.getValue() <= 0) continue;
-            materialBatches = Math.min(materialBatches, available.getOrDefault(e.getKey(), 0) / e.getValue());
-        }
-        if (materialBatches <= 0) return false;
-
-        // ★ v24: 空间上限 (Registry聚合)
-        ItemStack sampleOutput = probe.steps().get(probe.steps().size() - 1).recipe()
-            .getResultItem(world.registryAccess());
-        int outputPerBatch = sampleOutput.getCount();
-        if (outputPerBatch <= 0) return false;
-        int totalSpace = VanillaInputRegistry.totalSpace(maid, sampleOutput);
-        int spaceBatches = totalSpace / outputPerBatch;
-        if (spaceBatches <= 0) return false;
-        int finalBatches = Math.min(materialBatches, spaceBatches);
-        if (finalBatches <= 0) return false;
-
-        // === 用最终批数解析配方 ===
         var chain = RecipeTreeResolver.resolve(
-            targetItem, finalBatches, available, idx, 10, world.registryAccess());
+            targetItem, VanillaConstants.CRAFT_BATCH_SIZE, available, idx,
+            VanillaConstants.RECIPE_MAX_DEPTH, world.registryAccess());
         if (chain == null || chain.steps().isEmpty()) return false;
 
-        // === output: 提取材料 + 生成产物 (Registry聚合) ===
+        ItemStack sampleOutput = chain.steps().get(chain.steps().size() - 1).recipe()
+            .getResultItem(world.registryAccess());
+        if (VanillaInputRegistry.totalSpace(maid, sampleOutput) <= 0) return false;
+
+        // Phase 1: 预验证
+        for (var step : chain.steps()) {
+            for (Ingredient ing : step.recipe().getIngredients()) {
+                if (ing.isEmpty()) continue;
+                ItemStack[] matches = ing.getItems();
+                if (matches.length == 0) continue;
+                int need = step.craftCount() * matches[0].getCount();
+                for (int i = 0; i < maidInv.getSlots() && need > 0; i++) {
+                    if (maidInv.getStackInSlot(i).is(matches[0].getItem()))
+                        need -= maidInv.getStackInSlot(i).getCount();
+                }
+                if (need > 0) return false;
+            }
+        }
+
+        // Phase 2: 执行
         for (var step : chain.steps()) {
             for (Ingredient ing : step.recipe().getIngredients()) {
                 if (ing.isEmpty()) continue;
@@ -82,7 +78,7 @@ public final class CraftExecute {
             }
             VanillaOutputRegistry.deliver(maid, new ItemStack(
                 step.recipe().getResultItem(world.registryAccess()).getItem(),
-                step.recipe().getResultItem(world.registryAccess()).getCount() * finalBatches));
+                step.recipe().getResultItem(world.registryAccess()).getCount()));
         }
         world.playSound(null, pos, SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT,
             net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 1.0F);

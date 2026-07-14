@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.block;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.item.ItemSpawner;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -21,7 +22,7 @@ public final class JukeboxOutput {
         return true;
     }
 
-    /** 从唱片机弹出唱片回女仆背包 */
+    /** 从唱片机弹出唱片回女仆背包。背包满时溢出掉地上。 */
     public static boolean ejectDisc(JukeboxBlockEntity jukebox, EntityMaid maid) {
         ItemStack record = jukebox.getFirstItem();
         if (record.isEmpty()) return false;
@@ -29,6 +30,7 @@ public final class JukeboxOutput {
         if (remainder.getCount() < record.getCount()) {
             jukebox.removeItem(0, 1);
             jukebox.setChanged();
+            if (!remainder.isEmpty()) ItemSpawner.spawnForPickup(maid, remainder);
             return true;
         }
         return false;

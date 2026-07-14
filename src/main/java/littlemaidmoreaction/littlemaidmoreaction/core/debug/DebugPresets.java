@@ -67,17 +67,18 @@ public final class DebugPresets {
 
         List<RuleDef> rules = new ArrayList<>();
 
-        // Rule 800: 条件全量测试
-        rules.add(RuleDef.full(800, "DEBUG-全部条件",
-            "maid_tick", 1.0, COOLDOWN, PRIORITY, MatchMode.ALL,
+        // Rule 800: 条件全量测试 (默认禁用 — 需手动开启)
+        rules.add(new RuleDef(800, "DEBUG-全部条件", false, "maid_tick", 1.0, COOLDOWN, PRIORITY,
+            MatchMode.ALL,
             List.of(new ConditionDef("debug_conditions")),
             List.of(ActionStep.of("send_message",
                 "message", "[LMA DEBUG] conditions checked — see log",
-                "type", "chat"))));
+                "type", "chat")),
+            List.of()));
 
-        // Rule 801: 动作全量测试 (仅已驯服女仆)
-        rules.add(RuleDef.full(801, "DEBUG-全部动作",
-            "maid_tick", 1.0, COOLDOWN, PRIORITY, MatchMode.ALL,
+        // Rule 801: 动作全量测试 (默认禁用 — 需手动开启)
+        rules.add(new RuleDef(801, "DEBUG-全部动作", false, "maid_tick", 1.0, COOLDOWN, PRIORITY,
+            MatchMode.ALL,
             List.of(new ConditionDef("is_tamed", ":=:", "true")),
             List.of(
                 ActionStep.of("send_message",
@@ -87,7 +88,8 @@ public final class DebugPresets {
                 ActionStep.of("send_message",
                     "message", "[LMA DEBUG] actions test END — see log",
                     "type", "chat")
-            )));
+            ),
+            List.of()));
 
         int written = 0;
         for (RuleDef r : rules) {

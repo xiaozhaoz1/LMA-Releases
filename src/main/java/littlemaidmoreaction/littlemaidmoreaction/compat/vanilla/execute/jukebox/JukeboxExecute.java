@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.jukebox
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.block.JukeboxOutput;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -15,14 +16,23 @@ import net.minecraftforge.items.IItemHandler;
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
-/** v23: 唱片机编排 — 4态状态机, INSERTING→PLAYING(5min)→EJECTING→PICKUP_WAIT(1s)→INSERTING */
+/** v29: 唱片机编排 — enum状态机, INSERTING→PLAYING→EJECTING→PICKUP_WAIT→INSERTING */
 public final class JukeboxExecute {
-    private static final int PLAY_TICKS = 6000;
-    private static final int PICKUP_TICKS = 20;
+    private static final int PLAY_TICKS = VanillaConstants.JUKEBOX_PLAY_TICKS;
+    private static final int PICKUP_TICKS = VanillaConstants.JUKEBOX_PICKUP_TICKS;
+
+    enum Phase {
+        INSERTING, PLAYING, EJECTING, PICKUP_WAIT;
+        private static final Phase[] VALUES = values();
+        static Phase fromOrdinal(int ord) {
+            if (ord < 0 || ord >= VALUES.length) return INSERTING;
+            return VALUES[ord];
+        }
+    }
 
     private JukeboxExecute() {}
 
-    /** @return true if meaningful action was performed, false if no-op */
+    /** @return true if meaningful action was performed */
     public static boolean execute(ServerLevel world, EntityMaid maid, BlockPos pos, String target) {
         BlockEntity be = world.getBlockEntity(pos);
         if (!(be instanceof JukeboxBlockEntity jukebox)) {
@@ -31,26 +41,25 @@ public final class JukeboxExecute {
         }
 
         CompoundTag data = maid.getPersistentData();
-        String phase = data.getString("lma_jukebox_phase");
+        Phase phase = Phase.fromOrdinal(data.getInt("lma_jukebox_phase"));
         long phaseTick = data.getLong("lma_jukebox_tick");
         long now = world.getGameTime();
 
-        if (phase.isEmpty()) {
-            phase = "INSERTING";
-            data.putString("lma_jukebox_phase", phase);
+        if (!data.contains("lma_jukebox_phase")) {
+            data.putInt("lma_jukebox_phase", Phase.INSERTING.ordinal());
             data.putLong("lma_jukebox_tick", now);
+            phase = Phase.INSERTING;
             phaseTick = now;
             LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} init: phase=INSERTING", maid.getId());
         }
-        data.putLong("lma_flow_tick", now);  // 防 TaskEngine 超时
+        data.putLong("lma_flow_tick", now);
 
         switch (phase) {
-            case "INSERTING" -> {
-                // 唱片机已有碟 → 跳到 PLAYING (可能是手动放入)
+            case INSERTING -> {
                 if (!jukebox.getFirstItem().isEmpty()) {
-                    data.putString("lma_jukebox_phase", "PLAYING");
+                    data.putInt("lma_jukebox_phase", Phase.PLAYING.ordinal());
                     data.putLong("lma_jukebox_tick", now);
-                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING: jukebox already has disc, skip to PLAYING", maid.getId());
+                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING: has disc, skip to PLAYING", maid.getId());
                     return false;
                 }
                 IItemHandler inv = maid.getAvailableInv(true);
@@ -60,7 +69,7 @@ public final class JukeboxExecute {
                     if (s.is(ItemTags.MUSIC_DISCS)) discs.add(s);
                 }
                 if (discs.isEmpty()) {
-                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING: no music discs in inventory", maid.getId());
+                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING: no discs in inventory", maid.getId());
                     return false;
                 }
 
@@ -76,7 +85,7 @@ public final class JukeboxExecute {
                         }
                     }
                     if (chosen == null) {
-                        LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING: disc '{}' not found in inventory", maid.getId(), target);
+                        LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} disc '{}' not found", maid.getId(), target);
                         return false;
                     }
                 } else {
@@ -86,7 +95,6 @@ public final class JukeboxExecute {
                 LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING: chose {}/{} from {} discs",
                     maid.getId(), discKey, chosen.getDisplayName().getString(), discs.size());
 
-                // 从女仆背包提取并插入唱片机
                 IItemHandler maidInv = maid.getAvailableInv(true);
                 boolean inserted = false;
                 for (int i = 0; i < maidInv.getSlots(); i++) {
@@ -100,7 +108,7 @@ public final class JukeboxExecute {
                     }
                 }
                 if (inserted) {
-                    data.putString("lma_jukebox_phase", "PLAYING");
+                    data.putInt("lma_jukebox_phase", Phase.PLAYING.ordinal());
                     data.putLong("lma_jukebox_tick", now);
                     maid.getChatBubbleManager().addTextChatBubble(
                         "正在播放: " + chosen.getHoverName().getString());
@@ -109,40 +117,41 @@ public final class JukeboxExecute {
                 }
                 return inserted;
             }
-            case "PLAYING" -> {
-                // ★ Bug A: 检测唱片被手动取出 或 走到了空唱片机
+            case PLAYING -> {
                 if (jukebox.getFirstItem().isEmpty()) {
-                    data.putString("lma_jukebox_phase", "INSERTING");
+                    data.putInt("lma_jukebox_phase", Phase.INSERTING.ordinal());
                     data.putLong("lma_jukebox_tick", now);
-                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} PLAYING: jukebox empty, back to INSERTING", maid.getId());
+                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} PLAYING: empty, back to INSERTING", maid.getId());
                     return false;
                 }
-                if (now - phaseTick >= PLAY_TICKS) {
-                    data.putString("lma_jukebox_phase", "EJECTING");
+                long elapsed = Math.abs(now - phaseTick);
+                if (elapsed >= PLAY_TICKS) {
+                    data.putInt("lma_jukebox_phase", Phase.EJECTING.ordinal());
                     data.putLong("lma_jukebox_tick", now);
-                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} PLAYING→EJECTING (finished {} ticks)",
-                        maid.getId(), now - phaseTick);
+                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} PLAYING→EJECTING (elapsed {} ticks)",
+                        maid.getId(), elapsed);
                 }
                 return false;
             }
-            case "EJECTING" -> {
+            case EJECTING -> {
                 boolean ejected = JukeboxOutput.ejectDisc(jukebox, maid);
                 if (ejected) {
-                    data.putString("lma_jukebox_phase", "PICKUP_WAIT");
+                    data.putInt("lma_jukebox_phase", Phase.PICKUP_WAIT.ordinal());
                     data.putLong("lma_jukebox_tick", now);
                     LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} EJECTING: disc ejected", maid.getId());
                 } else {
-                    data.putString("lma_jukebox_phase", "INSERTING");
+                    data.putInt("lma_jukebox_phase", Phase.INSERTING.ordinal());
                     data.putLong("lma_jukebox_tick", now);
-                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} EJECTING: jukebox empty, back to INSERTING", maid.getId());
+                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} EJECTING: empty, back to INSERTING", maid.getId());
                 }
                 return ejected;
             }
-            case "PICKUP_WAIT" -> {
-                if (now - phaseTick >= PICKUP_TICKS) {
-                    data.putString("lma_jukebox_phase", "INSERTING");
+            case PICKUP_WAIT -> {
+                long elapsed = Math.abs(now - phaseTick);
+                if (elapsed >= PICKUP_TICKS) {
+                    data.putInt("lma_jukebox_phase", Phase.INSERTING.ordinal());
                     data.putLong("lma_jukebox_tick", now);
-                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} PICKUP_WAIT→INSERTING (disc collected)", maid.getId());
+                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} PICKUP_WAIT→INSERTING", maid.getId());
                 }
                 return false;
             }

@@ -30,9 +30,12 @@ public final class PlaceBlockExecute {
                     pos = alt;
                 }
                 var ctx = new DirectionalPlaceContext(world, pos.below(), Direction.UP, stack, Direction.UP);
-                blockItem.place(ctx);
-                stack.shrink(1);
-                return true;
+                var result = blockItem.place(ctx);
+                if (result.consumesAction()) {
+                    stack.shrink(1);
+                    return true;
+                }
+                return false;
             }
         }
         return false;
