@@ -22,6 +22,15 @@
 - **重构**: LmaFlowCoordinationBehavior 3 switch → TaskHandlerRegistry (-40行)
 - **统一**: BellExecute/FurnaceExecute void→boolean, VanillaTasks 同步
 
+### 2026-07-14 — v29.1 InventoryHelper + FurnaceSlotMapping + BlockEntity search
+- **新增**: InventoryHelper (findSlot/count, EntityMaid + IItemHandler 双重重载)
+- **新增**: FurnaceSlotMapping record (input/fuel/output, VANILLA=0/1/2)
+- **BlockSearch**: +findBlocksInRange() 便捷重载, 消除 5 处 manual cast
+- **熔炉检测**: BlockState→instanceof AbstractFurnaceBlockEntity → 自动兼容模组熔炉
+- **AltarExecute/PlaceBlockExecute/CraftExecute**: for-loop→InventoryHelper (-20行)
+- **FurnaceExecute**: +setPhase() helper, FurnaceSlotMapping 参数
+- **FurnaceOutput/SmeltExecute/VanillaTasks**: +FurnaceSlotMapping 参数
+
 ## [v28] — 2026-07-13 — I/O 原语架构迁移
 
 - Phase 4: +30 I/O 方法 (MaidStateReader+17, MaidStateWriter+6 等)
