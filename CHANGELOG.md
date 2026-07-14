@@ -1,5 +1,48 @@
 # Changelog
 
+## [v34] — 2026-07-14 — I/O 全覆盖 + 女仆编辑器 GUI
+
+### I/O 层扩展
+- **MaidStateReader**: 120→148 方法 (+28: ConfigManager 6, AI标志 3, Owner 4, 自定义属性 7, NBT读 4, 统计 2, 导航 1, TaskData 1)
+- **MaidStateWriter**: 50→59 方法 (+9: ConfigManager 写 8, TaskData 1)
+
+### 女仆编辑器 GUI
+- **MaidListScreen**: 女仆列表(左) + 3D预览区(右) + [编辑]按钮
+- **MaidEditorScreen**: 5列×4行网格, [◀][▶]+下拉切换 8 组 80 字段
+  组: Basic(20), Combat(12), AI(16), Display(12), Resist(8), Schedule(10), Custom(12), Owner(10)
+- 入口: LMAConfigScreen → [女仆编辑器]
+
+## [v33] — 2026-07-14 — compat/vanilla/ 整理
+
+- **删除死代码**: input/brew/ (4), BrewingStandInteractAction, BaseStateMachine, AbstractEntityInteraction
+- **execute/ 扁平化**: 9 单文件子目录 → 9 文件平放
+- compat/vanilla: 78→68 文件 (-10)
+
+## [v32] — 2026-07-14 — adapter/ → compat/vanilla/adapter/
+
+- 移动: adapter/tlm/ (11) → compat/vanilla/adapter/, adapter/gui/ → screen/
+- 删除: MaidAPI (8 方法重复 → I/O层)
+- 去重: AbstractFunctionalBlockInteraction → VanillaConstants, LmaTaskTypeRegistry → TaskHandlerRegistry
+
+### v32.1 — 清理残留
+- 删除: FurnaceSlotMapping (0 callers)
+- SlotLayout.slot() → OptionalInt
+- ItemMover.transfer() +回滚日志
+
+## [v31] — 2026-07-14 — 统一任务入口
+
+- 删除: SmeltExecute (FurnaceExecute 唯一熔炉入口)
+- 6 @RuleAction: 内联逻辑 → 写 PersistentData 委托任务系统
+  SmeltItemAction, FurnaceInteractAction, CraftingTableInteractAction,
+  JukeboxInteractAction, BellRingAction, PlaceAltarItemAction
+- ~320 行删除, 向后兼容 (action id/params 不变)
+
+## [v30] — 2026-07-14 — SlotLayout + ItemsUtil
+
+- 新增: SlotLayout (Builder模式), 删除: InventoryHelper → ItemsUtil
+- FurnaceInteractAction: 硬编码 SLOT_* → SlotLayout.FURNACE
+- FurnaceOutput/Execute/SmeltExecute: ItemsUtil.findStackSlot 替代 for-loop
+
 ## [v29] — 2026-07-14 — Execute 层优化 + TaskHandler 注册机制
 
 ### 2026-07-13 — I/O 架构完善
