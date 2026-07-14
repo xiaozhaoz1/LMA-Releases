@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.furnace;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.SlotLayout;
@@ -37,12 +37,12 @@ public final class FurnaceExecute {
                 if (!meaningful) setPhase(data, Phase.ADD_INPUT);
             }
             case ADD_INPUT -> {
-                if (furnace.getItem(slots.slot("input")).isEmpty())
+                if (furnace.getItem(slots.slot("input").orElse(0)).isEmpty())
                     meaningful = FurnaceOutput.addInput(furnace, maid, inputItemId, slots);
                 setPhase(data, Phase.ADD_FUEL);
             }
             case ADD_FUEL -> {
-                if (furnace.getItem(slots.slot("fuel")).isEmpty())
+                if (furnace.getItem(slots.slot("fuel").orElse(1)).isEmpty())
                     meaningful = FurnaceOutput.addFuel(furnace, maid, inputItemId, slots);
                 setPhase(data, Phase.COLLECT_RESULT);
             }

@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.bell;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.core.BlockPos;

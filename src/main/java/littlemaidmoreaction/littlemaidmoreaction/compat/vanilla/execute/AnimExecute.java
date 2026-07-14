@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.anim;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.movement.BrainHelper;

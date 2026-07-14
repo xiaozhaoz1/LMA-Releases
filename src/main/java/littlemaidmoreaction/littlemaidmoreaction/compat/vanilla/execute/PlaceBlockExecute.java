@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.block;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.util.ItemsUtil;

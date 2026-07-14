@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.maid;
 
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.crop.AutoCropHandler;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.AutoCropHandler;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;

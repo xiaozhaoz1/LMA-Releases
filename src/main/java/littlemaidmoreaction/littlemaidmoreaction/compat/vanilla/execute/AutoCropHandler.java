@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.crop;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute;
 
 import com.github.tartaricacid.touhoulittlemaid.api.task.ISpecialCropHandler;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;

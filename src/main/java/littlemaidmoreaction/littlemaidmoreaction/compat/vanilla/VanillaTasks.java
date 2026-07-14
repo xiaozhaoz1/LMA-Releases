@@ -2,10 +2,10 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.SlotLayout;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.bell.BellExecute;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.craft.CraftExecute;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.furnace.FurnaceExecute;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.jukebox.JukeboxExecute;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.BellExecute;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.CraftExecute;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.FurnaceExecute;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.JukeboxExecute;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 

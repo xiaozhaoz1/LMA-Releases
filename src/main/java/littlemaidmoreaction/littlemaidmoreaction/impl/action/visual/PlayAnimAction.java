@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.visual;
 
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.anim.AnimExecute;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.AnimExecute;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;

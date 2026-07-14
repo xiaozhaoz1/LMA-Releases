@@ -10,13 +10,13 @@ import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.registries.ForgeRegistries;
 
-/** 熔炉方块输出 — slots 参数支持自定义栏位布局。 */
+/** v32.1: SlotLayout OptionalInt */
 public final class FurnaceOutput {
     private FurnaceOutput() {}
 
     public static boolean collectResult(AbstractFurnaceBlockEntity furnace, EntityMaid maid,
                                          SlotLayout slots) {
-        int outSlot = slots.slot("output");
+        int outSlot = slots.slot("output").orElse(2);
         ItemStack result = furnace.getItem(outSlot);
         if (result.isEmpty()) return false;
         ItemStack copy = result.copy();
@@ -28,7 +28,7 @@ public final class FurnaceOutput {
 
     public static boolean addInput(AbstractFurnaceBlockEntity furnace, EntityMaid maid,
                                     String inputItemId, SlotLayout slots) {
-        int inSlot = slots.slot("input");
+        int inSlot = slots.slot("input").orElse(0);
         ItemStack input = furnace.getItem(inSlot);
         if (!input.isEmpty()) return false;
         if (inputItemId.isEmpty()) return false;
@@ -45,7 +45,7 @@ public final class FurnaceOutput {
 
     public static boolean addFuel(AbstractFurnaceBlockEntity furnace, EntityMaid maid,
                                    String inputItemId, SlotLayout slots) {
-        int fuelSlot = slots.slot("fuel");
+        int fuelSlot = slots.slot("fuel").orElse(1);
         ItemStack fuel = furnace.getItem(fuelSlot);
         if (!fuel.isEmpty()) return false;
         IItemHandler inv = maid.getAvailableInv(true);
