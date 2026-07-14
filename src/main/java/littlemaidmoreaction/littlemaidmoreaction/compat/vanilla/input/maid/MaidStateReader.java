@@ -41,6 +41,9 @@ public final class MaidStateReader {
     public static boolean isBlocking(EntityMaid m) { return m.isBlocking(); }
     public static boolean isBaby(EntityMaid m) { return m.isBaby(); }
     public static boolean isTamed(EntityMaid m) { return m.getOwnerUUID() != null; }
+    public static boolean isOwnedBy(EntityMaid m, net.minecraft.world.entity.player.Player p) {
+        return p != null && p.getUUID().equals(m.getOwnerUUID());
+    }
     public static boolean isInvulnerable(EntityMaid m) { return m.getIsInvulnerable(); }
     public static boolean isInvisible(EntityMaid m) { return m.isInvisible(); }
     public static boolean isGlowing(EntityMaid m) { return m.isCurrentlyGlowing(); }

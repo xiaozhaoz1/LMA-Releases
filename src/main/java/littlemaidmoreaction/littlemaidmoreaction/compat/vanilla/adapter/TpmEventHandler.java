@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.adapter.tlm;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter;
 
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.core.engine.RuleEngine;

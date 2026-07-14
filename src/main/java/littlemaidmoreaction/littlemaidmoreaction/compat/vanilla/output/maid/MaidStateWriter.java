@@ -52,6 +52,7 @@ public final class MaidStateWriter {
     public static void setRideable(EntityMaid m, boolean v) { m.setRideable(v); }
     public static void setCanClimb(EntityMaid m, boolean v) { m.setCanClimb(v); }
     public static void setSwinging(EntityMaid m, boolean v) { m.setSwingingArms(v); }
+    public static void setPickup(EntityMaid m, boolean v) { m.setPickup(v); }
     public static void swapHands(EntityMaid m) {
         var main = m.getMainHandItem(); var off = m.getOffhandItem();
         m.setItemSlot(EquipmentSlot.MAINHAND, off);
@@ -126,7 +127,6 @@ public final class MaidStateWriter {
         };
         m.setSchedule(s);
     }
-    public static void setPickup(EntityMaid m, boolean enabled) { m.setPickup(enabled); }
     public static void setPickup(EntityMaid m, boolean enabled, String type) {
         m.setPickup(enabled);
         if (enabled) {

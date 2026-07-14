@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.adapter.gui;
+package littlemaidmoreaction.littlemaidmoreaction.screen;
 
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam.TypedParamVisitor;

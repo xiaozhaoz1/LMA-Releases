@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.interact;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.search.BlockSearch;
 import littlemaidmoreaction.littlemaidmoreaction.core.memory.LmaTaskMemory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
@@ -68,9 +69,9 @@ public abstract class AbstractFunctionalBlockInteraction extends AbstractBlockIn
     // ★ v12.7 P0: 导航数据已迁移到 Brain Memory (LmaTaskMemory)
 
     /** 到达判定距离平方 (3格 = 9) */
-    private static final double ARRIVE_DIST_SQR = 9.0;
+    private static final double ARRIVE_DIST_SQR = VanillaConstants.ARRIVE_DIST_SQR;
     /** 导航超时 tick (30秒) */
-    private static final int NAV_TIMEOUT = 600;
+    private static final int NAV_TIMEOUT = VanillaConstants.NAV_TIMEOUT_TICKS;
 
     /** 子类定义的有效操作列表，用于 GUI 下拉选择 + 运行时验证 */
     protected abstract List<String> validActions();

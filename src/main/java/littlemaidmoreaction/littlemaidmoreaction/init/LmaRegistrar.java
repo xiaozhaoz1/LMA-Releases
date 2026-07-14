@@ -46,7 +46,7 @@ public final class LmaRegistrar {
         littlemaidmoreaction.littlemaidmoreaction.core.engine.ServerTaskExecutor.init();
         littlemaidmoreaction.littlemaidmoreaction.core.doc.DocGenerator.generateAll(
                 LittleMaidMoreAction.CONFIG_DIR.resolve("introduce"));
-        littlemaidmoreaction.littlemaidmoreaction.adapter.tlm.TlmVersionedEvents.register();
+        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.TlmVersionedEvents.register();
     }
 
     /** 注册音效 DeferredRegister 到 MOD 总线 */

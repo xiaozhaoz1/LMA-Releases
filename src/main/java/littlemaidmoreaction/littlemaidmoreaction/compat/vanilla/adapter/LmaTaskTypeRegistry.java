@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.adapter.tlm;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter;
 
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
@@ -67,16 +67,10 @@ public final class LmaTaskTypeRegistry {
 
     private static final ItemStack DEFAULT_ICON = Items.CRAFTING_TABLE.getDefaultInstance();
 
-    /** ★ v12.6 已知任务类型 — 即使规则尚未创建，TLM 任务栏也可见 */
-    private static final Set<String> KNOWN_TASK_TYPES = Set.of(
-        "altar_craft",     // 祭坛合成
-        "craft_chain",     // 工作台合成 (全部)
-        "furnace",         // 熔炉
-        "brewing",         // 炼药
-        "bell_ring",       // 敲钟
-        "jukebox"          // 唱片机
-        // ★ v13: farm 已移除 — AutoCropHandler 是 ISpecialCropHandler，扩展TLM农耕任务而非独立LMA任务
-    );
+    /** ★ v32: 从 TaskHandlerRegistry 读取已知任务类型 */
+    private static Set<String> getKnownTaskTypes() {
+        return littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.TaskHandlerRegistry.taskTypes();
+    }
 
     /** 已知简单任务类型 (启动时初始化 + 可运行时注册) */
     static {
@@ -98,7 +92,7 @@ public final class LmaTaskTypeRegistry {
         // ★ v14: brewing 已完全删除
         // altar_craft 保留 LmaTypedFlowTask (委派规则引擎)
 
-        for (String known : KNOWN_TASK_TYPES) {
+        for (String known : getKnownTaskTypes()) {
             // ★ v16: jukebox/bell_ring/furnace/craft_chain 改为 LmaTypedFlowTask 注册
             // ★ v14: brewing 不可自动化，保留跳过
             if ("brewing".equals(known)) continue;

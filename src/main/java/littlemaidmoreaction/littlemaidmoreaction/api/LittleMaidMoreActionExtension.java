@@ -19,8 +19,8 @@ import com.github.tartaricacid.touhoulittlemaid.inventory.chest.ChestManager;
 import java.util.List;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.tlm.LmaMagicCastingProvider;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.tlm.LmaTaskTypeRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaMagicCastingProvider;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskTypeRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.crop.AutoCropHandler;
 import littlemaidmoreaction.littlemaidmoreaction.resource.DynamicAnimationResources;
 import littlemaidmoreaction.littlemaidmoreaction.storage.StartupLoader;

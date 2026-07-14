@@ -3,7 +3,7 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.ai.context;
 import com.github.tartaricacid.touhoulittlemaid.ai.agent.context.AbstractMaidContext;
 import com.github.tartaricacid.touhoulittlemaid.ai.agent.context.GameContextRegister;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.tlm.LmaTaskTypeRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskTypeRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;
 import littlemaidmoreaction.littlemaidmoreaction.storage.RuleActionStorage;
 

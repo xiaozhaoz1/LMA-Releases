@@ -1,7 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.interact;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.tlm.LmaTaskTypeRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskTypeRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
 import net.minecraft.core.BlockPos;

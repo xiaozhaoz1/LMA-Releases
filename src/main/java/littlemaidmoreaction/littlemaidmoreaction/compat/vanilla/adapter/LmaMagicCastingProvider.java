@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.adapter.tlm;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter;
 
 import com.github.tartaricacid.touhoulittlemaid.api.animation.IMagicCastingAnimationProvider;
 import com.github.tartaricacid.touhoulittlemaid.api.animation.IMagicCastingState;

@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.adapter.tlm;
+package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidCheckRateTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;

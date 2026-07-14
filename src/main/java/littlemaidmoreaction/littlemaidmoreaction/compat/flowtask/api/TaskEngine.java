@@ -1,8 +1,8 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.flowtask.api;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.tlm.LmaFlowTask;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.tlm.LmaTaskProgressDisplay;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaFlowTask;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskProgressDisplay;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.core.engine.RuleEngine;
 import net.minecraft.core.BlockPos;
