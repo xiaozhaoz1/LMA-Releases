@@ -1,5 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.search;
 
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -11,6 +12,13 @@ public final class BlockSearch {
     private BlockSearch() {}
 
     public record Match(BlockPos pos, BlockState state, double distSqr) {}
+
+    /** 便捷重载: 自动 double→int + 默认垂直范围 */
+    public static List<Match> findBlocksInRange(
+            Level level, BlockPos center, double horizRange,
+            BiPredicate<BlockPos, BlockState> matcher) {
+        return findBlocks(level, center, (int) horizRange, VanillaConstants.SEARCH_VERTICAL, matcher);
+    }
 
     public static List<Match> findBlocks(
             Level level, BlockPos center, int horiz, int vert,

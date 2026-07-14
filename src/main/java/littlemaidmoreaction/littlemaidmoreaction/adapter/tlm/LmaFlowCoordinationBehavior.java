@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.adapter.tlm;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidCheckRateTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
 import com.google.common.collect.ImmutableMap;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.TaskHandlerRegistry;
@@ -14,9 +15,12 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 
-/** v29: 状态机编排 — 任务分发委托 TaskHandlerRegistry */
+import java.util.function.BiPredicate;
+
+/** v29.1: 状态机编排 — 任务分发委托 TaskHandlerRegistry */
 public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
 
     private static final int CHECK_INTERVAL = VanillaConstants.NAV_CHECK_INTERVAL;
@@ -46,7 +50,7 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         data.putString("lma_flow_task", taskType);
         data.putString("lma_flow_state", "in_progress");
         data.putLong("lma_flow_tick", world.getGameTime());
-        LittleMaidMoreAction.LOGGER.debug("[V29] GUI-init task '{}' — initialized PersistentData", taskType);
+        LittleMaidMoreAction.LOGGER.debug("[V29.1] GUI-init task '{}'", taskType);
         return true;
     }
 
@@ -120,24 +124,26 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         switch (result) {
             case SUCCESS -> completeTask(maid);
             case FAILED -> failTask(maid, handler.taskType() + " 执行失败");
-            case CONTINUE -> { /* 任务继续, 不调 complete/fail */ }
+            case CONTINUE -> { /* 任务继续 */ }
         }
     }
 
+    /** 搜索目标方块: targetBlock!=null→BlockState匹配, null→BlockEntity匹配 */
     private static BlockPos searchBlock(ServerLevel world, EntityMaid maid,
                                          TaskHandlerRegistry.TaskHandler handler) {
-        var block = handler.targetBlock();
-        if (block == null) {
-            // altar: 搜索 TileEntityAltar
-            var matches = BlockSearch.findBlocks(world, maid.blockPosition(),
-                (int) maid.getRestrictRadius(), VanillaConstants.SEARCH_VERTICAL,
-                (p, s) -> world.getBlockEntity(p) instanceof
-                    com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar);
-            return matches.isEmpty() ? null : matches.get(0).pos();
+        BiPredicate<BlockPos, BlockState> predicate;
+        if (handler.targetBlock() != null) {
+            predicate = (p, s) -> s.is(handler.targetBlock());
+        } else {
+            predicate = switch (handler.taskType()) {
+                case "furnace" -> (p, s) -> world.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity;
+                case "altar_craft" -> (p, s) -> world.getBlockEntity(p) instanceof TileEntityAltar;
+                default -> null;
+            };
+            if (predicate == null) return null;
         }
-        var matches = BlockSearch.findBlocks(world, maid.blockPosition(),
-            (int) maid.getRestrictRadius(), VanillaConstants.SEARCH_VERTICAL,
-            (p, s) -> s.is(block));
+        var matches = BlockSearch.findBlocksInRange(world, maid.blockPosition(),
+            maid.getRestrictRadius(), predicate);
         return matches.isEmpty() ? null : matches.get(0).pos();
     }
 
@@ -145,13 +151,13 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
                                          TaskHandlerRegistry.TaskHandler handler) {
         BlockState state = world.getBlockState(pos);
         if (state.isAir()) return false;
-        if (!handler.isValid().test(state)) return false;
-        // altar: 额外检查 BlockEntity
-        if (handler.targetBlock() == null) {
-            return world.getBlockEntity(pos) instanceof
-                com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
-        }
-        return true;
+        if (handler.targetBlock() != null) return handler.isValid().test(state);
+        // targetBlock==null → BlockEntity 验证
+        return switch (handler.taskType()) {
+            case "furnace" -> world.getBlockEntity(pos) instanceof AbstractFurnaceBlockEntity;
+            case "altar_craft" -> world.getBlockEntity(pos) instanceof TileEntityAltar;
+            default -> false;
+        };
     }
 
     static void completeTask(EntityMaid maid) {
@@ -168,7 +174,7 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         data.putLong("lma_flow_tick", maid.level().getGameTime());
         data.remove("lma_flow_cached");
         data.putString("lma_fail_reason", reason);
-        LittleMaidMoreAction.LOGGER.warn("[V29] task '{}' failed: {}", data.getString("lma_flow_task"), reason);
+        LittleMaidMoreAction.LOGGER.warn("[V29.1] task '{}' failed: {}", data.getString("lma_flow_task"), reason);
     }
 
     @Deprecated

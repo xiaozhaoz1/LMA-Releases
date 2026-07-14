@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.altar;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.InventoryHelper;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ItemResolver;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.altar.AltarOutput;
 import net.minecraft.core.BlockPos;
@@ -11,7 +12,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 import java.util.*;
 
-/** 祭坛物品放置 — 委托 PlaceAltarItemAction */
+/** v29.1: 祭坛物品放置 */
 public final class AltarExecute {
     private AltarExecute() {}
 
@@ -24,8 +25,9 @@ public final class AltarExecute {
 
         int totalPlaced = 0;
         for (TileEntityAltar ref : structures) {
-            ItemStack stack = findItem(maid, itemId);
-            if (stack.isEmpty()) break;
+            int slot = InventoryHelper.findSlot(maid, s -> s.is(item));
+            if (slot < 0) break;
+            ItemStack stack = maid.getAvailableInv(false).getStackInSlot(slot);
 
             int placed = AltarOutput.placeItems(ref, maid, stack);
             if (placed > 0) {
@@ -50,16 +52,5 @@ public final class AltarExecute {
         }
         result.sort((a, b) -> Double.compare(a.getBlockPos().distSqr(center), b.getBlockPos().distSqr(center)));
         return result;
-    }
-
-    private static ItemStack findItem(EntityMaid maid, String itemId) {
-        var item = ItemResolver.resolve(itemId);
-        if (item == null) return ItemStack.EMPTY;
-        var inv = maid.getAvailableInv(false);
-        for (int i = 0; i < inv.getSlots(); i++) {
-            var stack = inv.getStackInSlot(i);
-            if (stack.is(item)) return stack;
-        }
-        return ItemStack.EMPTY;
     }
 }

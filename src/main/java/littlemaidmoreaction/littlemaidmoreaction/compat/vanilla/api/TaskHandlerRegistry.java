@@ -16,8 +16,8 @@ import java.util.Set;
 import java.util.function.Predicate;
 
 /**
- * 任务处理器注册表 — 替代 LmaFlowCoordinationBehavior 中的 3 个 switch。
- * 新增任务类型只需在此 register() 一行。
+ * 任务处理器注册表 — 新增任务类型只需在此 register() 一行。
+ * targetBlock=null 的任务在 LmaFlowCoordinationBehavior.searchBlock() 中用 BlockEntity 匹配。
  */
 public final class TaskHandlerRegistry {
     private static final Map<String, TaskHandler> HANDLERS = new LinkedHashMap<>();
@@ -28,12 +28,11 @@ public final class TaskHandlerRegistry {
             (w, m, p, d) -> VanillaTasks.craft(w, m, p, d.getString("lma_task_target"))
                 ? TaskResult.SUCCESS : TaskResult.FAILED);
 
-        register("furnace", Blocks.FURNACE,
-            state -> state.is(Blocks.FURNACE)
-                  || state.is(Blocks.BLAST_FURNACE)
-                  || state.is(Blocks.SMOKER),
+        // targetBlock=null → searchBlock 用 instanceof AbstractFurnaceBlockEntity
+        register("furnace", null,
+            state -> true,
             (w, m, p, d) -> {
-                VanillaTasks.furnace(w, m, p, d.getString("lma_task_input"));
+                VanillaTasks.furnace(w, m, p, d.getString("lma_task_input"), FurnaceSlotMapping.VANILLA);
                 return TaskResult.SUCCESS;
             });
 
@@ -51,8 +50,9 @@ public final class TaskHandlerRegistry {
                 return TaskResult.SUCCESS;
             });
 
+        // targetBlock=null → searchBlock 用 instanceof TileEntityAltar
         register("altar_craft", null,
-            state -> false, // altar 验证特殊: 需检查 BlockEntity
+            state -> true,
             (w, m, p, d) -> {
                 var action = new littlemaidmoreaction.littlemaidmoreaction.impl.action.world.PlaceAltarItemAction();
                 var params = new java.util.HashMap<String, String>();
@@ -68,19 +68,12 @@ public final class TaskHandlerRegistry {
         HANDLERS.put(taskType, new TaskHandler(taskType, block, valid, exec));
     }
 
-    public static TaskHandler get(String taskType) {
-        return HANDLERS.get(taskType);
-    }
-
-    public static Set<String> taskTypes() {
-        return HANDLERS.keySet();
-    }
-
-    // -- nested types --
+    public static TaskHandler get(String taskType) { return HANDLERS.get(taskType); }
+    public static Set<String> taskTypes() { return HANDLERS.keySet(); }
 
     public record TaskHandler(
         String taskType,
-        Block targetBlock,
+        Block targetBlock,                // null → BlockEntity 匹配
         Predicate<BlockState> isValid,
         TaskExecutor executor
     ) {}

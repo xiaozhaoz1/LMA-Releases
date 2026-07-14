@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.craft;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.InventoryHelper;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaInputRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaOutputRegistry;
@@ -45,18 +46,15 @@ public final class CraftExecute {
             .getResultItem(world.registryAccess());
         if (VanillaInputRegistry.totalSpace(maid, sampleOutput) <= 0) return false;
 
-        // Phase 1: 预验证
+        // Phase 1: 预验证 — 统计库存
         for (var step : chain.steps()) {
             for (Ingredient ing : step.recipe().getIngredients()) {
                 if (ing.isEmpty()) continue;
                 ItemStack[] matches = ing.getItems();
                 if (matches.length == 0) continue;
                 int need = step.craftCount() * matches[0].getCount();
-                for (int i = 0; i < maidInv.getSlots() && need > 0; i++) {
-                    if (maidInv.getStackInSlot(i).is(matches[0].getItem()))
-                        need -= maidInv.getStackInSlot(i).getCount();
-                }
-                if (need > 0) return false;
+                int have = InventoryHelper.count(maidInv, s -> s.is(matches[0].getItem()));
+                if (have < need) return false;
             }
         }
 

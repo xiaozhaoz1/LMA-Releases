@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.block;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.InventoryHelper;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ItemResolver;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -9,7 +10,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.DirectionalPlaceContext;
 
-/** 方块放置 — 从女仆背包找方块物品放置到指定位置 */
+/** v29.1: 方块放置 */
 public final class PlaceBlockExecute {
     private PlaceBlockExecute() {}
 
@@ -19,24 +20,20 @@ public final class PlaceBlockExecute {
 
         BlockPos pos = maid.blockPosition().offset(ox, oy, oz);
         var inv = maid.getAvailableInv(false);
+        int slot = InventoryHelper.findSlot(inv, s -> s.getItem() == blockItem);
+        if (slot < 0) return false;
 
-        for (int i = 0; i < inv.getSlots(); i++) {
-            var stack = inv.getStackInSlot(i);
-            if (stack.getItem() == blockItem) {
-                // 找可放置位置
-                if (!world.getBlockState(pos).isAir()) {
-                    BlockPos alt = findAirNeighbor(world, pos);
-                    if (alt == null) return false;
-                    pos = alt;
-                }
-                var ctx = new DirectionalPlaceContext(world, pos.below(), Direction.UP, stack, Direction.UP);
-                var result = blockItem.place(ctx);
-                if (result.consumesAction()) {
-                    stack.shrink(1);
-                    return true;
-                }
-                return false;
-            }
+        var stack = inv.getStackInSlot(slot);
+        if (!world.getBlockState(pos).isAir()) {
+            BlockPos alt = findAirNeighbor(world, pos);
+            if (alt == null) return false;
+            pos = alt;
+        }
+        var ctx = new DirectionalPlaceContext(world, pos.below(), Direction.UP, stack, Direction.UP);
+        var result = blockItem.place(ctx);
+        if (result.consumesAction()) {
+            stack.shrink(1);
+            return true;
         }
         return false;
     }
