@@ -32,7 +32,7 @@ public final class TaskHandlerRegistry {
         register("furnace", null,
             state -> true,
             (w, m, p, d) -> {
-                VanillaTasks.furnace(w, m, p, d.getString("lma_task_input"), FurnaceSlotMapping.VANILLA);
+                VanillaTasks.furnace(w, m, p, d.getString("lma_task_input"), SlotLayout.FURNACE);
                 return TaskResult.SUCCESS;
             });
 

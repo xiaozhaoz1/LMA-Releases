@@ -1,9 +1,14 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api;
 
 /**
- * 熔炉栏位映射 — 不同模组熔炉可配置 input/fuel/output 槽位。
- * 原版: slot 0=input, 1=fuel, 2=output.
+ * @deprecated 使用 {@link SlotLayout} 替代。v30 后 FurnaceSlotMapping 委托到 SlotLayout。
  */
+@Deprecated
 public record FurnaceSlotMapping(int input, int fuel, int output) {
     public static final FurnaceSlotMapping VANILLA = new FurnaceSlotMapping(0, 1, 2);
+
+    public SlotLayout toSlotLayout() {
+        return SlotLayout.builder()
+            .role("input", input).role("fuel", fuel).role("output", output).build();
+    }
 }

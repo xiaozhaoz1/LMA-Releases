@@ -1,7 +1,8 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.block;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.FurnaceSlotMapping;
+import com.github.tartaricacid.touhoulittlemaid.util.ItemsUtil;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.SlotLayout;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.item.ItemSpawner;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.ItemStack;
@@ -13,58 +14,48 @@ import net.minecraftforge.registries.ForgeRegistries;
 public final class FurnaceOutput {
     private FurnaceOutput() {}
 
-    /** 取出产物 */
     public static boolean collectResult(AbstractFurnaceBlockEntity furnace, EntityMaid maid,
-                                         FurnaceSlotMapping slots) {
-        ItemStack result = furnace.getItem(slots.output());
+                                         SlotLayout slots) {
+        int outSlot = slots.slot("output");
+        ItemStack result = furnace.getItem(outSlot);
         if (result.isEmpty()) return false;
         ItemStack copy = result.copy();
-        furnace.setItem(slots.output(), ItemStack.EMPTY);
+        furnace.setItem(outSlot, ItemStack.EMPTY);
         furnace.setChanged();
         ItemSpawner.spawnForPickup(maid, copy);
         return true;
     }
 
-    /** 向输入槽添加材料 */
     public static boolean addInput(AbstractFurnaceBlockEntity furnace, EntityMaid maid,
-                                    String inputItemId, FurnaceSlotMapping slots) {
-        ItemStack input = furnace.getItem(slots.input());
+                                    String inputItemId, SlotLayout slots) {
+        int inSlot = slots.slot("input");
+        ItemStack input = furnace.getItem(inSlot);
         if (!input.isEmpty()) return false;
         if (inputItemId.isEmpty()) return false;
         var ti = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(inputItemId));
         if (ti == null) return false;
         IItemHandler inv = maid.getAvailableInv(true);
-        for (int i = 0; i < inv.getSlots(); i++) {
-            ItemStack stack = inv.getStackInSlot(i);
-            if (stack.is(ti)) {
-                int toTake = Math.min(8, stack.getCount());
-                furnace.setItem(slots.input(), inv.extractItem(i, toTake, false).copy());
-                furnace.setChanged();
-                return true;
-            }
-        }
-        return false;
+        int s = ItemsUtil.findStackSlot(inv, stack -> stack.is(ti));
+        if (s < 0) return false;
+        int toTake = Math.min(8, inv.getStackInSlot(s).getCount());
+        furnace.setItem(inSlot, inv.extractItem(s, toTake, false).copy());
+        furnace.setChanged();
+        return true;
     }
 
-    /** 向燃料槽添加燃料 (排除原料物品) */
     public static boolean addFuel(AbstractFurnaceBlockEntity furnace, EntityMaid maid,
-                                   String inputItemId, FurnaceSlotMapping slots) {
-        ItemStack fuel = furnace.getItem(slots.fuel());
+                                   String inputItemId, SlotLayout slots) {
+        int fuelSlot = slots.slot("fuel");
+        ItemStack fuel = furnace.getItem(fuelSlot);
         if (!fuel.isEmpty()) return false;
         IItemHandler inv = maid.getAvailableInv(true);
-        for (int i = 0; i < inv.getSlots(); i++) {
-            ItemStack stack = inv.getStackInSlot(i);
-            if (AbstractFurnaceBlockEntity.isFuel(stack)) {
-                if (!inputItemId.isEmpty()) {
-                    var ti = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(inputItemId));
-                    if (ti != null && stack.is(ti)) continue;
-                }
-                int toTake = Math.min(64, stack.getCount());
-                furnace.setItem(slots.fuel(), inv.extractItem(i, toTake, false).copy());
-                furnace.setChanged();
-                return true;
-            }
-        }
-        return false;
+        var ti = inputItemId.isEmpty() ? null : ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(inputItemId));
+        int s = ItemsUtil.findStackSlot(inv, stack ->
+            AbstractFurnaceBlockEntity.isFuel(stack) && (ti == null || !stack.is(ti)));
+        if (s < 0) return false;
+        int toTake = Math.min(64, inv.getStackInSlot(s).getCount());
+        furnace.setItem(fuelSlot, inv.extractItem(s, toTake, false).copy());
+        furnace.setChanged();
+        return true;
     }
 }

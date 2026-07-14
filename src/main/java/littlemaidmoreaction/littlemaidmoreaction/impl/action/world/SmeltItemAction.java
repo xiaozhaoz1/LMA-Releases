@@ -28,6 +28,6 @@ public final class SmeltItemAction implements IAction {
         if (!(ctx.maid().level() instanceof ServerLevel sl)) return;
         var p = ParamExtractor.from(raw, PARAMS);
         SmeltExecute.execute(sl, ctx.maid(), p.getString("item_id"), p.getString("fuel_id"), p.getInt("range"),
-            littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.FurnaceSlotMapping.VANILLA);
+            littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.SlotLayout.FURNACE);
     }
 }

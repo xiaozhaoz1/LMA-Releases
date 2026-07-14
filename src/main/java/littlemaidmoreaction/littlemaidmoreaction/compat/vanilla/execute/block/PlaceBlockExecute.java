@@ -1,7 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.block;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.InventoryHelper;
+import com.github.tartaricacid.touhoulittlemaid.util.ItemsUtil;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ItemResolver;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -10,7 +10,7 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.context.DirectionalPlaceContext;
 
-/** v29.1: 方块放置 */
+/** v30: ItemsUtil 替代手写遍历 */
 public final class PlaceBlockExecute {
     private PlaceBlockExecute() {}
 
@@ -20,7 +20,7 @@ public final class PlaceBlockExecute {
 
         BlockPos pos = maid.blockPosition().offset(ox, oy, oz);
         var inv = maid.getAvailableInv(false);
-        int slot = InventoryHelper.findSlot(inv, s -> s.getItem() == blockItem);
+        int slot = ItemsUtil.findStackSlot(inv, s -> s.getItem() == blockItem);
         if (slot < 0) return false;
 
         var stack = inv.getStackInSlot(slot);

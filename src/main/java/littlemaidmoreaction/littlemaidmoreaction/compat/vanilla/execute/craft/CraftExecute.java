@@ -1,7 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.craft;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.InventoryHelper;
+import com.github.tartaricacid.touhoulittlemaid.util.ItemsUtil;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaInputRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaOutputRegistry;
@@ -53,7 +53,8 @@ public final class CraftExecute {
                 ItemStack[] matches = ing.getItems();
                 if (matches.length == 0) continue;
                 int need = step.craftCount() * matches[0].getCount();
-                int have = InventoryHelper.count(maidInv, s -> s.is(matches[0].getItem()));
+                var slots = ItemsUtil.getFilterStackSlots(maidInv, s -> s.is(matches[0].getItem()));
+                int have = slots.stream().mapToInt(i -> maidInv.getStackInSlot(i).getCount()).sum();
                 if (have < need) return false;
             }
         }

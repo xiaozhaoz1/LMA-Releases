@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.altar;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.InventoryHelper;
+import com.github.tartaricacid.touhoulittlemaid.util.ItemsUtil;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ItemResolver;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.altar.AltarOutput;
 import net.minecraft.core.BlockPos;
@@ -12,7 +12,7 @@ import net.minecraft.world.level.block.entity.BlockEntity;
 
 import java.util.*;
 
-/** v29.1: 祭坛物品放置 */
+/** v30: ItemsUtil 替代手写遍历 */
 public final class AltarExecute {
     private AltarExecute() {}
 
@@ -25,9 +25,8 @@ public final class AltarExecute {
 
         int totalPlaced = 0;
         for (TileEntityAltar ref : structures) {
-            int slot = InventoryHelper.findSlot(maid, s -> s.is(item));
-            if (slot < 0) break;
-            ItemStack stack = maid.getAvailableInv(false).getStackInSlot(slot);
+            ItemStack stack = ItemsUtil.getStack(maid, s -> s.is(item));
+            if (stack.isEmpty()) break;
 
             int placed = AltarOutput.placeItems(ref, maid, stack);
             if (placed > 0) {
