@@ -44,6 +44,12 @@ public final class LMAConfigScreen extends Screen {
         y += 28;
 
         this.addRenderableWidget(Button.builder(
+                Component.literal("女仆编辑器"),
+                btn -> Minecraft.getInstance().setScreen(new MaidListScreen(this)))
+                .pos(cx - 80, y).size(160, 20).build());
+        y += 28;
+
+        this.addRenderableWidget(Button.builder(
                 Component.literal("调试: " + (MoreActionConfig.DEBUG_MODE.get() ? "ON" : "OFF")),
                 btn -> {
                     boolean v = !MoreActionConfig.DEBUG_MODE.get();

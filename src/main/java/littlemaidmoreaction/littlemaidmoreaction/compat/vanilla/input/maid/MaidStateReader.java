@@ -252,4 +252,55 @@ public final class MaidStateReader {
     public static boolean isShowBackpack(EntityMaid m) { return m.getConfigManager().isShowBackpack(); }
     /** 聊天气泡是否可见 */
     public static boolean isChatBubbleShow(EntityMaid m) { return m.getConfigManager().isChatBubbleShow(); }
+
+    // === v34: ConfigManager 补全 ===
+    public static boolean isShowBackItem(EntityMaid m) { return m.getConfigManager().isShowBackItem(); }
+    public static float getSoundFreq(EntityMaid m) { return m.getConfigManager().getSoundFreq(); }
+    public static String getPickupType(EntityMaid m) { return m.getConfigManager().getPickupType().name().toLowerCase(); }
+    public static boolean isOpenDoor(EntityMaid m) { return m.getConfigManager().isOpenDoor(); }
+    public static boolean isOpenFenceGate(EntityMaid m) { return m.getConfigManager().isOpenFenceGate(); }
+    public static boolean isActiveClimbing(EntityMaid m) { return m.getConfigManager().isActiveClimbing(); }
+
+    // === v34: AI Task 标志 ===
+    public static boolean isEnablePanic(EntityMaid m) { return m.getTask().enablePanic(m); }
+    public static boolean isEnableEating(EntityMaid m) { return m.getTask().enableEating(m); }
+    public static boolean isEnableLookAndRandomWalk(EntityMaid m) { return m.getTask().enableLookAndRandomWalk(m); }
+
+    // === v34: 导航补全 ===
+    public static String getSearchDimension(EntityMaid m) { return m.searchDimension().toString(); }
+
+    // === v34: Owner 补全 ===
+    public static java.util.UUID getOwnerUUID(EntityMaid m) { return m.getOwnerUUID(); }
+    public static String getOwnerName(EntityMaid m) {
+        var o = m.getOwner(); return o != null ? o.getScoreboardName() : "";
+    }
+    public static net.minecraft.world.item.ItemStack getTamedItem(EntityMaid m) { return new net.minecraft.world.item.ItemStack(m.getTamedItem().getItems()[0].getItem()); }
+    public static net.minecraft.world.item.ItemStack getTemptationItem(EntityMaid m) { return new net.minecraft.world.item.ItemStack(m.getTemptationItem().getItems()[0].getItem()); }
+
+    // === v34: TLM 自定义属性 ===
+    public static double getUseItemSpeed(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_USE_ITEM_SPEED.get()); }
+    public static double getCrossbowAttackSpeed(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_CROSSBOW_ATTACK_SPEED.get()); }
+    public static double getGunAttackSpeed(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_GUN_ATTACK_SPEED.get()); }
+    public static double getShootCooldown(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_SHOOT_COOLDOWN.get()); }
+    public static double getTridentCooldown(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_TRIDENT_COOLDOWN.get()); }
+    public static double getPickupRange(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_PICKUP_RANGE.get()); }
+    public static double getPassiveUseShieldTick(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_PASSIVE_USE_SHIELD_TICK.get()); }
+
+    // === v34: NBT/PersistentData 读 ===
+    public static float getPersistentFloat(EntityMaid m, String key, float def) {
+        var d = m.getPersistentData(); return d.contains(key) ? d.getFloat(key) : def;
+    }
+    public static long getPersistentLong(EntityMaid m, String key, long def) {
+        var d = m.getPersistentData(); return d.contains(key) ? d.getLong(key) : def;
+    }
+    public static String getPersistentString(EntityMaid m, String key, String def) {
+        var d = m.getPersistentData(); return d.contains(key) ? d.getString(key) : def;
+    }
+    public static boolean getPersistentBoolean(EntityMaid m, String key, boolean def) {
+        var d = m.getPersistentData(); return d.contains(key) ? d.getBoolean(key) : def;
+    }
+
+    // === v34: 统计 ===
+    public static boolean hasKillRecord(EntityMaid m) { return m.getKillRecordManager() != null; }
+    public static boolean hasGameRecord(EntityMaid m) { return m.getGameRecordManager() != null; }
 }

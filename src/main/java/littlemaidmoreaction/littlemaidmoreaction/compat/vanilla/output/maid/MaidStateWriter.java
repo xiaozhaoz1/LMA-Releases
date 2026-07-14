@@ -234,4 +234,20 @@ public final class MaidStateWriter {
     public static void reduceFavor(EntityMaid m, int amount) { m.getFavorabilityManager().reduce(amount); }
     /** 好感度升至满级 */
     public static void maxFavor(EntityMaid m) { m.getFavorabilityManager().max(); }
+
+    // === v34: ConfigManager 写 ===
+    public static void setShowBackpack(EntityMaid m, boolean v) { m.getConfigManager().setShowBackpack(v); }
+    public static void setShowBackItem(EntityMaid m, boolean v) { m.getConfigManager().setShowBackItem(v); }
+    public static void setChatBubbleShow(EntityMaid m, boolean v) { m.getConfigManager().setChatBubbleShow(v); }
+    public static void setSoundFreq(EntityMaid m, float v) { m.getConfigManager().setSoundFreq(v); }
+    public static void setPickupType(EntityMaid m, String type) {
+        m.getConfigManager().setPickupType(switch (type.toLowerCase()) {
+            case "only_item" -> com.github.tartaricacid.touhoulittlemaid.entity.passive.PickType.ONLY_ITEM;
+            case "only_xp" -> com.github.tartaricacid.touhoulittlemaid.entity.passive.PickType.ONLY_XP;
+            default -> com.github.tartaricacid.touhoulittlemaid.entity.passive.PickType.ALL;
+        });
+    }
+    public static void setOpenDoor(EntityMaid m, boolean v) { m.getConfigManager().setOpenDoor(v); }
+    public static void setOpenFenceGate(EntityMaid m, boolean v) { m.getConfigManager().setOpenFenceGate(v); }
+    public static void setActiveClimbing(EntityMaid m, boolean v) { m.getConfigManager().setActiveClimbing(v); }
 }
