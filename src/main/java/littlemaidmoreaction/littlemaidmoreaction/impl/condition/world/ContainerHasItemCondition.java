@@ -7,6 +7,7 @@ import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionCat
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionValueType;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -51,7 +52,7 @@ public final class ContainerHasItemCondition implements ICondition {
 
         BlockPos center = maid.blockPosition();
         for (BlockPos pos : BlockPos.betweenClosed(
-                center.offset(-range, -4, -range), center.offset(range, 4, range))) {
+                center.offset(-range, -VanillaConstants.SEARCH_VERTICAL, -range), center.offset(range, VanillaConstants.SEARCH_VERTICAL, range))) {
             BlockEntity te = maid.level().getBlockEntity(pos);
             if (te == null) continue;
 

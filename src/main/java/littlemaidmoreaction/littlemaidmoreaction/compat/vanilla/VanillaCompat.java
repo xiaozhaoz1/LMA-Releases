@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.maideditor.BuiltinMaidEditorRegistration;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.CompatScanner;
 
 /**
@@ -19,6 +20,7 @@ public final class VanillaCompat {
     private VanillaCompat() {}
 
     public static void init() {
+        BuiltinMaidEditorRegistration.init();
         CompatScanner.ScanResult r = CompatScanner.scan(VanillaCompat.class,
             "littlemaidmoreaction/littlemaidmoreaction/compat/vanilla/input/detect/",
             "littlemaidmoreaction/littlemaidmoreaction/compat/vanilla/interact/",

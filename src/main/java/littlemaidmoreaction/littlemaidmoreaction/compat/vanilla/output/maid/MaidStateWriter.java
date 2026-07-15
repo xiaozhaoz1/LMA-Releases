@@ -250,4 +250,30 @@ public final class MaidStateWriter {
     public static void setOpenDoor(EntityMaid m, boolean v) { m.getConfigManager().setOpenDoor(v); }
     public static void setOpenFenceGate(EntityMaid m, boolean v) { m.getConfigManager().setOpenFenceGate(v); }
     public static void setActiveClimbing(EntityMaid m, boolean v) { m.getConfigManager().setActiveClimbing(v); }
+
+    // === v34.2: 女仆编辑器 Writer ===
+    public static void setHealth(EntityMaid m, float v) { m.setHealth(Math.min(v, m.getMaxHealth())); }
+    public static void setMaxHealth(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(Math.max(1.0, v)); }
+    public static void setAttackDamage(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).setBaseValue(v); }
+    public static void setMovementSpeed(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MOVEMENT_SPEED).setBaseValue(v); }
+    public static void setFollowRange(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.FOLLOW_RANGE).setBaseValue(v); }
+    public static void setKnockbackResistance(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.KNOCKBACK_RESISTANCE).setBaseValue(v); }
+    public static void setAttackSpeed(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_SPEED).setBaseValue(v); }
+    public static void setArmorToughness(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ARMOR_TOUGHNESS).setBaseValue(v); }
+    public static void setBaby(EntityMaid m, boolean v) { m.setBaby(v); }
+    public static void setSprinting(EntityMaid m, boolean v) { m.setSprinting(v); }
+    public static void setSneaking(EntityMaid m, boolean v) { m.setShiftKeyDown(v); }
+    public static void setSwimming(EntityMaid m, boolean v) { m.setSwimming(v); }
+    public static void setRestrictRadius(EntityMaid m, float radius) {
+        var center = m.hasRestriction() ? m.getRestrictCenter() : m.blockPosition();
+        m.restrictTo(center, Math.round(radius));
+    }
+    // TLM 自定义属性
+    public static void setUseItemSpeed(EntityMaid m, double v) { m.getAttribute(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_USE_ITEM_SPEED.get()).setBaseValue(v); }
+    public static void setCrossbowAttackSpeed(EntityMaid m, double v) { m.getAttribute(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_CROSSBOW_ATTACK_SPEED.get()).setBaseValue(v); }
+    public static void setGunAttackSpeed(EntityMaid m, double v) { m.getAttribute(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_GUN_ATTACK_SPEED.get()).setBaseValue(v); }
+    public static void setShootCooldown(EntityMaid m, double v) { m.getAttribute(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_SHOOT_COOLDOWN.get()).setBaseValue(v); }
+    public static void setTridentCooldown(EntityMaid m, double v) { m.getAttribute(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_TRIDENT_COOLDOWN.get()).setBaseValue(v); }
+    public static void setPickupRange(EntityMaid m, double v) { m.getAttribute(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_PICKUP_RANGE.get()).setBaseValue(v); }
+    public static void setPassiveUseShieldTick(EntityMaid m, double v) { m.getAttribute(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_PASSIVE_USE_SHIELD_TICK.get()).setBaseValue(v); }
 }

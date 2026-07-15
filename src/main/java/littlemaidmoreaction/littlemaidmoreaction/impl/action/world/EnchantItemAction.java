@@ -3,6 +3,7 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.world;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.world.WorldOutput;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
@@ -41,7 +42,7 @@ public final class EnchantItemAction implements IAction {
     static BlockPos findBlock(EntityMaid maid, int range, net.minecraft.world.level.block.Block target) {
         var center = maid.blockPosition();
         for (BlockPos pos : BlockPos.betweenClosed(
-                center.offset(-range, -4, -range), center.offset(range, 4, range))) {
+                center.offset(-range, -VanillaConstants.SEARCH_VERTICAL, -range), center.offset(range, VanillaConstants.SEARCH_VERTICAL, range))) {
             if (maid.level().getBlockState(pos).is(target)) return pos.immutable();
         }
         return null;

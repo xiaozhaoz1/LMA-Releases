@@ -1,110 +1,37 @@
 # Changelog
 
-## [v34] — 2026-07-14 — I/O 全覆盖 + 女仆编辑器 GUI
+## [v34.2] — 2026-07-15 — 女仆编辑器注册模式 + execute Bug 修复
 
-### I/O 层扩展
-- **MaidStateReader**: 120→148 方法 (+28: ConfigManager 6, AI标志 3, Owner 4, 自定义属性 7, NBT读 4, 统计 2, 导航 1, TaskData 1)
-- **MaidStateWriter**: 50→59 方法 (+9: ConfigManager 写 8, TaskData 1)
+### 注册模式重构 (4 新文件)
+- **FieldType.java** — 字段类型枚举 (INT/FLOAT/BOOL/STRING)
+- **MaidEditorRegistry.java** — 注册中心 (addGroup/addField), 外部 mod 可扩展
+- **BuiltinMaidEditorRegistration.java** — LMA 内置 9 组 ~120 字段注册
+- 使用 I/O 层 reader/writer lambda: MaidStateReader 读, MaidStateWriter 写
 
-### 女仆编辑器 GUI
-- **MaidListScreen**: 女仆列表(左) + 3D预览区(右) + [编辑]按钮
-- **MaidEditorScreen**: 5列×4行网格, [◀][▶]+下拉切换 8 组 80 字段
-  组: Basic(20), Combat(12), AI(16), Display(12), Resist(8), Schedule(10), Custom(12), Owner(10)
-- 入口: LMAConfigScreen → [女仆编辑器]
+### MaidEditorScreen 重写
+- 硬编码 GROUPS + 120 case switch → registry 动态读取
+- 修复 apply：不再 rebuild 覆盖用户编辑
+- 新增"保存"按钮：全字段写入 + 关闭
+- 修复 writer 缺失 9 处（攻击/移速/幼年/游泳 等）
+- 只读字段加 `(只读)` 标记
+- 抗性组重做 (8项可改) + 饰品组新增 (12项只读)
+- 布局修正：页码居中于翻页按钮之间
 
-## [v33] — 2026-07-14 — compat/vanilla/ 整理
+### MaidListScreen
+- TLM MaidModelGui 同款预览：直接渲染选中女仆，跟随鼠标旋转
+- 去除预览面板框
 
-- **删除死代码**: input/brew/ (4), BrewingStandInteractAction, BaseStateMachine, AbstractEntityInteraction
-- **execute/ 扁平化**: 9 单文件子目录 → 9 文件平放
-- compat/vanilla: 78→68 文件 (-10)
+### execute/ 6 Bug (v34 代码审查)
+- FurnaceExecute: 冗余 isEmpty 预检 → 去掉
+- FurnaceExecute: COLLECT_RESULT 非对称 → 无条件推进
+- AltarExecute: List.hashCode() → System.identityHashCode()
+- AltarExecute + 3文件: 硬编码 -4/4 → VanillaConstants.SEARCH_VERTICAL
+- CraftExecute: 加单线程假设注释
 
-## [v32] — 2026-07-14 — adapter/ → compat/vanilla/adapter/
-
-- 移动: adapter/tlm/ (11) → compat/vanilla/adapter/, adapter/gui/ → screen/
-- 删除: MaidAPI (8 方法重复 → I/O层)
-- 去重: AbstractFunctionalBlockInteraction → VanillaConstants, LmaTaskTypeRegistry → TaskHandlerRegistry
-
-### v32.1 — 清理残留
-- 删除: FurnaceSlotMapping (0 callers)
-- SlotLayout.slot() → OptionalInt
-- ItemMover.transfer() +回滚日志
-
-## [v31] — 2026-07-14 — 统一任务入口
-
-- 删除: SmeltExecute (FurnaceExecute 唯一熔炉入口)
-- 6 @RuleAction: 内联逻辑 → 写 PersistentData 委托任务系统
-  SmeltItemAction, FurnaceInteractAction, CraftingTableInteractAction,
-  JukeboxInteractAction, BellRingAction, PlaceAltarItemAction
-- ~320 行删除, 向后兼容 (action id/params 不变)
-
-## [v30] — 2026-07-14 — SlotLayout + ItemsUtil
-
-- 新增: SlotLayout (Builder模式), 删除: InventoryHelper → ItemsUtil
-- FurnaceInteractAction: 硬编码 SLOT_* → SlotLayout.FURNACE
-- FurnaceOutput/Execute/SmeltExecute: ItemsUtil.findStackSlot 替代 for-loop
-
-## [v29] — 2026-07-14 — Execute 层优化 + TaskHandler 注册机制
-
-### 2026-07-13 — I/O 架构完善
-- **I/O 方法**: 95→346 (MaidStateReader 120, MaidStateWriter 53, CombatOutput 24, WorldOutput 24, MovementOutput 16, VisualOutput 12, ItemOutput 15, 等)
-- **动作委托率**: 43→55/110 (41%→74%)
-- **Execute 类**: +5 (PlaceBlockExecute, AltarExecute, AnimExecute, ContainerExecute, SmeltExecute)
-- **抽象层**: +4 (ItemResolver, BrainHelper, BaseStateMachine, ContainerOutput)
-- **Compat**: +3 Writer (SlashBladeWriter, YsmWriter, TpmWriter) + 12 动作委托
-- **TLM API 编目**: SchedulePos(5), FavorabilityManager(3), ChatBubbleManager(2), Config(2)
-- **API 文档**: `doc/IO-API-REFERENCE.md` — 346 方法完整参考
-- **Bug 修复**: 30 bug (P0×5, P1×10), 错题集 84→95
-- **40 commits** | 32 新文件 | 153 测试绿色
-
-### 2026-07-14 — Execute 层优化 + TaskHandler Registry
-- **新增**: ItemMover (tryExtract/tryInsert/transfer 原语), VanillaConstants (集中常量)
-- **新增**: TaskResult (SUCCESS/CONTINUE/FAILED), TaskHandlerRegistry (5 任务注册)
-- **P0 修复**: PlaceBlockExecute check place() return, JukeboxOutput spawn overflow, CraftExecute pre-verify
-- **重构**: JukeboxExecute String→enum 状态机 + Math.abs 防时间回退
-- **重构**: FurnaceExecute 伪状态机→enum + void→boolean
-- **重构**: LmaFlowCoordinationBehavior 3 switch → TaskHandlerRegistry (-40行)
-- **统一**: BellExecute/FurnaceExecute void→boolean, VanillaTasks 同步
-
-### 2026-07-14 — v29.1 InventoryHelper + FurnaceSlotMapping + BlockEntity search
-- **新增**: InventoryHelper (findSlot/count, EntityMaid + IItemHandler 双重重载)
-- **新增**: FurnaceSlotMapping record (input/fuel/output, VANILLA=0/1/2)
-- **BlockSearch**: +findBlocksInRange() 便捷重载, 消除 5 处 manual cast
-- **熔炉检测**: BlockState→instanceof AbstractFurnaceBlockEntity → 自动兼容模组熔炉
-- **AltarExecute/PlaceBlockExecute/CraftExecute**: for-loop→InventoryHelper (-20行)
-- **FurnaceExecute**: +setPhase() helper, FurnaceSlotMapping 参数
-- **FurnaceOutput/SmeltExecute/VanillaTasks**: +FurnaceSlotMapping 参数
-
-## [v28] — 2026-07-13 — I/O 原语架构迁移
-
-- Phase 4: +30 I/O 方法 (MaidStateReader+17, MaidStateWriter+6 等)
-- Phase 5: 14 动作委托 → ParamExtractor + Output
-- Phase 6: 15 条件委托 → Reader
-- 条件委托率: 83→98/131 (63%→75%), 动作委托率: 28→43/105 (27%→41%)
-- GUI 修复 + 唱片机四连修复 + P1 爆炸源 + NBT 异常
-
-## [v27] — 2026-07-13 — 消反射
-
-- BuiltinRegistrar: FQCN 字符串 + Class.forName → 直接 new XxxAction()
-- 零反射, 编译器验证, 覆盖 231 内置扩展
-
-## [v26] — 2026-07-13 — ParamExtractor
-
-- ParamExtractor 新建: rawParams ↔ typed values 桥接
-- CombatOutput +6 新方法 (damageByRatio/magicDamage/genericDamage/healByRatio/knockbackWithVertical/shieldEffect)
-
-## [v25] — 2026-07-13 — 条件委托
-
-- 83/120 条件 → I/O Reader (MaidStateReader 56/77, TargetStateReader 17/22, WorldStateReader 10/21)
-
-## [v16] — 2026-07-10 — 任务系统重置
-
-- 17 工具→6 工具 | 双轨→单轨 | 5 Pipeline + 8 Service
-- AI 唯一入口: `lma_start_task(task_type, target, target_count)`
-
-## [v12.7] — 2026-07-08 — Brain Memory
-
-- Brain Memory 替代 PersistentData 导航
-- Brain Memory: 类型安全, Activity 切换自动清除, 不跨会话持久化
+### MaidStateWriter 新增
+- +17 writer: setHealth/setMaxHealth/setAttackDamage/setMovementSpeed/setFollowRange/
+  setKnockbackResistance/setAttackSpeed/setArmorToughness/setBaby/setSprinting/setSneaking/
+  setSwimming/setRestrictRadius 及 7 个 InitAttribute writer
 
 ## [v10.0] — 2026-07-04 — 8 阶段重构完成 ✅
 

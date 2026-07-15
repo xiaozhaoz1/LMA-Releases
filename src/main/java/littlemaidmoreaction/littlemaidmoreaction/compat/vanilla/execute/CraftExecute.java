@@ -46,7 +46,9 @@ public final class CraftExecute {
             .getResultItem(world.registryAccess());
         if (VanillaInputRegistry.totalSpace(maid, sampleOutput) <= 0) return false;
 
-        // Phase 1: 预验证 — 统计库存
+        // Phase 1: 预验证 — 只读统计库存
+        // 假设：单线程服务器（Forge server thread）。预验证与执行之间无需锁，
+        // 因为不存在并发库存修改。如迁移到异步模型，需在此处加锁。
         for (var step : chain.steps()) {
             for (Ingredient ing : step.recipe().getIngredients()) {
                 if (ing.isEmpty()) continue;

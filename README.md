@@ -1,159 +1,106 @@
 # LittleMaidMoreAction — 车万女仆「更多动作」
 
-为 Touhou Little Maid 添加可视化规则编辑器与事件驱动的自动战斗动作系统。
+为 Touhou Little Maid 添加可视化规则编辑器与事件驱动的女仆战斗动作系统。
 
-[![Minecraft](https://img.shields.io/badge/Minecraft-1.20.1-green)](https://minecraft.net) [![Forge](https://img.shields.io/badge/Forge-47.4.13-blue)](https://files.minecraftforge.net/) [![Java](https://img.shields.io/badge/Java-17-red)](https://adoptium.net/) [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
+## 功能
 
----
+- **可视化规则编辑器** — Cloth Config GUI, 无需手写 JSON
+- **SelectionScreen v2** — 搜索框 + 分类下拉，107 条件/75 动作中 3 字符定位
+- **9 条预设** — 处决/闪避/弹反/肘击..., 开箱即用
+- **33 触发事件** — TLM + Forge 事件全覆盖
+- **83 动作类型** — 战斗(19)/移动(10)/特效(5)/物品(4)/女仆控制(20)/世界(7)/流程控制(8)/消息(2)/脚本(1)（含 YSM 兼容 4 个，set_ysm_model 支持随机模型）
+- **111 条件键** — MAID(67)/TARGET(21)/OWNER(5)/WORLD(16) 全覆盖，支持参数化条件（含 YSM 兼容 6 个）
+- **条件参数支持** — 条件可携带参数(如 effect_id)，Pipeline 贯通 ConditionDef→CondRow→GUI→evaluate
+- **20tick 时间窗口** — 瞬时条件(is_mainhand_attack 等)触发后 1 秒内保持有效
+- **CompatScanner** — 通用三扩展扫描器（条件/动作/事件），新 compat 模块 ~15 行
+- **注解驱动** — @RuleCondition/@RuleAction 自动注册, 外部模组 SPI 扩展
+- **脚本支持** — JavaScript/Lua 脚本动作 (JSR-223)
+- **可选 MVEL 表达式** — @{...} 语法支持复杂条件
+- **动画元数据** — 每动画独立配置 (优先级/锁移动/冻结AI/可打断)，INSTANT/FULL 双模式
+- **热重载** — F3+T 识别新增动画/音效
 
-## 这是什么
+## 版本
 
-LittleMaidMoreAction 是 Touhou Little Maid（车万女仆/TLM）的附属模组。玩家通过可视化规则编辑器配置"**当某事件发生时 → 满足某条件 → 执行某动作**"的自动化行为。无需编写任何代码或 JSON。
+**v34.2** — 2026-07-15 — 注册模式重构 + MaidEditorScreen apply/save + execute Bug修复
 
-**典型场景**：
-- 女仆低血量时自动治疗 → `maid_health < 20%` → `Heal`
-- 主人受到攻击时女仆反击 → `owner hurt` → `ForceTarget + Dash + ExecutionKill`
-- 下雪时换冬装 → `is snowing` → `SetYsmModel(winter)`
+| 指标 | v7.1 | v8.2 | v8.4 | v8.7 | v9.0 |
+|------|------|------|------|------|------|
+| 条件 | 35 | 100 | 100 | 107 | 107 |
+| 动作 | 53 | 75 | 70 | 75 | 75 |
+| 事件 | 29 | 29 | 28 | 28 | 28 |
+| 源文件 | 169 | 258 | 258 | 278 | 285 |
+| 测试 | 85 | 85 | 85 | 85 |
 
-## 游戏版本
+## 开发
 
-| 依赖 | 版本 |
-|------|------|
-| Minecraft | **1.20.1** |
-| Forge | **47.4.13** (兼容 47.4.x) |
-| Java | **17** |
-| Touhou Little Maid | **1.5.0+** |
-| Cloth Config | **11.1.136** |
+v5 工业级规则引擎 — 六边形架构, 零 Minecraft 依赖的 core 模块, 异步执行管道。
 
-> ⚠️ 不兼容 1.20.2+, Fabric, NeoForge。
+| 层 | 包 | 说明 |
+|----|-----|------|
+| core | `core/spi/` | 类型安全参数系统 (sealed TypedParam) |
+| core | `core/registry/` | 注解扫描 + ClassGraph 自动注册 + BuiltinRegistrar 三层回退 |
+| core | `core/engine/` | 异步管道 + 主线程安全执行 |
+| core | `core/model/` | 不可变数据模型 + 树形条件 + 参数化条件 |
+| adapter | `adapter/tlm/` | TLM 事件桥接 (29→RuleEngine) + MagicCasting Provider |
+| adapter | `adapter/gui/` | Visitor 模式动态表单 |
+| compat | `compat/ysm/` | YSM 兼容 — 门控扫描 + 条件/动作自动注册 |
+| network | `network/` | ID 同步 (旧系统) + PersistentData 同步 (专用服务器) |
+| storage | `storage/` | JSON 持久化 + 动画元数据 (animationsetup/) |
 
-## 当前版本 — v34
+新增条件: 实现 `ICondition` + `@RuleCondition` → 自动注册
+新增动作: 实现 `IAction` + `@RuleAction` → 自动注册
 
-| 指标 | 数值 |
-|------|------|
-| 条件 (Conditions) | **139** (75% I/O 委托) |
-| 动作 (Actions) | **110** (74% I/O 委托) |
-| 事件 (Events) | **36** |
-| 源文件 | **~480** |
-| I/O 方法 | **375** (20 文件, 全覆盖 TLM API) |
-| Execute 类 | **9** (扁平化) |
-| 测试 | **153** (JUnit 5) |
-| 女仆编辑器 | **v34** GUI 80字段 5×4网格 |
+### Compat 模块 — 模组兼容层
 
-## 功能详情
-
-### 可视化规则编辑器
-
-Cloth Config GUI — 搜索框 + 分类下拉，3 字符定位任意条件/动作。支持复制/粘贴/导入/导出规则。
-
-### 条件系统 (139 条件, 98 委托给 I/O Reader)
-
-| 类别 | 数量 | 示例 |
-|------|------|------|
-| MAID 女仆自身 | 85 | `maid_health`, `maid_distance`, `maid_is_begging`, `maid_schedule` |
-| TARGET 目标 | 22 | `target_health`, `target_is_monster`, `target_type` |
-| OWNER 主人 | 8 | `owner_distance`, `owner_health`, `owner_holding_item` |
-| WORLD 世界 | 18 | `world_time`, `world_is_thundering`, `world_biome` |
-| YSM 模型 | 6 | `is_ysm_model`, `ysm_model_id`, `ysm_roaming_var` |
-
-### 动作系统 (110 动作, 55 委托给 I/O Output)
-
-| 类别 | 数量 | 常用动作 |
-|------|------|---------|
-| COMBAT 战斗 | 25 | `deal_damage`, `execution_kill`, `bleed`, `launch`, `damage_nearby`, `life_steal`, `launch_projectile` |
-| MOVEMENT 移动 | 12 | `teleport`, `dash`, `leap`, `freeze_ai`, `swap_position`, `guard_pos` |
-| MAID 控制 | 22 | `set_maid_task`, `set_model`, `set_home`, `set_bauble`, `force_target` |
-| WORLD 世界 | 17 | `set_weather`, `set_time`, `explosion`, `summon_lightning`, `place_block`, `trade_villager` |
-| VISUAL 视觉 | 6 | `play_anim`, `play_sound`, `spawn_particle`, `spawn_heart_particle` |
-| ITEM 物品 | 5 | `give_item`, `repair_item`, `clear_inventory`, `drop_item`, `extract_maid_xp` |
-| CONTROL 流程 | 9 | `wait`, `repeat`, `send_message`, `open_maid_editor` |
-| MESSAGE 消息 | 2 | `send_chat`, `send_bubble` |
-| EFFECT 效果 | 2 | `apply_effect`, `clear_effects` |
-| COMPAT 兼容 | 10 | `set_ysm_model`, `slashblade_sa` 等 |
-
-### 动画系统
-
-- **INSTANT** 模式 — 单动画播放，常用于处决/闪避
-- **FULL** 模式 — 三阶段施法动画（Start→Casting→End），用于大招
-- **YSM 模型** — 支持 Yes Steve Model 轮盘动画
-- **动画参数** — 每动画配置：优先级/锁移动/冻结AI/可打断
-- **热重载** — F3+T 识别新增动画
-
-### I/O 三层架构
+参考 TLM 既有 compat 架构，每个兼容模组独立子包，门控加载。
 
 ```
-input/   纯查询  — MaidStateReader(148) + TargetStateReader(25) + WorldStateReader(19)
-output/  纯命令  — CombatOutput(24) + WorldOutput(24) + MaidStateWriter(59) + MovementOutput(16) +
-                    VisualOutput(12) + ItemOutput(15) + EffectOutput(3) + EntityOutput(4)
-execute/ 编排层 — CraftExecute, FurnaceExecute, JukeboxExecute, BellExecute,
-                   ContainerExecute, AltarExecute, AnimExecute, PlaceBlockExecute, AutoCropHandler
-api/     工具+注册 — SlotLayout, ItemMover, TaskHandlerRegistry, TaskResult, VanillaConstants, ParamExtractor
-adapter/ TLM桥接 — TlmEventAdapter, LmaFlowCoordinationBehavior, LmaTaskTypeRegistry 等 11 文件
+compat/
+├── CompatRegistry.java            # 调度中心 (InterModEnqueueEvent + checkModLoad)
+└── ysm/                           # YSM (Yes Steve Model)
+    ├── YsmCompat.java             # 门控 + 限定包扫描 + 自动注册
+    ├── YsmEvent.java              # 事件订阅（预留）
+    └── impl/
+        ├── condition/             # @RuleCondition → ICondition
+        │   ├── IsYsmModelCondition.java   # is_ysm_model (BOOL)
+        │   └── YsmModelIdCondition.java   # ysm_model_id (STR)
+        └── action/                # @RuleAction → IAction
+            └── SetYsmModelAction.java     # set_ysm_model
 ```
 
-完整 API 参考：`doc/IO-API-REFERENCE.md`
+**新增兼容模组**：创建 `compat/<modid>/` 文件夹 → 实现条件/动作 → 在 `CompatRegistry` 添加一行 `checkModLoad`。
 
-### 模组兼容
-
-| 模块 | 内容 | 条件 | 动作 |
-|------|------|------|------|
-| **YSM** (Yes Steve Model) | 模型切换/轮盘动画/漫游变量 | 6 | 6 |
-| **SlashBlade** (拔刀剑) | 拔刀剑连段/SA/ProudSoul | 17 | 6 |
+**条件/动作**：放在 `compat/<modid>/impl/condition/` 和 `compat/<modid>/impl/action/` 下，
+使用 `@RuleCondition`/`@RuleAction` 注解，由 `XxxCompat.scanAndRegister()` 自动发现。
+仅在目标模组加载时注册到编辑器。
 
 ## 安装
 
-1. 安装 [Minecraft Forge 47.4.13+](https://files.minecraftforge.net/) for 1.20.1
-2. 安装 [Touhou Little Maid 1.5.0+](https://www.curseforge.com/minecraft/mc-mods/touhou-little-maid)
-3. 安装 [Cloth Config 11.1.136](https://www.curseforge.com/minecraft/mc-mods/cloth-config)
-4. 下载 `littlemaidmoreaction-x.x.x.jar` → 放入 `.minecraft/mods/`
-5. 启动游戏
+1. 安装 Touhou Little Maid (>=1.5.0) + Cloth Config
+2. 将 jar 放入 mods/ 目录
+3. 启动游戏
 
 ## 使用
 
-### 打开规则编辑器
-Forge 模组列表 → LittleMaidMoreAction → 打开规则编辑器
+**规则编辑器**: Forge 模组列表 → LittleMaidMoreAction → 打开规则编辑器
 
-### 创建一条规则
-1. 选事件（如 `maid_hurt_target_pre` — 女仆攻击前）
-2. 加条件（如 `maid_health < 30%` + `target_is_monster`）
-3. 加动作（如 `play_anim(anim=execution)` + `deal_damage(damage=20)`）
-4. 保存 → 立即生效
+**自定义动画**: 将 `.animation.json` 放入 `config/littlemaidmoreaction/animations/` → F3+T
 
-### 自定义动画
-将 `.animation.json` 放入 `config/littlemaidmoreaction/animations/` → F3+T 热重载
+**自定义音效**: 将 `.ogg` 放入 `config/littlemaidmoreaction/sounds/` → F3+T
 
-### 独立规则 (v8.7)
-手持木棍右键女仆 → 打开该女仆独立规则界面 → 规则仅对该女仆生效
-保存路径: `config/littlemaidmoreaction/maid_rules/<uuid>.json`
+**动画参数编辑**: 规则编辑器 → 动作编辑 → 选 play_anim → [编辑] 按钮 → 配置每动画参数
+参数保存在 `config/littlemaidmoreaction/animationsetup/<name>.json`
 
-## 版本历史
+**条件参数编辑**: 规则编辑器 → 条件编辑 → 选择带参数条件(如女仆效果) → 出现参数输入框
 
-| 版本 | 日期 | 内容 |
-|------|------|------|
-| **v34** | 2026-07-14 | I/O 全覆盖 375方法, 女仆编辑器 GUI 80字段 |
-| **v33** | 2026-07-14 | compat/vanilla 整理, execute 扁平化 |
-| **v32** | 2026-07-14 | adapter→compat/vanilla, 去重 MaidAPI |
-| **v31** | 2026-07-14 | 统一任务入口, 6 action→PersistentData |
-| **v30** | 2026-07-14 | SlotLayout+ItemsUtil, FurnaceSlotMapping 删除 |
-| **v29** | 2026-07-13 | Execute优化, ItemMover, TaskHandlerRegistry |
-| v28 | 2026-07-13 | I/O原语 Phase 4-6, 唱片机四连修复 |
-| v27 | 2026-07-13 | 消反射 — BuiltinRegistrar 编译期安全 |
-| v26 | 2026-07-13 | ParamExtractor + CombatOutput 充实 |
-| v25 | 2026-07-13 | 83/120 条件→Reader 委托 |
-| v17-v24 | 2026-07-12 | I/O 三层架构 (input/output/execute) |
-| v16 | 2026-07-10 | 任务系统重置 (17→6工具, 单轨, 5 Pipeline) |
-| v12.7 | 2026-07-08 | Brain Memory 替代 PersistentData 导航 |
-| v9 | 2026-06-30 | 文件系统规则, SelectionScreen v2, CompatScanner |
-| v8.2 | 2026-06-25 | 100条件+75动作, 全屏选择器 |
-| v7 | 2026-06-24 | 6阶段模块化重构, 动画系统 Magic-ISS |
+**独立规则编辑** ★ v8.7: 手持木棍右键女仆 → 打开该女仆独立规则界面 → 规则仅对该女仆生效
+独立规则保存在 `config/littlemaidmoreaction/maid_rules/<uuid>.json`
 
-[完整更新日志](CHANGELOG.md)
-
-## 贡献者
+## 贡献者 / Contributors
 
 - **xiaozhaoz1** — 作者、设计、开发
-- **DeepSeek AI** — AI 协作开发
+- **DeepSeek AI** (deepseek-v4-pro) — AI 协作开发: 代码生成、架构设计、文档撰写、Bug 诊断修复、测试编写。累计贡献 258 源文件中大量代码，100 条件 + 75 动作实现，v5 六边形架构设计，v7 模块化重构
 
 ## 许可
 
-MIT License — 详见 [LICENSE](LICENSE)
+MIT

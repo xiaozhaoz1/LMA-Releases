@@ -3,6 +3,7 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.world;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.world.WorldOutput;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
@@ -42,7 +43,7 @@ public final class AnvilRepairAction implements IAction {
     static BlockPos findAnvil(EntityMaid maid, int range) {
         var center = maid.blockPosition();
         for (BlockPos pos : BlockPos.betweenClosed(
-                center.offset(-range, -4, -range), center.offset(range, 4, range))) {
+                center.offset(-range, -VanillaConstants.SEARCH_VERTICAL, -range), center.offset(range, VanillaConstants.SEARCH_VERTICAL, range))) {
             Block block = maid.level().getBlockState(pos).getBlock();
             if (block instanceof AnvilBlock) return pos.immutable();
         }

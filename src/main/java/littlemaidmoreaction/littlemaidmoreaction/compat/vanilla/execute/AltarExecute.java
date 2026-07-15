@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
 import com.github.tartaricacid.touhoulittlemaid.util.ItemsUtil;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ItemResolver;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.altar.AltarOutput;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -42,10 +43,10 @@ public final class AltarExecute {
         List<TileEntityAltar> result = new ArrayList<>();
         Set<Integer> seen = new HashSet<>();
         for (BlockPos pos : BlockPos.betweenClosed(
-                center.offset(-range, -4, -range), center.offset(range, 4, range))) {
+                center.offset(-range, -VanillaConstants.SEARCH_VERTICAL, -range), center.offset(range, VanillaConstants.SEARCH_VERTICAL, range))) {
             BlockEntity te = maid.level().getBlockEntity(pos);
             if (te instanceof TileEntityAltar altar && altar.isCanPlaceItem()) {
-                int hash = altar.getCanPlaceItemPosList().getData().hashCode();
+                int hash = System.identityHashCode(altar.getCanPlaceItemPosList());
                 if (seen.add(hash)) result.add(altar);
             }
         }

@@ -1,8 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.screen;
 
-import com.github.tartaricacid.touhoulittlemaid.client.gui.entity.model.MaidModelGui;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.tartaricacid.touhoulittlemaid.util.EntityCacheUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -10,20 +8,17 @@ import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.InventoryScreen;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.phys.AABB;
 
 import java.util.List;
-import java.util.Objects;
 
-/** v34.1: 女仆列表 + 静态3D预览 */
+/** v34.2: TLM MaidModelGui 同款预览 — 直接渲染选中女仆 */
 public final class MaidListScreen extends Screen {
     private static final int LIST_W = 240;
     private final Screen parent;
     private MaidList maidList;
     private EntityMaid selectedMaid;
-    private EntityMaid previewMaid;
 
     public MaidListScreen(Screen parent) {
         super(Component.literal("女仆编辑器"));
@@ -53,43 +48,20 @@ public final class MaidListScreen extends Screen {
         if (selectedMaid != null) {
             int px = LIST_W + 40;
             int py = height / 2 + 40;
-            renderEntityPreview(g, selectedMaid, px, py);
+            renderEntityPreview(g, selectedMaid, px, py, mx, my);
         } else {
             g.drawCenteredString(font, "选择女仆查看预览", LIST_W + 80, height / 2, 0x666666);
         }
     }
 
-    private void renderEntityPreview(GuiGraphics g, EntityMaid maid, int x, int y) {
-        // 同步外观到预览实体
-        if (previewMaid == null) {
-            previewMaid = createPreviewMaid();
-        }
-        if (previewMaid != null) {
-            previewMaid.setModelId(maid.getModelId());
-            previewMaid.setYsmModel(maid.getYsmModelId(), maid.getYsmModelTexture(), maid.getYsmModelName());
-            previewMaid.setIsYsmModel(maid.isYsmModel());
-            // 静态渲染: mouseX=mouseY=0 → 不跟随鼠标
-            InventoryScreen.renderEntityInInventoryFollowsMouse(g, x, y, 35, 0, 0, previewMaid);
-        }
+    private void renderEntityPreview(GuiGraphics g, EntityMaid maid, int x, int y, int mx, int my) {
+        // TLM MaidModelGui 同款：直接渲染实际女仆，跟随鼠标旋转
+        InventoryScreen.renderEntityInInventoryFollowsMouse(g, x, y, 50, x - mx, y - 90 - my, maid);
 
-        // 信息
         String info = maid.getName().getString()
                 + "  Lv." + maid.getFavorabilityManager().getLevel()
                 + "  " + (int) maid.getHealth() + "/" + (int) maid.getMaxHealth() + "❤";
         g.drawCenteredString(font, info, x, y + 110, 0xFFFFFF);
-    }
-
-    private EntityMaid createPreviewMaid() {
-        var mc = Minecraft.getInstance();
-        if (mc.level == null) return null;
-        try {
-            Entity e = EntityCacheUtil.ENTITY_CACHE.get(EntityMaid.TYPE,
-                    () -> Objects.requireNonNullElseGet(EntityMaid.TYPE.create(mc.level), () -> new EntityMaid(mc.level)));
-            EntityMaid m = (EntityMaid) e;
-            m.setOnGround(true);
-            m.setIsYsmModel(false);
-            return m;
-        } catch (Exception ex) { return null; }
     }
 
     @Override

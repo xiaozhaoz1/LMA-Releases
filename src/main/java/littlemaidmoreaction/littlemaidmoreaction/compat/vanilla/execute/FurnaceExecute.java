@@ -34,16 +34,14 @@ public final class FurnaceExecute {
         switch (phase) {
             case COLLECT_RESULT -> {
                 meaningful = FurnaceOutput.collectResult(furnace, maid, slots);
-                if (!meaningful) setPhase(data, Phase.ADD_INPUT);
+                setPhase(data, Phase.ADD_INPUT);
             }
             case ADD_INPUT -> {
-                if (furnace.getItem(slots.slot("input").orElse(0)).isEmpty())
-                    meaningful = FurnaceOutput.addInput(furnace, maid, inputItemId, slots);
+                meaningful = FurnaceOutput.addInput(furnace, maid, inputItemId, slots);
                 setPhase(data, Phase.ADD_FUEL);
             }
             case ADD_FUEL -> {
-                if (furnace.getItem(slots.slot("fuel").orElse(1)).isEmpty())
-                    meaningful = FurnaceOutput.addFuel(furnace, maid, inputItemId, slots);
+                meaningful = FurnaceOutput.addFuel(furnace, maid, inputItemId, slots);
                 setPhase(data, Phase.COLLECT_RESULT);
             }
         }
