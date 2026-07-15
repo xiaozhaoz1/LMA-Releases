@@ -86,7 +86,7 @@ compat/
 
 **自定义动画**: 将 `.animation.json` 放入 `config/littlemaidmoreaction/animations/` → F3+T
 
-**自定义音效**: 将 `.ogg` 放入 `config/littlemaidmoreaction/sounds/` → F3+T
+**内置音效**: JAR内置 3 个音效(man/manbaout/whatcanisay)，自定义音效通过资源包添加
 
 **动画参数编辑**: 规则编辑器 → 动作编辑 → 选 play_anim → [编辑] 按钮 → 配置每动画参数
 参数保存在 `config/littlemaidmoreaction/animationsetup/<name>.json`
