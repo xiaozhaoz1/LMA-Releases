@@ -1,0 +1,1 @@
+{"id":17,"name":"预设-声音模仿","enabled":true,"eventId":"lma_tick","chance":0.03,"cooldown":400,"priority":5,"matchMode":"ALL","conditions":[{"key":"maid_task","op":":=:","val":"touhou_little_maid:idle"}],"actions":[{"type":"play_sound","params":{"sound_id":"minecraft:entity.wolf.howl,minecraft:entity.enderman.teleport,minecraft:block.lava.ambient","volume":"1.0","pitch":"1.0"}}]}

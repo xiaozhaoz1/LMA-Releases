@@ -31,4 +31,8 @@ public final class BrainHelper {
     public static void clearLookTarget(EntityMaid maid) {
         maid.getBrain().eraseMemory(MemoryModuleType.LOOK_TARGET);
     }
+    /** ★ v35.1: 清除 CANT_REACH_WALK_TARGET — 恢复 AI 移动能力 */
+    public static void clearCantReachTarget(EntityMaid maid) {
+        maid.getBrain().eraseMemory(MemoryModuleType.CANT_REACH_WALK_TARGET_SINCE);
+    }
 }

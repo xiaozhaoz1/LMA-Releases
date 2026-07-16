@@ -41,7 +41,7 @@ public final class YsmCompat {
         CompatScanner.ScanResult r = CompatScanner.scan(YsmCompat.class,
                 "littlemaidmoreaction/littlemaidmoreaction/compat/ysm/impl/condition/",
                 "littlemaidmoreaction/littlemaidmoreaction/compat/ysm/impl/action/",
-                "littlemaidmoreaction/littlemaidmoreaction/compat/ysm/impl/event/");
+                "littlemaidmoreaction/littlemaidmoreaction/compat/ysm/impl/event/", net.minecraftforge.common.MinecraftForge.EVENT_BUS::register);
 
         LittleMaidMoreAction.LOGGER.info("[YsmCompat] init done: +{} conditions +{} actions +{} events",
                 r.conditions(), r.actions(), r.events());

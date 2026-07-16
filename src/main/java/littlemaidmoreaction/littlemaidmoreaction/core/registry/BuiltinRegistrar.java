@@ -224,7 +224,7 @@ public final class BuiltinRegistrar {
         register(new DropItemAction());
         register(new ExtractMaidXpAction());
         register(new GiveItemAction());
-        register(new littlemaidmoreaction.littlemaidmoreaction.impl.action.item.RepairItemAction());
+        register(new littlemaidmoreaction.littlemaidmoreaction.impl.action.maid.RepairItemAction());
 
         // maid
         register(new AutoMatchCropAction());

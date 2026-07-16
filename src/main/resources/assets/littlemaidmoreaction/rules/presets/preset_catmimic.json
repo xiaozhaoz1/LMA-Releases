@@ -1,0 +1,16 @@
+{
+  "id": 16,
+  "name": "预设-猫猫模仿",
+  "enabled": true,
+  "eventId": "lma_tick",
+  "chance": 0.02,
+  "cooldown": 600,
+  "priority": 5,
+  "matchMode": "ALL",
+  "conditions": [
+    {"key": "maid_task", "op": ":=:", "val": "touhou_little_maid:idle"}
+  ],
+  "actions": [
+    {"type": "play_sound", "params": {"sound_id": "minecraft:entity.cat.ambient", "volume": "1.0", "pitch": "1.0"}}
+  ]
+}

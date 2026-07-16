@@ -1,0 +1,16 @@
+{
+  "id": 9,
+  "name": "预设-饰品修复",
+  "enabled": true,
+  "eventId": "lma_tick",
+  "chance": 1.0,
+  "cooldown": 0,
+  "priority": 10,
+  "matchMode": "ALL",
+  "conditions": [
+    {"key": "maid_task", "op": ":=:", "val": "touhou_little_maid:idle"}
+  ],
+  "actions": [
+    {"type": "repair_item"}
+  ]
+}

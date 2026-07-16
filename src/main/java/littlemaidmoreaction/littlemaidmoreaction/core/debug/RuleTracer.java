@@ -3,16 +3,17 @@ package littlemaidmoreaction.littlemaidmoreaction.core.debug;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;
-import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.player.Player;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiConsumer;
 
 /**
  * 规则执行追踪器 — v8.3: 条件/动作逐条追踪 + 实时游戏内消息。
+ *
+ * <p>v35.1: sendMsg 改为 BiConsumer 回调 — 移除 core/ 对 Player/Component 的直接引用。
  *
  * <p>启用 {@code /lmma_trace live} 后触发规则的玩家收到实时消息。
  * 环形缓冲区最多 200 条历史记录。
@@ -25,19 +26,22 @@ public final class RuleTracer {
     private static volatile boolean liveMessages;
     private static final ThreadLocal<TraceRecord> CURRENT = new ThreadLocal<>();
 
+    /** v35.1: 消息发送回调 (由 engine/ 层注入 Player.sendSystemMessage) */
+    private static volatile BiConsumer<EntityMaid, String> msgSender;
+
     public static void setEnabled(boolean v) { enabled = v; }
     public static boolean isEnabled() { return enabled; }
     public static void setLiveMessages(boolean v) { liveMessages = v; }
     public static boolean isLiveMessages() { return liveMessages; }
     public static TraceRecord current() { return CURRENT.get(); }
 
+    /** v35.1: 注入消息发送器 (engine/ 层: Player::sendSystemMessage) */
+    public static void setMessageSender(BiConsumer<EntityMaid, String> sender) { msgSender = sender; }
+
     /** 发送游戏内消息给女仆主人 */
     private static void sendMsg(EntityMaid maid, String msg) {
-        if (!liveMessages || maid == null) return;
-        var owner = maid.getOwner();
-        if (owner instanceof Player) {
-            ((Player) owner).sendSystemMessage(Component.literal(msg));
-        }
+        if (!liveMessages || maid == null || msgSender == null) return;
+        msgSender.accept(maid, msg);
     }
 
     /** 开始追踪 — 在规则命中时调用 */

@@ -5,25 +5,25 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
+/** v35.1: 更新为 Function-based resolve() — MC 重载已移至 EngineUtils */
 class ExpressionResolverTest {
 
     @Test
     @DisplayName("non-expression strings pass through unchanged")
     void nonExpression_passesThrough() {
-        String result = ExpressionResolver.resolve("just_a_value", null, null, null);
-        assertEquals("just_a_value", result);
+        assertEquals("just_a_value", ExpressionResolver.resolve("just_a_value", k -> "0"));
     }
 
     @Test
     @DisplayName("null input returns null")
     void nullInput_returnsNull() {
-        assertNull(ExpressionResolver.resolve(null, null, null, null));
+        assertNull(ExpressionResolver.resolve(null, k -> "0"));
     }
 
     @Test
     @DisplayName("string without dollar passes through")
     void withoutDollar_passesThrough() {
-        assertEquals("hello", ExpressionResolver.resolve("hello", null, null, null));
+        assertEquals("hello", ExpressionResolver.resolve("hello", k -> "0"));
     }
 
     @Test

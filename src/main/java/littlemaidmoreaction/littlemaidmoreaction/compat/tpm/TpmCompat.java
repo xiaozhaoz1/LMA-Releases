@@ -24,7 +24,7 @@ public final class TpmCompat {
         CompatScanner.ScanResult r = CompatScanner.scan(TpmCompat.class,
                 "littlemaidmoreaction/littlemaidmoreaction/compat/tpm/impl/condition/",
                 "littlemaidmoreaction/littlemaidmoreaction/compat/tpm/impl/action/",
-                null);
+                null, net.minecraftforge.common.MinecraftForge.EVENT_BUS::register);
 
         RuleActionStorage.ensureCompatDefaults(TpmPresets.createDefaults());
 

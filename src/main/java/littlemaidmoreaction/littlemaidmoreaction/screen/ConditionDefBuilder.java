@@ -1,6 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.screen;
 
-import littlemaidmoreaction.littlemaidmoreaction.core.attribute.MaidAttrRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.MaidAttrRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.ConditionDef;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionValueType;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;

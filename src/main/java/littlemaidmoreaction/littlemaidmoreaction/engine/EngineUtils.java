@@ -1,9 +1,14 @@
 package littlemaidmoreaction.littlemaidmoreaction.engine;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
+import littlemaidmoreaction.littlemaidmoreaction.core.engine.ConditionEvaluator;
+import littlemaidmoreaction.littlemaidmoreaction.core.expression.ExpressionResolver;
+import littlemaidmoreaction.littlemaidmoreaction.core.model.ConditionDef;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.nbt.TagParser;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.LivingEntity;
 
 /**
@@ -15,6 +20,27 @@ import net.minecraft.world.entity.LivingEntity;
  * - NBT 解析吞所有异常并返回 null（编辑器可能写入非法 JSON 片段）
  */
 public final class EngineUtils {
+
+    // ---- 条件评估 + 表达式解析 MC 便利重载 (v35.1: 从 core/ 移入) ----
+
+    /** MC 便利重载 → 委托 core/ConditionEvaluator */
+    public static boolean evaluateCondition(ConditionDef cond, EntityMaid maid,
+                                            LivingEntity target, DamageSource source) {
+        return ConditionEvaluator.evaluate(cond, new RuleContext(maid, target, source));
+    }
+
+    /** MC 便利重载 → 委托 core/ConditionEvaluator */
+    public static String resolveConditionKey(String key, EntityMaid maid,
+                                             LivingEntity target, DamageSource source) {
+        return ConditionEvaluator.resolveKey(key, new RuleContext(maid, target, source), java.util.Map.of());
+    }
+
+    /** MC 便利重载 → 委托 core/ExpressionResolver */
+    public static String resolveExpression(String expr, EntityMaid maid,
+                                           LivingEntity target, DamageSource source) {
+        return ExpressionResolver.resolve(expr,
+            key -> ConditionEvaluator.resolveKey(key, new RuleContext(maid, target, source), java.util.Map.of()));
+    }
 
     private EngineUtils() {} // 工具类禁止实例化
 

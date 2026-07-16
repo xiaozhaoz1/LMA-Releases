@@ -24,7 +24,7 @@ public final class VanillaCompat {
         CompatScanner.ScanResult r = CompatScanner.scan(VanillaCompat.class,
             "littlemaidmoreaction/littlemaidmoreaction/compat/vanilla/input/detect/",
             "littlemaidmoreaction/littlemaidmoreaction/compat/vanilla/interact/",
-            null  // no events
+            null, null // no events
         );
 
         LittleMaidMoreAction.LOGGER.info(

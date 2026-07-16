@@ -52,7 +52,7 @@ public final class ParamMerger {
 
         // Layer 3: $expr 表达式求值
         merged.replaceAll((k, v) ->
-            ExpressionResolver.resolve(v, ctx.maid(), ctx.target(), ctx.source()));
+            ExpressionResolver.resolve(v, ctx));
 
         return merged;
     }

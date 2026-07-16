@@ -1,6 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.screen;
 
-import littlemaidmoreaction.littlemaidmoreaction.core.attribute.MaidAttrRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.MaidAttrRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.LmaAnimationDef;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;

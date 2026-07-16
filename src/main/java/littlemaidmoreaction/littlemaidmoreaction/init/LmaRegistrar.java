@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.init;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.core.debug.RuleTracer;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ActionRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.BuiltinRegistrar;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ClassScanner;
@@ -8,6 +9,8 @@ import littlemaidmoreaction.littlemaidmoreaction.core.registry.ConditionRegistry
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ForgeClassScanner;
 import littlemaidmoreaction.littlemaidmoreaction.storage.RuleActionStorage;
 import littlemaidmoreaction.littlemaidmoreaction.storage.StartupLoader;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.entity.player.Player;
 import net.minecraftforge.eventbus.api.IEventBus;
 
 /**
@@ -43,7 +46,12 @@ public final class LmaRegistrar {
 
     /** 服务端初始化 — 任务执行器 + 文档 + 版本门控 */
     public static void initServer() {
-        littlemaidmoreaction.littlemaidmoreaction.core.engine.ServerTaskExecutor.init();
+        // v35.1: 注入 RuleTracer 消息发送器 (Player::sendSystemMessage)
+        RuleTracer.setMessageSender((maid, msg) -> {
+            var owner = maid.getOwner();
+            if (owner instanceof Player player) player.sendSystemMessage(Component.literal(msg));
+        });
+        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.ForgeTaskQueueBridge.init();
         littlemaidmoreaction.littlemaidmoreaction.core.doc.DocGenerator.generateAll(
                 LittleMaidMoreAction.CONFIG_DIR.resolve("introduce"));
         littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.TlmVersionedEvents.register();
@@ -56,7 +64,7 @@ public final class LmaRegistrar {
 
     /** ★ v12.7 P0: 注册 MemoryModuleType DeferredRegister */
     public static void registerMemoryModules(IEventBus modBus) {
-        littlemaidmoreaction.littlemaidmoreaction.core.memory.LmaMemoryModuleRegistry.register(modBus);
+        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaMemoryModuleRegistry.register(modBus);
     }
 
     private LmaRegistrar() {}

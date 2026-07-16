@@ -9,8 +9,8 @@ import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskOrchestrator;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskRegistry;
 
 import java.util.List;
 import java.util.Map;
@@ -69,7 +69,7 @@ public final class StartTaskAction implements IAction {
         LmaFlowTask.savePreviousTask(maid);
 
         // 2. 验证材料 + 切换 Brain
-        PipelineResult result = TaskOrchestrator.validate(maid, taskType, sharedTaskId, target, targetCount);
+        PipelineResult result = TaskRegistry.validate(maid, taskType, sharedTaskId, target, targetCount);
         if (!result.completed()) {
             data.remove("lma_flow_task"); data.remove("lma_flow_task_id");
             data.remove("lma_flow_state"); data.remove("lma_flow_step");

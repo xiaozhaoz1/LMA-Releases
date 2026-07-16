@@ -12,8 +12,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaFlowTask;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskOrchestrator;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.PipelineResult;
 
 /**
  * v16: AI 唯一任务入口 — 取代 AssignTaskTool + CreateRuleTool + QueryRecipeTool + ...
@@ -147,7 +147,7 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
         // ★ v18: Pipeline 验证材料 → Brain Behavior 直接执行
         String sharedTaskId = String.valueOf(System.currentTimeMillis() % 100000);
         data.putString("lma_flow_task_id", sharedTaskId);
-        PipelineResult result = TaskOrchestrator.validate(maid, p.taskType, sharedTaskId, p.target, p.targetCount);
+        PipelineResult result = TaskRegistry.validate(maid, p.taskType, sharedTaskId, p.target, p.targetCount);
 
         if (!result.completed()) {
             data.remove("lma_flow_task"); data.remove("lma_flow_task_id");

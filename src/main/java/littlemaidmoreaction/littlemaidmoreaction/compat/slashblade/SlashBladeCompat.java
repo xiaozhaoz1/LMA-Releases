@@ -35,7 +35,7 @@ public final class SlashBladeCompat {
         CompatScanner.ScanResult r = CompatScanner.scan(SlashBladeCompat.class,
                 "littlemaidmoreaction/littlemaidmoreaction/compat/slashblade/impl/condition/",
                 "littlemaidmoreaction/littlemaidmoreaction/compat/slashblade/impl/action/",
-                null);
+                null, net.minecraftforge.common.MinecraftForge.EVENT_BUS::register);
 
         SlashbladeEventAdapter.register();
 

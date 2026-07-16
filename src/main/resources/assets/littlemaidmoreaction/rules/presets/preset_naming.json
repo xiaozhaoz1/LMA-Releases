@@ -1,0 +1,17 @@
+{
+  "id": 14,
+  "name": "预设-命名仪式",
+  "enabled": true,
+  "eventId": "maid_interact",
+  "chance": 1.0,
+  "cooldown": 0,
+  "priority": 80,
+  "matchMode": "ALL",
+  "conditions": [
+    {"key": "owner_holding_item", "op": ":=:", "val": "minecraft:name_tag"}
+  ],
+  "actions": [
+    {"type": "set_favor", "params": {"amount": "20"}},
+    {"type": "spawn_heart_particle"}
+  ]
+}

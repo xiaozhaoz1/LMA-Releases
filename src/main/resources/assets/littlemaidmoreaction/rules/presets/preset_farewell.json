@@ -1,0 +1,14 @@
+{
+  "id": 15,
+  "name": "预设-离别赠言",
+  "enabled": true,
+  "eventId": "maid_death",
+  "chance": 1.0,
+  "cooldown": 0,
+  "priority": 100,
+  "matchMode": "ALL",
+  "conditions": [],
+  "actions": [
+    {"type": "drop_item", "params": {"item_id": "minecraft:cake", "count": "1"}}
+  ]
+}

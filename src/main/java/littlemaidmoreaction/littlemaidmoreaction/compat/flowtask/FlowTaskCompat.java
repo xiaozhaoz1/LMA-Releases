@@ -14,7 +14,7 @@ public final class FlowTaskCompat {
         CompatScanner.scan(FlowTaskCompat.class,
             "littlemaidmoreaction/littlemaidmoreaction/compat/flowtask/impl/condition/",
             "littlemaidmoreaction/littlemaidmoreaction/compat/flowtask/impl/action/",
-            null);
+            null, net.minecraftforge.common.MinecraftForge.EVENT_BUS::register);
 
         LittleMaidMoreAction.LOGGER.info("[FlowTask] 流程任务模块已初始化");
     }

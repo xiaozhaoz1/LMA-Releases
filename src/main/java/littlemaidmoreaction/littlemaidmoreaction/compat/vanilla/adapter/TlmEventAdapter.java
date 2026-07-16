@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.*;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskEngine;
 import littlemaidmoreaction.littlemaidmoreaction.core.engine.RuleEngine;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -120,10 +121,23 @@ public final class TlmEventAdapter {
 
     // ═══ TLM 转换 (2+1) ═══
 
+    // ★ v35.4: 100tick(5s) 节流 — 被动规则(lma_tick) + TaskEngine, maid_tick 保持原样给战斗规则
+    private static final int LMA_TICK_INTERVAL = 100;
+    private static final String KEY_LMA_TICK = "lma_tick_last";
+
     @SubscribeEvent public static void onMaidTick(MaidTickEvent e) {
         var ctx = new RuleContext(e.getMaid());
-        // v11: 任务引擎 tick (状态轮询+超时检测, 在规则匹配前执行)
-        littlemaidmoreaction.littlemaidmoreaction.compat.flowtask.api.TaskEngine.tick(ctx);
+        var data = e.getMaid().getPersistentData();
+        long now = e.getMaid().level().getGameTime();
+        long last = data.getLong(KEY_LMA_TICK);
+
+        // 每 LMA_TICK_INTERVAL tick 触发一次慢事件
+        if (now - last >= LMA_TICK_INTERVAL || last == 0) {
+            data.putLong(KEY_LMA_TICK, now);
+            TaskEngine.tick(ctx);
+            RuleEngine.handleEvent("lma_tick", ctx);
+        }
+        // maid_tick 保持每 tick 触发 (战斗/快速响应规则)
         RuleEngine.handleEvent("maid_tick", ctx);
     }
     @SubscribeEvent public static void onMaidTombstone(MaidTombstoneEvent e) {

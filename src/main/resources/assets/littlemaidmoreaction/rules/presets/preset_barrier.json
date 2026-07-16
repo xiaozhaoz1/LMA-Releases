@@ -1,0 +1,1 @@
+{"id":13,"name":"预设-领域封锁","enabled":true,"eventId":"maid_tick","chance":1.0,"cooldown":600,"priority":60,"matchMode":"ALL","conditions":[{"key":"is_combat_task"}],"actions":[{"type":"barrier_ward"}]}

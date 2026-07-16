@@ -1,5 +1,8 @@
 package littlemaidmoreaction.littlemaidmoreaction.task.service;
 
+import littlemaidmoreaction.littlemaidmoreaction.core.MaterialChecker;
+import littlemaidmoreaction.littlemaidmoreaction.core.model.MaterialReport;
+
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;

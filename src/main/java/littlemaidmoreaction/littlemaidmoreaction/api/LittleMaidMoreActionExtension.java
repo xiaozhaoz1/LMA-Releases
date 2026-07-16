@@ -24,12 +24,7 @@ import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskT
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.AutoCropHandler;
 import littlemaidmoreaction.littlemaidmoreaction.resource.DynamicAnimationResources;
 import littlemaidmoreaction.littlemaidmoreaction.storage.StartupLoader;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskOrchestrator;
-import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.AltarCraftPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.BellRingPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.CraftChainPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.FurnacePipeline;
-import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.JukeboxPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskRegistry;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.Pack;
@@ -56,11 +51,8 @@ import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 public final class LittleMaidMoreActionExtension implements ILittleMaid {
 
     public LittleMaidMoreActionExtension() {
-        TaskOrchestrator.register(new CraftChainPipeline());
-        TaskOrchestrator.register(new FurnacePipeline());
-        TaskOrchestrator.register(new JukeboxPipeline());
-        TaskOrchestrator.register(new BellRingPipeline());
-        TaskOrchestrator.register(new AltarCraftPipeline());
+        // ★ v35: 任务类型注册已移至 TaskRegistry (静态初始化)
+        TaskRegistry.taskTypes(); // 触发类加载 → 自动注册 5 个 Pipeline
     }
 
     /** 注册 LMA 魔法咏唱动画 Provider — TLM 每帧自动调用（客户端专用） */
@@ -136,8 +128,8 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
             @Override
             public List<MemoryModuleType<?>> getExtraMemoryTypes() {
                 return List.of(
-                        littlemaidmoreaction.littlemaidmoreaction.core.memory.LmaMemoryModuleRegistry.NAV_TARGET.get(),
-                        littlemaidmoreaction.littlemaidmoreaction.core.memory.LmaMemoryModuleRegistry.NAV_START_TICK.get()
+                        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaMemoryModuleRegistry.NAV_TARGET.get(),
+                        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaMemoryModuleRegistry.NAV_START_TICK.get()
                 );
             }
         });

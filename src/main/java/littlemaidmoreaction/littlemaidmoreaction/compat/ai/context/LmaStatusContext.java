@@ -55,6 +55,7 @@ public final class LmaStatusContext {
 
             // ★ v12.6: 强化身份消歧 + 任务关键词检测
             sb.append("IDENTITY: You ARE this maid entity. Player=owner. ");
+            if (maid.hasCustomName()) sb.append("Your name is \"").append(maid.getCustomName().getString()).append("\". ");
             sb.append("CRITICAL: owner says \"I/me/my\" = owner NOT you. ");
             sb.append("\"you\"/\"maid\" = this maid (YOU). ");
             sb.append("target=self=YOU. target=owner=player. ");

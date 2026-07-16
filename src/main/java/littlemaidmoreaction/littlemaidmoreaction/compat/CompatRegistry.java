@@ -27,31 +27,38 @@ public final class CompatRegistry {
     public static final String SLASHBLADE = "slashblade";
     public static final String TPM = "true_power_of_maid";
 
+    /** v35.5: 防止 scanAllCompatEarly() + onEnqueue() 双重初始化 */
+    private static volatile boolean earlyScanned = false;
+
     /**
      * ★ Bug #68 fix: 提前扫描 compat 模块（mod 构造器中调用）。
      * 注册动作/条件到 Registry，确保 RuleActionStorage.load() 读取规则时
      * 所有 compat 动作已可用，消除 "未知动作类型" 警告。
-     * init() 方法幂等 — 条件/动作重复注册无害，规则文件写后不重写。
+     * 幂等 — 条件/动作重复注册无害，earlyScanned 守卫防止重复执行副作用。
      */
     public static void scanAllCompatEarly() {
-        littlemaidmoreaction.littlemaidmoreaction.compat.flowtask.FlowTaskCompat.init();
-        VanillaCompat.init();
-        checkModLoad(YSM, YsmCompat::init);
-        checkModLoad(SLASHBLADE, SlashBladeCompat::init);
-        checkModLoad(TPM, TpmCompat::init);
+        if (earlyScanned) return;
+        earlyScanned = true;
+        doScan();
     }
 
     @SubscribeEvent
     public static void onEnqueue(final InterModEnqueueEvent event) {
         event.enqueueWork(() -> {
-            // 原生功能 — 无需门控 (祭坛已迁移到 impl, ForgeClassScanner 自动注册)
-            littlemaidmoreaction.littlemaidmoreaction.compat.flowtask.FlowTaskCompat.init();
-            VanillaCompat.init();  // ★ v12.4: compat/vanilla/interact/ 注册 (P0修复)
-            // 外部模组 — 门控检查
-            checkModLoad(YSM, YsmCompat::init);
-            checkModLoad(SLASHBLADE, SlashBladeCompat::init);
-            checkModLoad(TPM, TpmCompat::init);
+            // ★ v35.5: 若 scanAllCompatEarly() 已扫描则跳过，避免双重初始化
+            if (earlyScanned) return;
+            earlyScanned = true;
+            doScan();
         });
+    }
+
+    /** 执行 compat 扫描 (条件/动作注册 + 门控检查) */
+    private static void doScan() {
+        littlemaidmoreaction.littlemaidmoreaction.compat.flowtask.FlowTaskCompat.init();
+        VanillaCompat.init();
+        checkModLoad(YSM, YsmCompat::init);
+        checkModLoad(SLASHBLADE, SlashBladeCompat::init);
+        checkModLoad(TPM, TpmCompat::init);
     }
 
     private static void checkModLoad(String modId, Runnable runnable) {

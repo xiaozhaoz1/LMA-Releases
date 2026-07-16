@@ -67,9 +67,9 @@ public final class LmaTaskTypeRegistry {
 
     private static final ItemStack DEFAULT_ICON = Items.CRAFTING_TABLE.getDefaultInstance();
 
-    /** ★ v32: 从 TaskHandlerRegistry 读取已知任务类型 */
+    /** ★ v35: 从 TaskRegistry 读取已知任务类型 */
     private static Set<String> getKnownTaskTypes() {
-        return littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.TaskHandlerRegistry.taskTypes();
+        return littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskRegistry.taskTypes();
     }
 
     /** 已知简单任务类型 (启动时初始化 + 可运行时注册) */
@@ -93,9 +93,9 @@ public final class LmaTaskTypeRegistry {
         // altar_craft 保留 LmaTypedFlowTask (委派规则引擎)
 
         for (String known : getKnownTaskTypes()) {
-            // ★ v16: jukebox/bell_ring/furnace/craft_chain 改为 LmaTypedFlowTask 注册
-            // ★ v14: brewing 不可自动化，保留跳过
             if ("brewing".equals(known)) continue;
+            // ★ v35.4: 只注册 showInBar=true 的任务到 TLM 任务栏
+            if (!littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskToggle.isVisible(known)) continue;
             registerIfNew(known);
         }
 

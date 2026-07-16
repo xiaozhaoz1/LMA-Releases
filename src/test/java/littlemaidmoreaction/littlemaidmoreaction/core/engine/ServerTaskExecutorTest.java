@@ -7,33 +7,29 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * {@link ServerTaskExecutor} 的单元测试。
+ * {@link ServerTaskQueue} 的单元测试 (v35.1: 从 ServerTaskExecutor 重命名)。
  *
- * <p>注意：测试环境不加载 MinecraftForge，因此 {@link ServerTaskExecutor#init()}
- * 无法正常执行。对于需要 {@code initialized = true} 的测试用例，通过反射直接设置标志位。
+ * <p>测试纯 Java 队列逻辑，不依赖 Forge/MC 运行时。
  */
 class ServerTaskExecutorTest {
 
     @BeforeEach
     void reset() {
-        ServerTaskExecutor.resetForTest();
+        ServerTaskQueue.resetForTest();
     }
 
     @Test
-    @DisplayName("submit() throws IllegalStateException if init() was not called")
+    @DisplayName("submit() throws IllegalStateException if not initialized")
     void submit_throwsIfNotInitialized() {
-        assertThrows(IllegalStateException.class, () -> ServerTaskExecutor.submit(() -> {}));
+        assertThrows(IllegalStateException.class, () -> ServerTaskQueue.submit(() -> {}));
     }
 
     @Test
-    @DisplayName("init() is idempotent (calling twice doesn't throw)")
-    void init_isIdempotent() {
-        // 通过反射设置 initialized = true，模拟已初始化状态
+    @DisplayName("markInitialized() is idempotent")
+    void markInitialized_isIdempotent() {
         setInitialized(true);
-
-        // 再次调用 init()，应因幂等性检查而不抛出异常
-        ServerTaskExecutor.init();
-        ServerTaskExecutor.init();
+        ServerTaskQueue.markInitialized();
+        assertDoesNotThrow(() -> ServerTaskQueue.submit(() -> {}));
     }
 
     @Test
@@ -41,17 +37,17 @@ class ServerTaskExecutorTest {
     void submit_returnsIncompleteFuture() {
         setInitialized(true);
 
-        var future = ServerTaskExecutor.submit(() -> {});
+        var future = ServerTaskQueue.submit(() -> {});
 
         assertNotNull(future);
-        // 由于测试环境中没有 tick 事件消费队列，future 应保持未完成状态
+        // 测试环境无 tick 消费，future 应保持未完成
         assertFalse(future.isDone());
     }
 
-    /** 通过反射设置 {@code initialized} 标志位，绕过 Forge 测试环境限制。 */
+    /** 通过反射设置 initialized 标志位 */
     private static void setInitialized(boolean value) {
         try {
-            var field = ServerTaskExecutor.class.getDeclaredField("initialized");
+            var field = ServerTaskQueue.class.getDeclaredField("initialized");
             field.setAccessible(true);
             field.setBoolean(null, value);
         } catch (Exception e) {

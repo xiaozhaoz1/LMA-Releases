@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.core.engine;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.movement.BrainHelper;
 import littlemaidmoreaction.littlemaidmoreaction.core.debug.RuleTracer;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.ActionStep;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;
@@ -319,7 +320,7 @@ public final class ActionPipeline {
         data.remove("lma_anim_dur");
         // lmma_anim_seq 保留 — Provider 需要检测新请求
         // 恢复 AI 移动
-        ctx.maid().getBrain().eraseMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.CANT_REACH_WALK_TARGET_SINCE);
+        BrainHelper.clearCantReachTarget(ctx.maid());
         if (!oldMode.isEmpty()) {
             LittleMaidMoreAction.LOGGER.info("[LMA/Pipeline] resetAnim maid={} oldMode={} cleared v7 keys", ctx.maid().getId(), oldMode);
         }

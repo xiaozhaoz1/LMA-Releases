@@ -49,6 +49,13 @@ public final class LMAConfigScreen extends Screen {
                 .pos(cx - 80, y).size(160, 20).build());
         y += 28;
 
+        // ★ v35.2: 任务树入口
+        this.addRenderableWidget(Button.builder(
+                Component.literal("任务树"),
+                btn -> Minecraft.getInstance().setScreen(new TaskTreeScreen(this)))
+                .pos(cx - 80, y).size(160, 20).build());
+        y += 28;
+
         this.addRenderableWidget(Button.builder(
                 Component.literal("调试: " + (MoreActionConfig.DEBUG_MODE.get() ? "ON" : "OFF")),
                 btn -> {

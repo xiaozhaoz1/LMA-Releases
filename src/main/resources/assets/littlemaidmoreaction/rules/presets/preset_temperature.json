@@ -1,0 +1,14 @@
+{
+  "id": 10,
+  "name": "预设-温度感知",
+  "enabled": true,
+  "eventId": "lma_tick",
+  "chance": 1.0,
+  "cooldown": 0,
+  "priority": 10,
+  "matchMode": "ALL",
+  "conditions": [],
+  "actions": [
+    {"type": "temperature_adapt"}
+  ]
+}

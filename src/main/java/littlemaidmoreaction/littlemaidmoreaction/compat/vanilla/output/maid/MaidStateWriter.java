@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.maid;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
-import littlemaidmoreaction.littlemaidmoreaction.core.attribute.MaidAttrRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.MaidAttrRegistry;
 import com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
