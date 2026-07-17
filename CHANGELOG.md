@@ -1,5 +1,13 @@
 # Changelog
 
+## [v36.6] — 2026-07-17 — 状态原子化 + 采集目标抽象 + TaskEngine 打架修复
+
+- **P0 根因**: lma_flow_tick 无心跳 → TaskEngine 60 秒超时杀活任务 → auto-restart 无限 churn（"卡住"的真凶，日志实锤）
+- **TaskStateService**（新）: lma_flow_* 状态写入单一所有者 — init/heartbeat/fail/complete/clearAll；协调行为全部委托；执行器 keepAlive 打心跳 → 活任务永不被超时杀
+- **HarvestTarget 抽象类**（新，用户要求的检测原子化）: matches/canHarvest/validAt/veinPredicate/consumesDurability/intervalTicks/label 六判定收拢，WOOD/ORE 两实现；执行器归零内联判断，新采集类型=一个新实现类
+- 半径修复: 无家模式回退 config 默认 16 格（原裸用 restrictRadius 可能无效）
+- 待机可感知: 无目标时一次性气泡"附近没有可采集的目标"（状态翻转才再发）+ DEBUG 含半径值
+
 ## [v36.5] — 2026-07-17 — 修复：stale failed 阻塞任务切换 + 气泡 API 误用
 
 - **P0**: failTask 残留 lma_flow_task 导致切换任务后女仆不动 → checkExtra 对已注册 LMA 任务放行重新初始化
