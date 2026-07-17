@@ -76,6 +76,7 @@ public enum RuleEvent {
     // ===== LMA 自定义 (2) — v11 =====
     TASK_CHANGED("task_changed", "任务状态变更", Event.class, false),
     LMA_TASK_START("lma_task_start", "女仆任务循环触发", LmaTaskStartEvent.class, false),
+    LMA_ENV_SCAN("lma_env_scan", "环境感知扫描命中", MaidTickEvent.class, false),
 
     ;
 

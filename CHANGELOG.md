@@ -1,5 +1,52 @@
 # Changelog
 
+## [v37.1] — 2026-07-17 — 世界感知补齐（常驻 + 变化触发）
+
+### 世界状态感知（判定对齐 TLM）
+- **WorldSensor 类型** — `addWorldSensor(id, trigger(prev,now), appliesTo, callback)` prev/now 边沿触发
+- **6 个内置常驻感知器**（所有女仆，纯规则事件通道）：
+  `env_too_cold`（温度<0.15, TLM COLD 档）/ `env_too_hot`（>1.0, TLM 判热）/ `env_snowing`（下雨中且位置降水=SNOW）/ `env_day_night_change` / `env_weather_change` / `env_dimension_change`
+- WorldInfo 新增: tempCategory(COLD/OCEAN/MEDIUM/WARM 四档) / temperature(biome 基础温度) / precipitation(NONE/RAIN/SNOW) / dayTime
+- 边沿检测：只在进入状态时触发一次，不重复轰炸
+- 内置注册后系统**常驻**（每女仆 200 tick 一次轻量世界读取；方块/实体扫描仍按需）
+- Config 新增: cold_threshold(0.15) / hot_threshold(1.0)
+- 用法：规则事件 `lma_env_scan` + 条件 `env_sensor_hit(sensor_id=env_too_cold)` → 任意动作
+
+## [v37] — 2026-07-17 — 环境感知调度器 EnvSense
+
+### 新系统（低耗环境感知 + 注册 API）
+- **EnvSenseRegistry** — `addBlockSensor/addEntitySensor(id, matcher, appliesTo, callback)` 注册 API，id 去重 WARN，appliesTo=null 适用所有女仆
+- **EnvSenseScheduler** — 每女仆每 200 tick（config 可调）最多一次合并扫描；**零注册=零开销**（每 tick 仅一次布尔判断）；按需扫描（无适用感知器的女仆零扫描）
+- **EnvScanner**（输入层）— N 感知器共享单次 `(2r+1)²×9` 方块遍历 + 单次 AABB 实体查询 + 世界状态直读；半径=工作范围优先
+- **EnvSnapshot** — 不可变快照缓存，任意代码 `getSnapshot(maid)` O(1) 读取；命中按距离排序截断
+- **双通道触发**: ①命中感知器 Java 回调（try/catch 隔离）②`lma_env_scan` 规则事件（ctx attr `env_hits`）
+- **env_sensor_hit 规则条件** — O(1) 查快照，规则不再自己扫描（对比 detect 条件绑 maid_tick 每 tick 3,969 方块位，降 ~99.5%）
+- 缓存闭环：EntityLeaveLevelEvent 清理 LAST_SCAN + SNAPSHOTS
+- Config 新增 env_sense 组: scan_interval_ticks(200) / default_radius(16) / max_hits_per_sensor(32)
+
+## [v36] — 2026-07-17 — 连锁采集任务：采集木材 + 采集矿石
+
+### 新任务 (环境感知硬编码任务引擎，非规则引擎)
+- **collect_wood 采集木材** — 女仆持斧自动寻找工作范围内树木，走到树旁 3 格内连锁砍伐整棵（BFS 26 邻域），树叶留存自然衰减
+- **collect_ore 采集矿石** — 女仆持镐自动挖掘同种矿脉，挖掘等级判定（木镐挖不动钻石矿）
+- 多 tick 逐块破坏（默认 5 tick/块）+ 挥臂动画 + 工具耐久消耗（剩 1 点耐久停手）
+- 天然树校验：原木需连接非手放树叶，防拆玩家木建筑（config 可关）
+- 一轮完成自动搜索下一目标，连续作业
+
+### 新分层组件 (IO 原子化架构)
+- **输入层** `input/item/ToolStateReader` — 工具原子读 IO（tier/类型/耐久/NBT）
+- **输入层** `input/search/ConnectedBlockSearch` — BFS 连通搜索 + 天然树 DFS 校验
+- **计算层** `task/service/ToolJudge` — canPickaxeMine/canAxeChop/isToolUsable 判断组合
+- **执行层** `execute/ChainHarvestExecute` — WOOD/ORE 共用状态机，只编排零内联判断
+- `task/pipeline/ChainWoodPipeline` + `ChainOrePipeline`
+
+### 框架扩展
+- TaskRegistry 新增 `registerSearch()` — searchPredicate 标签/多方块搜索（原 targetBlock 只支持单方块）
+- LmaFlowCoordinationBehavior searchBlock/isBlockValid 支持 searchPredicate
+- TlmEventAdapter 跨 session 清理新增 lma_chain_* 队列键
+- LmaTaskTypeRegistry.getIcon 精确映射优先（修复 collect_wood 误中 collect→镐图标）
+- Config 新增 chain_harvest 组: max_blocks(64) / break_interval_ticks(5) / wood_nature_check(true)
+
 ## [v34.2] — 2026-07-15 — 女仆编辑器注册模式 + execute Bug 修复
 
 ### 注册模式重构 (4 新文件)

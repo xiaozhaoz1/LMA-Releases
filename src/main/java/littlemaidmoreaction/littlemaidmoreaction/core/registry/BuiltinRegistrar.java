@@ -159,6 +159,7 @@ public final class BuiltinRegistrar {
         register(new ContainerHasItemCondition());
         register(new DamageTypeCondition());
         register(new DimensionCondition());
+        register(new EnvSensorCondition());
         register(new IsCriticalAttackCondition());
         register(new PlayerHasItemCondition());
         register(new StructureNearbyCondition());

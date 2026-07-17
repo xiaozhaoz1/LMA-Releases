@@ -131,11 +131,13 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         }
     }
 
-    /** 搜索目标方块: targetBlock!=null→BlockState匹配, null→BlockEntity匹配 */
+    /** 搜索目标方块: searchPredicate→自定义匹配, targetBlock!=null→BlockState匹配, null→BlockEntity匹配 */
     private static BlockPos searchBlock(ServerLevel world, EntityMaid maid,
                                          TaskRegistry.TaskHandler handler) {
         BiPredicate<BlockPos, BlockState> predicate;
-        if (handler.targetBlock() != null) {
+        if (handler.searchPredicate() != null) {
+            predicate = handler.searchPredicate();
+        } else if (handler.targetBlock() != null) {
             predicate = (p, s) -> s.is(handler.targetBlock());
         } else {
             predicate = switch (handler.taskType()) {
@@ -154,6 +156,7 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
                                          TaskRegistry.TaskHandler handler) {
         BlockState state = world.getBlockState(pos);
         if (state.isAir()) return false;
+        if (handler.searchPredicate() != null) return handler.isValid().test(state);
         if (handler.targetBlock() != null) return handler.isValid().test(state);
         // targetBlock==null → BlockEntity 验证
         return switch (handler.taskType()) {

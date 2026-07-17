@@ -21,6 +21,8 @@ public final class VanillaCompat {
 
     public static void init() {
         BuiltinMaidEditorRegistration.init();
+        // v37.1: 内置世界感知器（太冷/太热/下雪/昼夜/天气/维度 — 常驻边沿触发）
+        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense.BuiltinEnvSensors.init();
         CompatScanner.ScanResult r = CompatScanner.scan(VanillaCompat.class,
             "littlemaidmoreaction/littlemaidmoreaction/compat/vanilla/input/detect/",
             "littlemaidmoreaction/littlemaidmoreaction/compat/vanilla/interact/",

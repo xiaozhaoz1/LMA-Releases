@@ -137,6 +137,9 @@ public final class TlmEventAdapter {
             TaskEngine.tick(ctx);
             RuleEngine.handleEvent("lma_tick", ctx);
         }
+        // v37: 环境感知调度（内部自节流 200tick，无感知器时零开销）
+        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense
+            .EnvSenseScheduler.tick(e.getMaid());
         // maid_tick 保持每 tick 触发 (战斗/快速响应规则)
         RuleEngine.handleEvent("maid_tick", ctx);
     }
@@ -215,6 +218,9 @@ public final class TlmEventAdapter {
             data.remove("lma_flow_counter"); data.remove("lma_flow_max_count");
             data.remove("lma_flow_tick"); data.remove("lma_flow_timeout");
             data.remove("lma_flow_data"); data.remove("lma_flow_cached");
+            // v36: 连锁采集队列跨 session 清理（防止残留队列指向远处坐标）
+            littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute
+                .ChainHarvestExecute.clearChainData(data);
             // 恢复原TLM任务 → brain回到正常状态
             var defaultTask = com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager.getIdleTask();
             maid.setTask(defaultTask);

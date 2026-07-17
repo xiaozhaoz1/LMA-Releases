@@ -390,6 +390,34 @@
 | `resolve(id)` | `Item` | Forge Registry |
 | `exists(id)` | `boolean` | Forge Registry |
 
+### ToolStateReader (6 methods) — v36
+`compat/vanilla/input/item/ToolStateReader.java` — 原子只读，零判断
+
+| Method | Returns | Source |
+|--------|---------|--------|
+| `getTierLevel(stack)` | `int` (-1=非Tiered) | MC TieredItem |
+| `isPickaxe(stack)` / `isAxe(stack)` | `boolean` | MC instanceof |
+| `isCorrectToolForDrops(stack, state)` | `boolean` | MC 原生(含挖掘等级) |
+| `getRemainingDurability(stack)` | `int` (不可损坏=MAX) | MC + calc |
+| `getNbt(stack)` | `CompoundTag?` | MC |
+
+### ConnectedBlockSearch (2 methods) — v36
+`compat/vanilla/input/search/ConnectedBlockSearch.java`
+
+| Method | Returns | Source |
+|--------|---------|--------|
+| `findConnected(w, start, match, maxBlocks, anchor, maxDistSqr)` | `List<BlockPos>` BFS层序 | MC + BFS |
+| `isNaturalTree(w, startLog, maxLogs)` | `boolean` (DFS原木→自然树叶) | MC + DFS |
+
+### ToolJudge (3 methods) — v36 计算层
+`compat/vanilla/task/service/ToolJudge.java` — 组合原子 IO 出高层判断
+
+| Method | Returns | 组合 |
+|--------|---------|------|
+| `canPickaxeMine(tool, state)` | `boolean` | isPickaxe + isCorrectToolForDrops |
+| `canAxeChop(tool, state)` | `boolean` | isAxe |
+| `isToolUsable(tool, reserve)` | `boolean` | getRemainingDurability > reserve |
+
 ### ParamExtractor (factory + accessors)
 | Method | Returns | Source |
 |--------|---------|--------|
@@ -411,3 +439,5 @@
 ---
 
 > v11 2026-07-13 | 346 methods | 20 files | Compiled + 153 tests green
+> v36 2026-07-17 | +11 methods (+ToolStateReader/ConnectedBlockSearch/ToolJudge) | 23 files | Compiled + tests green
+> v37 2026-07-17 | +EnvSense (EnvSenseRegistry/EnvSenseScheduler/EnvScanner/EnvSnapshot — api/envsense + input/sense) | 每200tick合并扫描, 注册API: addBlockSensor/addEntitySensor(id, matcher, appliesTo, callback), 快照查询: EnvSenseScheduler.getSnapshot(maid)

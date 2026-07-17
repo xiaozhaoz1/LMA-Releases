@@ -20,6 +20,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
 /**
@@ -75,12 +76,36 @@ public final class TaskRegistry {
                 action.execute(new RuleContext(m), params);
                 return TaskResult.SUCCESS;
             });
+
+        // ── v36: 连锁采集（环境感知任务 — searchPredicate 按标签搜索目标） ──
+        registerSearch("collect_wood",
+            (p, s) -> s.is(net.minecraft.tags.BlockTags.LOGS),
+            state -> state.is(net.minecraft.tags.BlockTags.LOGS),
+            new littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.pipeline.ChainWoodPipeline(),
+            (w, m, p, d) -> littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute
+                .ChainHarvestExecute.execute(w, m, p, d,
+                    littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.ChainHarvestExecute.Mode.WOOD));
+
+        registerSearch("collect_ore",
+            (p, s) -> s.is(net.minecraftforge.common.Tags.Blocks.ORES),
+            state -> state.is(net.minecraftforge.common.Tags.Blocks.ORES),
+            new littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.pipeline.ChainOrePipeline(),
+            (w, m, p, d) -> littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute
+                .ChainHarvestExecute.execute(w, m, p, d,
+                    littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.ChainHarvestExecute.Mode.ORE));
     }
 
-    /** 注册任务类型 */
+    /** 注册任务类型 (targetBlock 精确匹配搜索) */
     public static void register(String taskType, Block block, Predicate<BlockState> valid,
                                  TaskPipeline pipeline, TaskExecutor executor) {
-        HANDLERS.put(taskType, new TaskHandler(taskType, block, valid, pipeline, executor));
+        HANDLERS.put(taskType, new TaskHandler(taskType, block, null, valid, pipeline, executor));
+    }
+
+    /** v36: 注册任务类型 (searchPredicate 自定义搜索 — 标签/多方块匹配) */
+    public static void registerSearch(String taskType, BiPredicate<BlockPos, BlockState> searchPredicate,
+                                       Predicate<BlockState> valid,
+                                       TaskPipeline pipeline, TaskExecutor executor) {
+        HANDLERS.put(taskType, new TaskHandler(taskType, null, searchPredicate, valid, pipeline, executor));
     }
 
     /**
@@ -115,6 +140,7 @@ public final class TaskRegistry {
     public record TaskHandler(
         String taskType,
         Block targetBlock,
+        BiPredicate<BlockPos, BlockState> searchPredicate,
         Predicate<BlockState> isValid,
         TaskPipeline pipeline,
         TaskExecutor executor

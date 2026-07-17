@@ -202,6 +202,9 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
             if (event.getEntity() instanceof EntityMaid maid) {
                 AutoCropHandler.onMaidUnload(maid.getUUID());
+                // v37: 环境感知缓存清理（key 闭环）
+                littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense
+                    .EnvSenseScheduler.onMaidUnload(maid.getId());
             }
         }
     }

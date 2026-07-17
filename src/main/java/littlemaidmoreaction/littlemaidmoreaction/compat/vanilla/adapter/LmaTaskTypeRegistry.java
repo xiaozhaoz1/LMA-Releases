@@ -167,6 +167,12 @@ public final class LmaTaskTypeRegistry {
     /** 根据 task_type 获取图标 */
     public static ItemStack getIcon(String taskType) {
         if (taskType == null || taskType.isEmpty()) return DEFAULT_ICON;
+        // v36: 精确映射优先 — 关键词 contains 对 collect_wood 会误中 "collect"→镐
+        switch (taskType) {
+            case "collect_wood": return Items.IRON_AXE.getDefaultInstance();
+            case "collect_ore": return Items.IRON_PICKAXE.getDefaultInstance();
+            default: break;
+        }
         String lower = taskType.toLowerCase(Locale.ROOT);
         for (var entry : ICON_MAP.entrySet()) {
             if (lower.contains(entry.getKey())) {
