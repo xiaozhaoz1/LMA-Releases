@@ -9,7 +9,6 @@ import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.item.ToolS
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.search.BlockSearch;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.search.ConnectedBlockSearch;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.world.WorldOutput;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskKeys;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.service.ToolJudge;
 import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import net.minecraft.core.BlockPos;
@@ -17,46 +16,57 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.common.Tags;
 
 import javax.annotation.Nullable;
-import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 
 /**
- * 连锁采集执行器 (v36) — 砍树 (WOOD) / 挖矿 (ORE) 共用状态机。
+ * 连锁采集执行器 (v36.4) — 砍树 (WOOD) / 挖矿 (ORE) 简化循环。
  *
- * <h3>v36.3 批量预队列</h3>
- * 到达时一次性搜范围内所有目标 → BFS 扁平化入单一队列 → 跳过集标记 → 连续挖掘。
- * 打破 v36.2 "每脉走→挖→搜下一脉" 慢循环。挖掘头顶气泡实时显示进度。
+ * <h3>循环（用户 2026-07-17 定义）</h3>
+ * <pre>
+ * 每 3 秒(60 tick)扫描周围目标
+ *   → 最近的"能挖的"(等级过滤+跳过集) → 设路径走过去
+ *   → 到达 → BFS 整脉/整树 → 蓄力(块数 × 每块tick) → 时间到整脉同消
+ *   → 挖不了跳过找下一个；挖完立即接下一轮扫描
+ *   → 无目标保持空闲扫描(任务常驻，树再生自动恢复作业)
+ * </pre>
  *
- * <h3>速度模型（v36.2 用户定义）</h3>
- * {@link ToolJudge#harvestIntervalTicks}: 空手40/木20/石15/铁10/钻5/合金5 (tick/块)。
+ * <h3>速度表（v36.2 用户定义, tick/块）</h3>
+ * {@link ToolJudge#harvestIntervalTicks}: 空手40/木20/石15/铁10/钻5/合金5。
+ * 蓄力总时长 = 块数 × 每块 tick。
  */
 public final class ChainHarvestExecute {
 
     public enum Mode { WOOD, ORE }
 
+    // ── PersistentData keys (set → remove 闭环; IDX/TICK 为旧版残留一并清理) ──
     public static final String KEY_QUEUE = "lma_chain_queue";
-    public static final String KEY_IDX = "lma_chain_idx";
-    public static final String KEY_TICK = "lma_chain_tick";
+    public static final String KEY_CHARGE_END = "lma_chain_charge_end";
+    private static final String KEY_IDX_LEGACY = "lma_chain_idx";
+    private static final String KEY_TICK_LEGACY = "lma_chain_tick";
 
+    /** v36.4 用户定: 3 秒扫描一次 */
+    private static final int SCAN_INTERVAL_TICKS = 60;
+    /** BFS/破坏距离上限平方 (以女仆为锚点 32 格) */
     private static final double MAX_DIST_SQR = 32 * 32;
     private static final int NATURE_CHECK_MAX_LOGS = 100;
     private static final int TOOL_RESERVE_DURABILITY = 1;
-    /** v36.3 用户定 10 — 批量预队列后跳过集作用降低 */
+    /** 跳过集容量 (v36.3 用户定 10) */
     private static final int SKIP_MAX = 10;
 
-    // ── 跳过集（按工具 tier 版本化） ──
+    /** entityId → 上次扫描 gameTime（空闲扫描节流） */
+    private static final Map<Integer, Long> LAST_SCAN = new ConcurrentHashMap<>();
+    /** entityId → 跳过集（按工具 tier 版本化） */
     private static final Map<Integer, SkipState> SKIPPED = new ConcurrentHashMap<>();
 
     private static final class SkipState {
@@ -77,132 +87,151 @@ public final class ChainHarvestExecute {
             return TaskResult.FAILED;
         }
 
-        if (!data.contains(KEY_QUEUE)) {
-            return initQueue(world, maid, pos, data, mode, tool);
+        // 蓄力/破坏阶段
+        if (data.contains(KEY_QUEUE)) {
+            return charge(world, maid, data, mode, tool);
         }
-        return breakNext(world, maid, data, mode, tool);
+
+        // 到达目标方块 → 尝试开脉
+        BlockState state = world.getBlockState(pos);
+        if (isTarget(mode, state)) {
+            return tryStartVein(world, maid, pos, data, mode, tool);
+        }
+
+        // 空闲（pos=女仆脚下 keepAlive 回调）→ 3 秒节流扫描
+        return idleScan(world, maid, data, mode, tool, false);
     }
 
-    // ── 阶段 1: v36.3 批量预队列 — 到达时一次性搜所有候选，全量扁平化入队 ──
+    // ── 阶段 1: 到达开脉（挖不了 → 跳过 → 立即找下一个） ──
 
-    private static TaskResult initQueue(ServerLevel world, EntityMaid maid, BlockPos pos,
-                                        CompoundTag data, Mode mode, ItemStack tool) {
-        // 1. 搜范围内所有候选
-        List<BlockPos> candidates = findAllTargets(world, maid, mode, tool);
-        if (candidates.isEmpty()) {
-            LittleMaidMoreAction.LOGGER.info("[ChainHarvest] mode={} 范围内无可采集目标", mode);
-            return TaskResult.FAILED;
+    private static TaskResult tryStartVein(ServerLevel world, EntityMaid maid, BlockPos pos,
+                                           CompoundTag data, Mode mode, ItemStack tool) {
+        var skip = skipSet(maid, tool);
+        BlockState state = world.getBlockState(pos);
+
+        if (skip.contains(pos.asLong())) {
+            return idleScan(world, maid, data, mode, tool, true);
+        }
+        if (mode == Mode.ORE && !ToolJudge.canPickaxeMine(tool, state)) {
+            addSkip(skip, pos.asLong());
+            return idleScan(world, maid, data, mode, tool, true);
+        }
+        if (mode == Mode.WOOD && MoreActionConfig.CHAIN_WOOD_NATURE_CHECK.get()
+                && !ConnectedBlockSearch.isNaturalTree(world, pos, NATURE_CHECK_MAX_LOGS)) {
+            addSkip(skip, pos.asLong());
+            return idleScan(world, maid, data, mode, tool, true);
         }
 
-        // 2. 对每个候选 BFS → 全量扁平化入队（去重）
-        Set<Long> seen = new HashSet<>();
-        List<Long> flat = new ArrayList<>();
-        int blockedByNature = 0;
-        for (BlockPos c : candidates) {
-            if (flat.size() >= MoreActionConfig.CHAIN_MAX_BLOCKS.get()) break;
-            if (mode == Mode.WOOD && MoreActionConfig.CHAIN_WOOD_NATURE_CHECK.get()
-                    && !ConnectedBlockSearch.isNaturalTree(world, c, NATURE_CHECK_MAX_LOGS)) {
-                addSkip(skipSet(maid, tool), c.asLong());
-                blockedByNature++;
-                continue;
-            }
-            BlockState startState = world.getBlockState(c);
-            List<BlockPos> vein = ConnectedBlockSearch.findConnected(world, c,
-                    matchPredicate(mode, startState),
-                    MoreActionConfig.CHAIN_MAX_BLOCKS.get() - flat.size(),
-                    maid.blockPosition(), MAX_DIST_SQR);
-            for (BlockPos v : vein) {
-                if (seen.add(v.asLong())) flat.add(v.asLong());
-            }
-            // 脉起点标记已入队（下次 findAllTargets 跳过）
-            addSkip(skipSet(maid, tool), c.asLong());
+        List<BlockPos> vein = ConnectedBlockSearch.findConnected(world, pos,
+                matchPredicate(mode, state),
+                MoreActionConfig.CHAIN_MAX_BLOCKS.get(), maid.blockPosition(), MAX_DIST_SQR);
+        if (vein.isEmpty()) {
+            addSkip(skip, pos.asLong());
+            return idleScan(world, maid, data, mode, tool, true);
         }
 
-        if (flat.isEmpty()) {
-            clearChainData(data);
-            if (blockedByNature > 0) {
-                return skipAndRelay(world, maid, pos, data, mode, tool,
-                        "非天然树×" + blockedByNature);
+        // 耐久保护: 需耗久时队列截断至剩余耐久-1（保 1 点不打坏工具）
+        if (consumesDurability(mode, tool)) {
+            int budget = ToolStateReader.getRemainingDurability(tool) - TOOL_RESERVE_DURABILITY;
+            if (budget < vein.size()) {
+                vein = vein.subList(0, Math.max(0, budget));
             }
-            return TaskResult.FAILED;
+            if (vein.isEmpty()) {
+                clearChainData(data);
+                return TaskResult.FAILED;
+            }
         }
 
-        long[] queue = new long[flat.size()];
-        for (int i = 0; i < queue.length; i++) queue[i] = flat.get(i);
+        int perBlockTicks = ToolJudge.harvestIntervalTicks(tool, mode == Mode.WOOD);
+        long chargeTicks = (long) vein.size() * perBlockTicks;
+        long[] queue = new long[vein.size()];
+        for (int i = 0; i < queue.length; i++) queue[i] = vein.get(i).asLong();
         data.putLongArray(KEY_QUEUE, queue);
-        data.putInt(KEY_IDX, 0);
-        data.putLong(KEY_TICK, 0L);
+        data.putLong(KEY_CHARGE_END, world.getGameTime() + chargeTicks);
 
-        String label = mode == Mode.WOOD ? "伐木" : "采矿";
-        LittleMaidMoreAction.LOGGER.info("[ChainHarvest] mode={} 批量入队 {} 块 ({}脉)",
-                mode, queue.length, candidates.size());
-        bubble(maid, label + " 剩余 " + queue.length + " 块");
+        LittleMaidMoreAction.LOGGER.info("[ChainHarvest] mode={} 开脉 {} 块 @ {} 蓄力 {}t",
+                mode, queue.length, pos, chargeTicks);
+        bubble(maid, label(mode) + " " + queue.length + " 块 蓄力 "
+                + String.format("%.1f", chargeTicks / 20.0) + " 秒");
         keepAlive(world, maid);
         return TaskResult.CONTINUE;
     }
 
-    // ── 阶段 2: 逐块破坏（v36.2 等级提速 + v36.3 气泡 + 脉间 relay） ──
+    // ── 阶段 2: 蓄力 → 时间到整脉同消 ──
 
-    private static TaskResult breakNext(ServerLevel world, EntityMaid maid,
-                                        CompoundTag data, Mode mode, ItemStack tool) {
+    private static TaskResult charge(ServerLevel world, EntityMaid maid,
+                                     CompoundTag data, Mode mode, ItemStack tool) {
         long now = world.getGameTime();
-        long last = data.getLong(KEY_TICK);
-        int interval = ToolJudge.harvestIntervalTicks(tool, mode == Mode.WOOD);
-        if (last != 0 && last <= now && now - last < interval) {
+        long end = data.getLong(KEY_CHARGE_END);
+
+        if (now < end) {
+            if (now % 5 == 0) maid.swing(InteractionHand.MAIN_HAND);
+            bubble(maid, label(mode) + " 蓄力 "
+                    + String.format("%.1f", (end - now) / 20.0) + " 秒");
             keepAlive(world, maid);
             return TaskResult.CONTINUE;
         }
 
+        // 时间到 — 逐块复核后整脉同消
         long[] queue = data.getLongArray(KEY_QUEUE);
-        int idx = data.getInt(KEY_IDX);
-        while (idx < queue.length) {
-            BlockPos target = BlockPos.of(queue[idx]);
-            idx++;
+        int broken = 0;
+        for (long l : queue) {
+            BlockPos target = BlockPos.of(l);
             BlockState state = world.getBlockState(target);
             if (!stillMatches(mode, state)) continue;
             if (target.distSqr(maid.blockPosition()) > MAX_DIST_SQR) continue;
             if (mode == Mode.ORE && !ToolJudge.canPickaxeMine(tool, state)) continue;
             if (!maid.canDestroyBlock(target)) continue;
-
-            data.putInt(KEY_IDX, idx);
-            if (maid.destroyBlock(target)) {
-                boolean consumeDurability = mode == Mode.ORE
-                        || (ToolStateReader.isAxe(tool)
-                            && ToolJudge.isToolUsable(tool, TOOL_RESERVE_DURABILITY));
-                if (consumeDurability) {
-                    tool.hurtAndBreak(1, maid,
-                            e -> e.broadcastBreakEvent(InteractionHand.MAIN_HAND));
-                }
-                maid.swing(InteractionHand.MAIN_HAND);
-                data.putLong(KEY_TICK, now);
-
-                // v36.3 气泡进度
-                String label = mode == Mode.WOOD ? "伐木" : "采矿";
-                bubble(maid, label + " 剩余 " + (queue.length - idx) + "/" + queue.length + " 块");
-            }
-            keepAlive(world, maid);
-            return TaskResult.CONTINUE;
+            if (maid.destroyBlock(target)) broken++;
         }
-
-        // 队列耗尽 — v36.3 重搜+接力（批量预队列后少数残余可能新增/跳过集耗尽）
+        if (broken > 0 && consumesDurability(mode, tool)) {
+            tool.hurtAndBreak(broken, maid,
+                    e -> e.broadcastBreakEvent(InteractionHand.MAIN_HAND));
+        }
+        maid.swing(InteractionHand.MAIN_HAND);
         clearChainData(data);
-        BlockPos next = lastTarget(maid);  // 优先接力上次队列末尾附近的
-        if (next == null) next = firstTarget(world, maid, mode, tool);
-        if (next != null) {
-            LmaTaskMemory.setNavTarget(maid, next);
-            LmaTaskMemory.setNavStartTick(maid, now);
-            return TaskResult.CONTINUE;
-        }
-        clearFlowData(data);
-        LmaTaskMemory.clearAllNav(maid);
+        LAST_SCAN.remove(maid.getId()); // 立即触发下一轮扫描
+        LittleMaidMoreAction.LOGGER.info("[ChainHarvest] mode={} 整脉破坏 {} 块", mode, broken);
+        bubble(maid, label(mode) + " 完成 " + broken + " 块");
+        keepAlive(world, maid);
         return TaskResult.CONTINUE;
     }
 
-    // ── v36.3 批量目标搜索 ──
+    // ── 阶段 0: 空闲扫描（3 秒节流，常驻不休眠） ──
 
-    /** 范围内所有可采目标（等级前置过滤 + 跳过集过滤），按距离排 */
-    private static List<BlockPos> findAllTargets(ServerLevel world, EntityMaid maid,
-                                                  Mode mode, ItemStack tool) {
+    private static TaskResult idleScan(ServerLevel world, EntityMaid maid, CompoundTag data,
+                                       Mode mode, ItemStack tool, boolean immediate) {
+        long now = world.getGameTime();
+        int id = maid.getId();
+        if (!immediate) {
+            long last = LAST_SCAN.getOrDefault(id, 0L);
+            if (last != 0 && last <= now && now - last < SCAN_INTERVAL_TICKS) {
+                keepAlive(world, maid);
+                return TaskResult.CONTINUE;
+            }
+        }
+        LAST_SCAN.put(id, now);
+
+        BlockPos next = findNearestValid(world, maid, mode, tool);
+        if (next == null) {
+            // 常驻空闲: 不 FAILED — 树再生/矿刷新后自动恢复作业
+            keepAlive(world, maid);
+            return TaskResult.CONTINUE;
+        }
+        if (next.distSqr(maid.blockPosition()) < VanillaConstants.ARRIVE_DIST_SQR) {
+            return tryStartVein(world, maid, next, data, mode, tool);
+        }
+        // 设路径立即起步（协调行为同款调用，不等行为重启）
+        LmaTaskMemory.setNavTarget(maid, next);
+        LmaTaskMemory.setNavStartTick(maid, now);
+        BehaviorUtils.setWalkAndLookTargetMemories(maid, next, 1.0F, 2);
+        return TaskResult.CONTINUE;
+    }
+
+    /** 最近的"能挖的"目标（等级过滤 + 跳过集过滤），BlockSearch 已按距离排序 */
+    @Nullable
+    private static BlockPos findNearestValid(ServerLevel world, EntityMaid maid,
+                                             Mode mode, ItemStack tool) {
         var skip = skipSet(maid, tool);
         BiPredicate<BlockPos, BlockState> pred;
         if (mode == Mode.WOOD) {
@@ -213,40 +242,10 @@ public final class ChainHarvestExecute {
         }
         var matches = BlockSearch.findBlocksInRange(world, maid.blockPosition(),
                 maid.getRestrictRadius(), pred);
-        List<BlockPos> result = new ArrayList<>();
-        for (var m : matches) result.add(m.pos());
-        return result;
-    }
-
-    /** 上次队列最后一个有效的 pos（接力锚点） */
-    @Nullable
-    private static BlockPos lastTarget(EntityMaid maid) {
-        BlockPos nav = LmaTaskMemory.getNavTarget(maid);
-        return nav != null ? nav : LmaTaskMemory.getNavTarget(maid); // blockPos fallback
-    }
-
-    /** 搜下一个候选（for relay）— 等价 findAllTargets 首项，但会清除已入队旧 skip 后可能回归 */
-    @Nullable
-    private static BlockPos firstTarget(ServerLevel world, EntityMaid maid,
-                                        Mode mode, ItemStack tool) {
-        var list = findAllTargets(world, maid, mode, tool);
-        return list.isEmpty() ? null : list.get(0);
+        return matches.isEmpty() ? null : matches.get(0).pos();
     }
 
     // ── 跳过集 ──
-
-    private static TaskResult skipAndRelay(ServerLevel world, EntityMaid maid, BlockPos pos,
-                                           CompoundTag data, Mode mode, ItemStack tool, String reason) {
-        clearChainData(data);
-        BlockPos next = firstTarget(world, maid, mode, tool);
-        if (next == null) {
-            LittleMaidMoreAction.LOGGER.info("[ChainHarvest] mode={} 范围内无可采集目标 ({})", mode, reason);
-            return TaskResult.FAILED;
-        }
-        LmaTaskMemory.setNavTarget(maid, next);
-        LmaTaskMemory.setNavStartTick(maid, world.getGameTime());
-        return TaskResult.CONTINUE;
-    }
 
     private static LinkedHashSet<Long> skipSet(EntityMaid maid, ItemStack tool) {
         SkipState state = SKIPPED.computeIfAbsent(maid.getId(), k -> new SkipState());
@@ -267,43 +266,54 @@ public final class ChainHarvestExecute {
 
     // ── 判定 ──
 
+    private static boolean isTarget(Mode mode, BlockState state) {
+        return mode == Mode.WOOD ? state.is(BlockTags.LOGS) : state.is(Tags.Blocks.ORES);
+    }
+
+    private static boolean stillMatches(Mode mode, BlockState state) {
+        return !state.isAir() && isTarget(mode, state);
+    }
+
     private static BiPredicate<BlockPos, BlockState> matchPredicate(Mode mode, BlockState startState) {
         if (mode == Mode.WOOD) return (p, s) -> s.is(BlockTags.LOGS);
         Block startBlock = startState.getBlock();
         return (p, s) -> s.getBlock() == startBlock;
     }
 
-    private static boolean stillMatches(Mode mode, BlockState state) {
-        if (state.isAir()) return false;
-        return mode == Mode.WOOD ? state.is(BlockTags.LOGS) : state.is(Tags.Blocks.ORES);
+    /** 耗久规则: 挖矿恒扣; 砍树仅持可用斧扣（空手/非斧慢砍不扣） */
+    private static boolean consumesDurability(Mode mode, ItemStack tool) {
+        return mode == Mode.ORE
+                || (ToolStateReader.isAxe(tool)
+                    && ToolJudge.isToolUsable(tool, TOOL_RESERVE_DURABILITY));
+    }
+
+    private static String label(Mode mode) {
+        return mode == Mode.WOOD ? "伐木" : "采矿";
     }
 
     // ── 生命周期 ──
 
+    /** 自持导航目标 = 女仆脚下 → 协调行为 tick() 到达检查恒真 → 每 tick 回调本执行器 */
     private static void keepAlive(ServerLevel world, EntityMaid maid) {
         LmaTaskMemory.setNavTarget(maid, maid.blockPosition());
         LmaTaskMemory.setNavStartTick(maid, world.getGameTime());
     }
 
+    /** 清除连锁状态 key（闭环，含旧版残留 key） */
     public static void clearChainData(CompoundTag data) {
         data.remove(KEY_QUEUE);
-        data.remove(KEY_IDX);
-        data.remove(KEY_TICK);
+        data.remove(KEY_CHARGE_END);
+        data.remove(KEY_IDX_LEGACY);
+        data.remove(KEY_TICK_LEGACY);
     }
 
+    /** 女仆卸载清理（内存态闭环） */
     public static void onMaidUnload(int entityId) {
         SKIPPED.remove(entityId);
+        LAST_SCAN.remove(entityId);
     }
 
-    private static void clearFlowData(CompoundTag data) {
-        data.remove(TaskKeys.FLOW_TASK); data.remove(TaskKeys.FLOW_TASK_ID);
-        data.remove(TaskKeys.FLOW_STATE); data.remove(TaskKeys.FLOW_STEP);
-        data.remove(TaskKeys.FLOW_COUNTER); data.remove(TaskKeys.FLOW_MAX_COUNT);
-        data.remove(TaskKeys.FLOW_TICK); data.remove(TaskKeys.FLOW_TIMEOUT);
-        data.remove(TaskKeys.FLOW_DATA); data.remove(TaskKeys.FLOW_CACHED);
-    }
-
-    /** v36.3 头顶气泡 — 高频破坏节流（sendBubbleIfTimeout 内部 3000ms 冷却，自动返回相同的 bubble id） */
+    /** 头顶气泡进度（LMA 内置超时节流） */
     private static void bubble(EntityMaid maid, String text) {
         WorldOutput.sendBubbleIfTimeout(maid, text, 3000);
     }
