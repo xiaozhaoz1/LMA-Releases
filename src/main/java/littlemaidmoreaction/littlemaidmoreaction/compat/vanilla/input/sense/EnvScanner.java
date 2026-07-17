@@ -94,6 +94,7 @@ public final class EnvScanner {
 
         // ── 世界状态: 直读快照（温度/降水判定对齐 TLM IMaid.getAtBiomeTemp / SoundUtil） ──
         var biome = level.getBiome(center).value();
+        long dayTime = WorldStateReader.getTime(level);
         EnvSnapshot.WorldInfo world = new EnvSnapshot.WorldInfo(
                 WorldStateReader.isDay(level),
                 WorldStateReader.isRaining(level),
@@ -104,7 +105,8 @@ public final class EnvScanner {
                 tempCategory(biome.getBaseTemperature()),
                 biome.getBaseTemperature(),
                 biome.getPrecipitationAt(center).name(),
-                WorldStateReader.getTime(level));
+                dayTime,
+                timeSegment(dayTime));
 
         // worldTriggers 由调度器基于 prev/now 对比填充
         return new EnvSnapshot(level.getGameTime(),
@@ -117,5 +119,13 @@ public final class EnvScanner {
         if (baseTemp < 0.55f) return "OCEAN";
         if (baseTemp < 0.95f) return "MEDIUM";
         return "WARM";
+    }
+
+    /** v37.2 时间段划分（MC 无官方常量，自定义边界） */
+    private static String timeSegment(long dayTime) {
+        if (dayTime < 12000) return "DAY";
+        if (dayTime < 13800) return "DUSK";
+        if (dayTime < 22200) return "NIGHT";
+        return "DAWN";
     }
 }

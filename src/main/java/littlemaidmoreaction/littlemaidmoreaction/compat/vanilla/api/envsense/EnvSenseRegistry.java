@@ -3,8 +3,10 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import net.minecraft.core.BlockPos;
+import net.minecraft.tags.TagKey;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.Structure;
 
 import javax.annotation.Nullable;
 import java.util.Collection;
@@ -21,6 +23,7 @@ import java.util.function.Predicate;
  * 做一次合并扫描，命中时经回调 + {@code lma_env_scan} 规则事件双通道触发。
  *
  * <p><b>零注册 = 零开销</b>：无感知器时调度器每 tick 只做一次布尔判断。
+ * v37.1 起内置世界感知器常驻（{@link BuiltinEnvSensors}）。
  *
  * <h3>用法</h3>
  * <pre>{@code
@@ -59,9 +62,15 @@ public final class EnvSenseRegistry {
                               @Nullable Predicate<EntityMaid> appliesTo,
                               @Nullable SensorCallback callback) {}
 
+    /** v37.2: 结构感知器 — 低频 findNearestMapStructure 探测（村庄/前哨站/矿井），边沿触发 */
+    public record StructureSensor(String id, TagKey<Structure> tag,
+                                  @Nullable Predicate<EntityMaid> appliesTo,
+                                  @Nullable SensorCallback callback) {}
+
     private static final Map<String, BlockSensor> BLOCK_SENSORS = new ConcurrentHashMap<>();
     private static final Map<String, EntitySensor> ENTITY_SENSORS = new ConcurrentHashMap<>();
     private static final Map<String, WorldSensor> WORLD_SENSORS = new ConcurrentHashMap<>();
+    private static final Map<String, StructureSensor> STRUCTURE_SENSORS = new ConcurrentHashMap<>();
 
     private EnvSenseRegistry() {}
 
@@ -89,9 +98,18 @@ public final class EnvSenseRegistry {
         WORLD_SENSORS.put(id, new WorldSensor(id, trigger, appliesTo, callback));
     }
 
+    /** v37.2: 注册结构感知器（低频探测，间隔 config structure_interval_ticks）。id 全局唯一 */
+    public static void addStructureSensor(String id, TagKey<Structure> tag,
+                                          @Nullable Predicate<EntityMaid> appliesTo,
+                                          @Nullable SensorCallback callback) {
+        if (isDuplicate(id)) return;
+        STRUCTURE_SENSORS.put(id, new StructureSensor(id, tag, appliesTo, callback));
+    }
+
     /** 是否有任何感知器（调度器快速门控） */
     public static boolean hasSensors() {
-        return !BLOCK_SENSORS.isEmpty() || !ENTITY_SENSORS.isEmpty() || !WORLD_SENSORS.isEmpty();
+        return !BLOCK_SENSORS.isEmpty() || !ENTITY_SENSORS.isEmpty()
+                || !WORLD_SENSORS.isEmpty() || !STRUCTURE_SENSORS.isEmpty();
     }
 
     public static Collection<BlockSensor> blockSensors() {
@@ -106,16 +124,21 @@ public final class EnvSenseRegistry {
         return WORLD_SENSORS.values();
     }
 
+    public static Collection<StructureSensor> structureSensors() {
+        return STRUCTURE_SENSORS.values();
+    }
+
     /** 测试/热重载用：移除感知器 */
     public static void remove(String id) {
         BLOCK_SENSORS.remove(id);
         ENTITY_SENSORS.remove(id);
         WORLD_SENSORS.remove(id);
+        STRUCTURE_SENSORS.remove(id);
     }
 
     private static boolean isDuplicate(String id) {
         if (BLOCK_SENSORS.containsKey(id) || ENTITY_SENSORS.containsKey(id)
-                || WORLD_SENSORS.containsKey(id)) {
+                || WORLD_SENSORS.containsKey(id) || STRUCTURE_SENSORS.containsKey(id)) {
             LittleMaidMoreAction.LOGGER.warn("[EnvSense] 感知器 id 重复注册被忽略: {}", id);
             return true;
         }

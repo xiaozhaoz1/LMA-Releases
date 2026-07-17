@@ -1,5 +1,18 @@
 # Changelog
 
+## [v37.2] — 2026-07-17 — EnvSense 扩展：生物分类/时间段/亮度/死亡感知/玩家门控/结构探测
+
+### 新增感知能力
+- **玩家门控**（性能闸）：仅玩家 64 格（config player_gate_radius, 0=关）内的女仆参与一切感知 — 挂机农场女仆零开销
+- **实体分类感知**（存在即命中，快照含实体列表）：`env_nearby_monster`（MobCategory.MONSTER, TLM 先例）/ `env_nearby_friendly`（非怪物非杂项 Mob）/ `env_nearby_maid`
+- **时间段**：WorldInfo 新增 timeSegment（DAY/DUSK/NIGHT/DAWN 自定义四段）+ `env_time_segment_change` 边沿
+- **亮度**：`env_darkness`（亮度 < 7 进入黑暗时触发，config darkness_threshold）
+- **雷暴开始**：`env_thunder_start` 单边沿（比 weather_change 精确）
+- **玩家周围实体死亡**：新规则事件 `lma_nearby_death`（LivingDeathEvent 驱动，ctx.target=死亡实体，玩家门控 + 女仆半径过滤；女仆自身死亡仍走 maid_death）
+- **结构探测**（低频边沿，默认每 MC 天一次/女仆，config 可关）：`env_village_nearby` / `env_mineshaft_nearby`（原版 StructureTags）/ `env_pillager_outpost_nearby`（LMA 自带 datapack 标签，原版无此 tag）
+- **StructureSensor 注册类型**：`addStructureSensor(id, TagKey<Structure>, appliesTo, callback)`
+- Config 新增 5 项: player_gate_radius(64) / darkness_threshold(7) / structure_enabled(true) / structure_interval_ticks(24000) / structure_radius_chunks(8)
+
 ## [v37.1] — 2026-07-17 — 世界感知补齐（常驻 + 变化触发）
 
 ### 世界状态感知（判定对齐 TLM）

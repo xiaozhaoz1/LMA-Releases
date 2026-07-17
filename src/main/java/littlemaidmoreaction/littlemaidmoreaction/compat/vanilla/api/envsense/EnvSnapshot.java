@@ -36,11 +36,13 @@ public record EnvSnapshot(long gameTime,
      *                      注: 位置温度 getTemperature(pos) 在本映射为 private，TLM 靠 AT 开放，LMA 不引入 AT）
      * @param precipitation 女仆位置降水类型: NONE / RAIN / SNOW
      * @param dayTime       当日时间 0-23999
+     * @param timeSegment   v37.2 时间段: DAY(0-11999) / DUSK(12000-13799) / NIGHT(13800-22199) / DAWN(22200-23999)
+     *                      — MC 无官方边界常量，此为自定义划分
      */
     public record WorldInfo(boolean day, boolean raining, boolean thundering,
                             int moonPhase, int lightAtMaid, String dimension,
                             String tempCategory, float temperature,
-                            String precipitation, long dayTime) {}
+                            String precipitation, long dayTime, String timeSegment) {}
 
     /** 指定感知器的命中方块（无命中返回空列表） */
     public List<BlockPos> blocks(String sensorId) {

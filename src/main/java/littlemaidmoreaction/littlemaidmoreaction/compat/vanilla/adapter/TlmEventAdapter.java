@@ -193,6 +193,22 @@ public final class TlmEventAdapter {
         RuleEngine.handleEvent("lma_task_start", new RuleContext(e.getMaid()));
     }
 
+    // ===== v37.2: 玩家周围实体死亡 → 通知附近女仆 (lma_nearby_death, ctx.target=死亡实体) =====
+    @SubscribeEvent
+    public static void onNearbyDeath(net.minecraftforge.event.entity.living.LivingDeathEvent e) {
+        var dead = e.getEntity();
+        if (dead.level().isClientSide()) return;
+        if (dead instanceof EntityMaid) return; // 女仆自身死亡由 maid_death 覆盖
+        if (!(dead.level() instanceof net.minecraft.server.level.ServerLevel level)) return;
+        int gate = littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig.ENV_PLAYER_GATE_RADIUS.get();
+        if (gate > 0 && !level.hasNearbyAlivePlayer(dead.getX(), dead.getY(), dead.getZ(), gate)) return;
+        int radius = littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig.ENV_DEFAULT_RADIUS.get();
+        var box = dead.getBoundingBox().inflate(radius, radius, radius);
+        for (EntityMaid maid : level.getEntitiesOfClass(EntityMaid.class, box)) {
+            RuleEngine.handleEvent("lma_nearby_death", new RuleContext(maid, e.getEntity()));
+        }
+    }
+
     // ===== Entity Join — 清理跨session残留任务 =====
     @SubscribeEvent
     public static void onEntityJoin(EntityJoinLevelEvent e) {

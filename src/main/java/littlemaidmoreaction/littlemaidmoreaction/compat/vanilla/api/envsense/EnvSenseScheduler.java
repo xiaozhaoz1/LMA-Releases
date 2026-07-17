@@ -5,16 +5,20 @@ import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense.EnvSenseRegistry.BlockSensor;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense.EnvSenseRegistry.EntitySensor;
+import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense.EnvSenseRegistry.StructureSensor;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense.EnvSenseRegistry.WorldSensor;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.sense.EnvScanner;
 import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.engine.RuleEngine;
+import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
@@ -22,6 +26,10 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>挂钩点: {@code TlmEventAdapter.onMaidTick} 每 tick 调用 {@link #tick}，
  * 内部自节流。无感知器注册时开销 = 一次布尔判断（零扫描）。
+ *
+ * <h3>v37.2 玩家门控</h3>
+ * 仅玩家 {@code player_gate_radius}（默认 64 格，0=关闭门控）范围内的女仆
+ * 参与一切感知 — 远离玩家的女仆（挂机农场等）零感知开销。
  *
  * <h3>双通道分发</h3>
  * <ol>
@@ -41,6 +49,10 @@ public final class EnvSenseScheduler {
     private static final Map<Integer, Long> LAST_SCAN = new ConcurrentHashMap<>();
     /** entityId → 最新快照 */
     private static final Map<Integer, EnvSnapshot> SNAPSHOTS = new ConcurrentHashMap<>();
+    /** v37.2: entityId → 上次结构探测 gameTime（独立低频计时） */
+    private static final Map<Integer, Long> STRUCT_LAST = new ConcurrentHashMap<>();
+    /** v37.2: entityId → 上轮探测到的结构感知器 id 集（边沿检测基线） */
+    private static final Map<Integer, Set<String>> STRUCT_FOUND = new ConcurrentHashMap<>();
 
     private EnvSenseScheduler() {}
 
@@ -57,6 +69,13 @@ public final class EnvSenseScheduler {
         if (last != 0 && last <= now && now - last < interval) return;
         LAST_SCAN.put(id, now);
 
+        // v37.2 玩家门控: 远离玩家的女仆零感知（每周期只查一次距离）
+        int gateRadius = MoreActionConfig.ENV_PLAYER_GATE_RADIUS.get();
+        if (gateRadius > 0
+                && !level.hasNearbyAlivePlayer(maid.getX(), maid.getY(), maid.getZ(), gateRadius)) {
+            return;
+        }
+
         // 按需过滤: 无适用感知器的女仆零扫描
         List<BlockSensor> blocks = new ArrayList<>();
         for (BlockSensor s : EnvSenseRegistry.blockSensors()) {
@@ -70,7 +89,11 @@ public final class EnvSenseScheduler {
         for (WorldSensor s : EnvSenseRegistry.worldSensors()) {
             if (s.appliesTo() == null || s.appliesTo().test(maid)) worlds.add(s);
         }
-        if (blocks.isEmpty() && entities.isEmpty() && worlds.isEmpty()) return;
+        List<StructureSensor> structs = new ArrayList<>();
+        for (StructureSensor s : EnvSenseRegistry.structureSensors()) {
+            if (s.appliesTo() == null || s.appliesTo().test(maid)) structs.add(s);
+        }
+        if (blocks.isEmpty() && entities.isEmpty() && worlds.isEmpty() && structs.isEmpty()) return;
 
         int radius = maid.hasRestriction()
                 ? Math.max(4, (int) maid.getRestrictRadius())
@@ -90,6 +113,10 @@ public final class EnvSenseScheduler {
                 LittleMaidMoreAction.LOGGER.error("[EnvSense] 世界感知器 '{}' 触发判定异常", s.id(), ex);
             }
         }
+
+        // v37.2: 结构低频探测通道（独立间隔，边沿触发）
+        triggered.addAll(scanStructures(level, maid, structs, id, now));
+
         EnvSnapshot snapshot = triggered.isEmpty() ? scanned
                 : new EnvSnapshot(scanned.gameTime(), scanned.blockHits(),
                         scanned.entityHits(), scanned.world(), List.copyOf(triggered));
@@ -115,6 +142,12 @@ public final class EnvSenseScheduler {
                 dispatch(s.id(), s.callback(), maid, snapshot);
             }
         }
+        for (StructureSensor s : structs) {
+            if (snapshot.worldTriggers().contains(s.id())) {
+                hitIds.add(s.id());
+                dispatch(s.id(), s.callback(), maid, snapshot);
+            }
+        }
 
         // 通道2: 规则引擎事件
         if (!hitIds.isEmpty()) {
@@ -134,6 +167,42 @@ public final class EnvSenseScheduler {
     public static void onMaidUnload(int entityId) {
         LAST_SCAN.remove(entityId);
         SNAPSHOTS.remove(entityId);
+        STRUCT_LAST.remove(entityId);
+        STRUCT_FOUND.remove(entityId);
+    }
+
+    // ── private ──
+
+    /**
+     * v37.2 结构探测: findNearestMapStructure 较慢（主线程 ms 级），
+     * 独立低频间隔（默认 24000 tick = 1 MC 天）+ 总开关。
+     * 返回本轮新出现（边沿）的结构感知器 id。
+     */
+    private static List<String> scanStructures(ServerLevel level, EntityMaid maid,
+                                               List<StructureSensor> structs, int id, long now) {
+        if (structs.isEmpty() || !MoreActionConfig.ENV_STRUCTURE_ENABLED.get()) return List.of();
+        long structLast = STRUCT_LAST.getOrDefault(id, 0L);
+        int structInterval = MoreActionConfig.ENV_STRUCTURE_INTERVAL.get();
+        if (structLast != 0 && structLast <= now && now - structLast < structInterval) return List.of();
+        STRUCT_LAST.put(id, now);
+
+        Set<String> found = new HashSet<>();
+        for (StructureSensor s : structs) {
+            try {
+                BlockPos pos = level.findNearestMapStructure(s.tag(), maid.blockPosition(),
+                        MoreActionConfig.ENV_STRUCTURE_RADIUS.get(), false);
+                if (pos != null) found.add(s.id());
+            } catch (Exception ex) {
+                LittleMaidMoreAction.LOGGER.error("[EnvSense] 结构感知器 '{}' 探测异常", s.id(), ex);
+            }
+        }
+        Set<String> prevFound = STRUCT_FOUND.getOrDefault(id, Set.of());
+        List<String> newly = new ArrayList<>();
+        for (String sid : found) {
+            if (!prevFound.contains(sid)) newly.add(sid);
+        }
+        STRUCT_FOUND.put(id, found);
+        return newly;
     }
 
     private static void dispatch(String id, @Nullable EnvSenseRegistry.SensorCallback cb,
