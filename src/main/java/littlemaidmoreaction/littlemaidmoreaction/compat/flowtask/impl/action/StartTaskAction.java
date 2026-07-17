@@ -2,15 +2,15 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.flowtask.impl.action;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaFlowTask;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskTypeRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaFlowTask;
+import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry;
 
 import java.util.List;
 import java.util.Map;

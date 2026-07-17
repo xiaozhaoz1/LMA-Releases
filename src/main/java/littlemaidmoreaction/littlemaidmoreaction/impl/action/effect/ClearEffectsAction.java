@@ -1,7 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.impl.action.effect;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.effect.EffectOutput;
+import littlemaidmoreaction.littlemaidmoreaction.api.ParamExtractor;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.effect.EffectOutput;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;

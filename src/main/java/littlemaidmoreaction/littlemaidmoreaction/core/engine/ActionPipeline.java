@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.core.engine;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.movement.BrainHelper;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.movement.BrainHelper;
 import littlemaidmoreaction.littlemaidmoreaction.core.debug.RuleTracer;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.ActionStep;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;

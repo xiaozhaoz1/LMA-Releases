@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.compat;
 
 import littlemaidmoreaction.littlemaidmoreaction.compat.slashblade.SlashBladeCompat;
 import littlemaidmoreaction.littlemaidmoreaction.compat.tpm.TpmCompat;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.VanillaCompat;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaCompat;
 import littlemaidmoreaction.littlemaidmoreaction.compat.ysm.YsmCompat;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.ModList;
@@ -26,6 +26,7 @@ public final class CompatRegistry {
     public static final String YSM = "yes_steve_model";
     public static final String SLASHBLADE = "slashblade";
     public static final String TPM = "true_power_of_maid";
+    public static final String CREATE = "create";
 
     /** v35.5: 防止 scanAllCompatEarly() + onEnqueue() 双重初始化 */
     private static volatile boolean earlyScanned = false;

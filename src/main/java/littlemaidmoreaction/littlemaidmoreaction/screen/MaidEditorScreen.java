@@ -1,8 +1,8 @@
 package littlemaidmoreaction.littlemaidmoreaction.screen;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.maideditor.FieldType;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.maideditor.MaidEditorRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.api.maideditor.FieldType;
+import littlemaidmoreaction.littlemaidmoreaction.api.maideditor.MaidEditorRegistry;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.*;
 import net.minecraft.client.gui.screens.Screen;

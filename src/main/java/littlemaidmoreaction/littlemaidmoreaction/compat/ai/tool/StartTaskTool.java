@@ -10,10 +10,10 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaFlowTask;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaFlowTask;
+import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
 
 /**
  * v16: AI 唯一任务入口 — 取代 AssignTaskTool + CreateRuleTool + QueryRecipeTool + ...

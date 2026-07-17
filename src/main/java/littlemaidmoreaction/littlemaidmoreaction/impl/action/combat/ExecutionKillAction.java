@@ -1,8 +1,8 @@
 package littlemaidmoreaction.littlemaidmoreaction.impl.action.combat;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.combat.CombatOutput;
+import littlemaidmoreaction.littlemaidmoreaction.api.ParamExtractor;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.combat.CombatOutput;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.*;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;

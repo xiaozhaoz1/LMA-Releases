@@ -1,6 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.screen;
 
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.*;
+import littlemaidmoreaction.littlemaidmoreaction.task.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

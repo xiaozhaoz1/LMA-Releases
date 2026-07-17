@@ -2,10 +2,10 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.combat;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.world.WorldStateReader;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.combat.CombatOutput;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.effect.EffectOutput;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.visual.VisualOutput;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.world.WorldStateReader;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.combat.CombatOutput;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.effect.EffectOutput;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.visual.VisualOutput;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;

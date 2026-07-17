@@ -1,8 +1,8 @@
 package littlemaidmoreaction.littlemaidmoreaction.impl.action.maid;
 
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.AutoCropHandler;
+import littlemaidmoreaction.littlemaidmoreaction.api.ParamExtractor;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.AutoCropHandler;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;

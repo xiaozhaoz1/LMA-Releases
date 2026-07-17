@@ -7,7 +7,7 @@ import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionCat
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionValueType;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
+import littlemaidmoreaction.littlemaidmoreaction.api.VanillaConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.block.entity.BlockEntity;

@@ -2,8 +2,8 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.world;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.search.BlockSearch;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.world.WorldStateReader;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.BlockSearch;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.world.WorldStateReader;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;

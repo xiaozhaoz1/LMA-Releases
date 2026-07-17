@@ -1,5 +1,13 @@
 # Changelog
 
+## [v38.1] — 2026-07-18 — FakePlayer + 机械臂搬运 + 架构重构
+
+- **女仆模拟玩家左右键** — 参考 Create Deployer: LmaFakePlayer, 4模式 (右键/左键 × 一次性/持续), 方块破坏+收集掉落
+- **机械臂搬运任务** — 参考 Create Mechanical Arm: 右键容器标记取物/放物点 → 右键女仆启动 → 自导航搬运循环
+- **架构重构** — compat/vanilla (~110文件) 拆回顶层包 api/task/adapter/vanilla
+- **IO 标准化** — IReader/IWriter/IExecutor/TaskState 统一接口
+- **TLM IO 扩展** — WorldOutput +maidDestroyBlock/maidPlaceBlock/sendThinkingBubble, CombatOutput +maidDoHurtTarget
+
 ## [v36.7] — 2026-07-17 — 删除祭坛合成任务
 
 - 任务栏移除"祭坛合成"（有合成台不需要祭坛 — 用户决策）：TaskRegistry 注册 + AltarCraftPipeline 删除、协调行为 altar_craft 分支清理、AI 工具/关键词/图标/分组/语言键同步移除

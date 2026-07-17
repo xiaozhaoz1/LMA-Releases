@@ -5,7 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.ai.agent.context.GameContextRegi
 import com.github.tartaricacid.touhoulittlemaid.entity.favorability.FavorabilityManager;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.PickType;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.search.LightQuery;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.LightQuery;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.effect.MobEffectInstance;

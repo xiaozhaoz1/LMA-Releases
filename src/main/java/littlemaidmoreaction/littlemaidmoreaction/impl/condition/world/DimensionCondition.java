@@ -1,6 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.impl.condition.world;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.world.WorldStateReader;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.world.WorldStateReader;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionValueType;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;

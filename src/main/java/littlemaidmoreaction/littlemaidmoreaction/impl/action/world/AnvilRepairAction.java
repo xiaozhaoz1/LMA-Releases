@@ -2,9 +2,9 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.world;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.VanillaConstants;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.world.WorldOutput;
+import littlemaidmoreaction.littlemaidmoreaction.api.ParamExtractor;
+import littlemaidmoreaction.littlemaidmoreaction.api.VanillaConstants;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.world.WorldOutput;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;

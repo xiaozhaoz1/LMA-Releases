@@ -1,6 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.impl.action.visual;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.ParamExtractor;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.visual.VisualOutput;
+import littlemaidmoreaction.littlemaidmoreaction.api.ParamExtractor;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.visual.VisualOutput;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;

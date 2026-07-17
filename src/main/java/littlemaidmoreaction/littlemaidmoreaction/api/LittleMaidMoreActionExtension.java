@@ -19,12 +19,12 @@ import com.github.tartaricacid.touhoulittlemaid.inventory.chest.ChestManager;
 import java.util.List;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaMagicCastingProvider;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute.AutoCropHandler;
+import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaMagicCastingProvider;
+import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.AutoCropHandler;
 import littlemaidmoreaction.littlemaidmoreaction.resource.DynamicAnimationResources;
 import littlemaidmoreaction.littlemaidmoreaction.storage.StartupLoader;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.Pack;
@@ -128,8 +128,8 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
             @Override
             public List<MemoryModuleType<?>> getExtraMemoryTypes() {
                 return List.of(
-                        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaMemoryModuleRegistry.NAV_TARGET.get(),
-                        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaMemoryModuleRegistry.NAV_START_TICK.get()
+                        littlemaidmoreaction.littlemaidmoreaction.adapter.LmaMemoryModuleRegistry.NAV_TARGET.get(),
+                        littlemaidmoreaction.littlemaidmoreaction.adapter.LmaMemoryModuleRegistry.NAV_START_TICK.get()
                 );
             }
         });
@@ -203,11 +203,14 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
             if (event.getEntity() instanceof EntityMaid maid) {
                 AutoCropHandler.onMaidUnload(maid.getUUID());
                 // v37: 环境感知缓存清理（key 闭环）
-                littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense
+                littlemaidmoreaction.littlemaidmoreaction.api.envsense
                     .EnvSenseScheduler.onMaidUnload(maid.getId());
                 // v36.1: 连锁采集跳过集清理
-                littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute
+                littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
                     .ChainHarvestExecute.onMaidUnload(maid.getId());
+                // v38: FakePlayer 持续挖掘清理
+                littlemaidmoreaction.littlemaidmoreaction.vanilla.fakeplayer
+                    .FakePlayerManager.onMaidUnload(maid.getId());
             }
         }
     }

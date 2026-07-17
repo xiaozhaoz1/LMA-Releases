@@ -1,7 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.impl.action.movement;
 
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.output.maid.MaidStateWriter;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.maid.MaidStateWriter;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;

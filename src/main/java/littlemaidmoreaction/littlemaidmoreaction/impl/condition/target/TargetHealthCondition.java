@@ -1,6 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.impl.condition.target;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.target.TargetStateReader;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.target.TargetStateReader;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleCondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.*;
 import java.util.Map;

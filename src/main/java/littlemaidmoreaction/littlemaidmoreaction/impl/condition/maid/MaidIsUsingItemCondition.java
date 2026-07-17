@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.condition.maid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleCondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.*;
-import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.maid.MaidStateReader;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.maid.MaidStateReader;
 import java.util.Map;
 @RuleCondition
 public final class MaidIsUsingItemCondition implements ICondition {

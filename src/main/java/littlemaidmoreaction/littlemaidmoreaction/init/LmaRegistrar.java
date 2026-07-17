@@ -51,10 +51,10 @@ public final class LmaRegistrar {
             var owner = maid.getOwner();
             if (owner instanceof Player player) player.sendSystemMessage(Component.literal(msg));
         });
-        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.ForgeTaskQueueBridge.init();
+        littlemaidmoreaction.littlemaidmoreaction.adapter.ForgeTaskQueueBridge.init();
         littlemaidmoreaction.littlemaidmoreaction.core.doc.DocGenerator.generateAll(
                 LittleMaidMoreAction.CONFIG_DIR.resolve("introduce"));
-        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.TlmVersionedEvents.register();
+        littlemaidmoreaction.littlemaidmoreaction.adapter.TlmVersionedEvents.register();
     }
 
     /** 注册音效 DeferredRegister 到 MOD 总线 */
@@ -64,7 +64,7 @@ public final class LmaRegistrar {
 
     /** ★ v12.7 P0: 注册 MemoryModuleType DeferredRegister */
     public static void registerMemoryModules(IEventBus modBus) {
-        littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter.LmaMemoryModuleRegistry.register(modBus);
+        littlemaidmoreaction.littlemaidmoreaction.adapter.LmaMemoryModuleRegistry.register(modBus);
     }
 
     private LmaRegistrar() {}
