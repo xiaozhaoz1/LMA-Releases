@@ -30,7 +30,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
 
 /**
- * 连锁采集执行器 (v36.4) — 砍树 (WOOD) / 挖矿 (ORE) 简化循环。
+ * 连锁采集执行器 (v36.4/v36.5) — 砍树 (WOOD) / 挖矿 (ORE) 简化循环。
  *
  * <h3>循环（用户 2026-07-17 定义）</h3>
  * <pre>
@@ -44,6 +44,9 @@ import java.util.function.BiPredicate;
  * <h3>速度表（v36.2 用户定义, tick/块）</h3>
  * {@link ToolJudge#harvestIntervalTicks}: 空手40/木20/石15/铁10/钻5/合金5。
  * 蓄力总时长 = 块数 × 每块 tick。
+ *
+ * <h3>v36.5 气泡</h3>
+ * TLM 气泡按 id 替换（{@link WorldOutput#sendBubbleReplacing}），3 秒节流刷新倒计时。
  */
 public final class ChainHarvestExecute {
 
@@ -57,7 +60,6 @@ public final class ChainHarvestExecute {
 
     /** v36.4 用户定: 3 秒扫描一次 */
     private static final int SCAN_INTERVAL_TICKS = 60;
-    /** BFS/破坏距离上限平方 (以女仆为锚点 32 格) */
     private static final double MAX_DIST_SQR = 32 * 32;
     private static final int NATURE_CHECK_MAX_LOGS = 100;
     private static final int TOOL_RESERVE_DURABILITY = 1;
@@ -68,6 +70,9 @@ public final class ChainHarvestExecute {
     private static final Map<Integer, Long> LAST_SCAN = new ConcurrentHashMap<>();
     /** entityId → 跳过集（按工具 tier 版本化） */
     private static final Map<Integer, SkipState> SKIPPED = new ConcurrentHashMap<>();
+    /** v36.5: entityId → 当前气泡 id / 上次气泡刷新 gameTime */
+    private static final Map<Integer, Long> BUBBLE_ID = new ConcurrentHashMap<>();
+    private static final Map<Integer, Long> BUBBLE_TICK = new ConcurrentHashMap<>();
 
     private static final class SkipState {
         int tierLevel = Integer.MIN_VALUE;
@@ -151,8 +156,8 @@ public final class ChainHarvestExecute {
 
         LittleMaidMoreAction.LOGGER.info("[ChainHarvest] mode={} 开脉 {} 块 @ {} 蓄力 {}t",
                 mode, queue.length, pos, chargeTicks);
-        bubble(maid, label(mode) + " " + queue.length + " 块 蓄力 "
-                + String.format("%.1f", chargeTicks / 20.0) + " 秒");
+        bubble(world, maid, label(mode) + " " + queue.length + " 块 蓄力 "
+                + String.format("%.1f", chargeTicks / 20.0) + " 秒", true);
         keepAlive(world, maid);
         return TaskResult.CONTINUE;
     }
@@ -166,8 +171,8 @@ public final class ChainHarvestExecute {
 
         if (now < end) {
             if (now % 5 == 0) maid.swing(InteractionHand.MAIN_HAND);
-            bubble(maid, label(mode) + " 蓄力 "
-                    + String.format("%.1f", (end - now) / 20.0) + " 秒");
+            bubble(world, maid, label(mode) + " 蓄力 "
+                    + String.format("%.1f", (end - now) / 20.0) + " 秒", false);
             keepAlive(world, maid);
             return TaskResult.CONTINUE;
         }
@@ -192,7 +197,7 @@ public final class ChainHarvestExecute {
         clearChainData(data);
         LAST_SCAN.remove(maid.getId()); // 立即触发下一轮扫描
         LittleMaidMoreAction.LOGGER.info("[ChainHarvest] mode={} 整脉破坏 {} 块", mode, broken);
-        bubble(maid, label(mode) + " 完成 " + broken + " 块");
+        bubble(world, maid, label(mode) + " 完成 " + broken + " 块", true);
         keepAlive(world, maid);
         return TaskResult.CONTINUE;
     }
@@ -311,10 +316,23 @@ public final class ChainHarvestExecute {
     public static void onMaidUnload(int entityId) {
         SKIPPED.remove(entityId);
         LAST_SCAN.remove(entityId);
+        BUBBLE_ID.remove(entityId);
+        BUBBLE_TICK.remove(entityId);
     }
 
-    /** 头顶气泡进度（LMA 内置超时节流） */
-    private static void bubble(EntityMaid maid, String text) {
-        WorldOutput.sendBubbleIfTimeout(maid, text, 3000);
+    /**
+     * v36.5 头顶气泡 — TLM 气泡按 id 替换（sendBubbleReplacing），
+     * 非强制时 3 秒节流（蓄力倒计时每 3 秒刷新一次，无每 tick 洪水）。
+     */
+    private static void bubble(ServerLevel world, EntityMaid maid, String text, boolean force) {
+        int id = maid.getId();
+        long now = world.getGameTime();
+        if (!force) {
+            long last = BUBBLE_TICK.getOrDefault(id, 0L);
+            if (last != 0 && last <= now && now - last < SCAN_INTERVAL_TICKS) return;
+        }
+        BUBBLE_TICK.put(id, now);
+        long prev = BUBBLE_ID.getOrDefault(id, -1L);
+        BUBBLE_ID.put(id, WorldOutput.sendBubbleReplacing(maid, text, prev));
     }
 }

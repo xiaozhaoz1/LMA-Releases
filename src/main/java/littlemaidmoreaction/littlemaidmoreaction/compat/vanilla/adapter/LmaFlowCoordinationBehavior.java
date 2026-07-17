@@ -39,7 +39,18 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
 
         String task = LmaFlowTask.getCurrentFlowTaskType(maid);
         if (!task.isEmpty() && !"none".equals(task)) {
-            return "in_progress".equals(maid.getPersistentData().getString("lma_flow_state"));
+            if ("in_progress".equals(maid.getPersistentData().getString("lma_flow_state"))) {
+                return true;
+            }
+            // ★ v36.5: stale failed/completed 解锁 — 女仆当前 GUI 任务是已注册 LMA 任务时
+            // 放行到下方 GUI-init 重新初始化（修复 failed 残留阻塞任务切换 Bug）
+            var curTask = maid.getTask();
+            String curType = LmaFlowTask.isLmaTask(curTask)
+                    ? LmaTaskTypeRegistry.extractTaskType(curTask.getUid().getPath()) : null;
+            if (curType == null || TaskRegistry.get(curType) == null) {
+                return false;
+            }
+            // fall through → GUI-init 覆盖 stale 状态
         }
 
         var maidTask = maid.getTask();
@@ -86,6 +97,11 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
 
         BlockPos nearest = searchBlock(world, maid, handler);
         if (nearest == null) {
+            // ★ v36.5: 链式任务(searchPredicate)交给 executor 空闲扫描 — 常驻待机，不 failTask 刷屏
+            if (handler.searchPredicate() != null) {
+                doExecute(world, maid, maid.blockPosition(), handler);
+                return;
+            }
             failTask(maid, "找不到" + taskType + "方块");
             return;
         }

@@ -82,9 +82,20 @@ public final class WorldOutput {
         return true;
     }
     // === Phase 11: TLM ChatBubbleManager API ===
-    /** 发送气泡（去重: 相同 text 在 timeout tick 内不重复发送） */
-    public static long sendBubbleIfTimeout(EntityMaid maid, String text, long timeout) {
-        return maid.getChatBubbleManager().addTextChatBubbleIfTimeout(text, timeout);
+    /**
+     * 发送气泡（若 previousChatBubbleId 对应的气泡仍在显示则不重复发送，返回原 id）。
+     * ⚠ v36.5 勘误: 第二参数是【上一个气泡 id】(TLM ChatBubbleManager.java:78)，不是超时毫秒！
+     */
+    public static long sendBubbleIfTimeout(EntityMaid maid, String text, long previousChatBubbleId) {
+        return maid.getChatBubbleManager().addTextChatBubbleIfTimeout(text, previousChatBubbleId);
+    }
+    /** v36.5: 替换式气泡 — 移除旧气泡后发新气泡，返回新 id（用于进度/倒计时刷新） */
+    public static long sendBubbleReplacing(EntityMaid maid, String text, long previousChatBubbleId) {
+        var manager = maid.getChatBubbleManager();
+        if (previousChatBubbleId >= 0) {
+            manager.removeChatBubble(previousChatBubbleId);
+        }
+        return manager.addTextChatBubble(text);
     }
     /** 清除女仆头顶气泡 */
     public static void clearBubble(EntityMaid maid, long bubbleId) {

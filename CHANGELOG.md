@@ -1,5 +1,11 @@
 # Changelog
 
+## [v36.5] — 2026-07-17 — 修复：stale failed 阻塞任务切换 + 气泡 API 误用
+
+- **P0**: failTask 残留 lma_flow_task 导致切换任务后女仆不动 → checkExtra 对已注册 LMA 任务放行重新初始化
+- **P0**: TLM 气泡 API 第二参数是上一个气泡 id 而非超时毫秒（WorldOutput 包装层 Javadoc 勘误）→ 新增 sendBubbleReplacing 替换式刷新，蓄力倒计时每 3 秒更新且无每 tick 洪水
+- 链式任务搜索无果不再 failTask 刷屏 → 交给 executor 常驻空闲扫描待机
+
 ## [v36.4] — 2026-07-17 — 简化循环：3 秒扫描 → 走最近 → 蓄力整脉同消
 
 - **循环重设计**（用户方案）：每 3 秒扫描周围 → 最近的能挖目标（等级过滤）设路径走过去 → 到达 BFS 整脉/整树 → **蓄力（块数 × 每块 tick）后整脉同时消失** → 立即接下一轮
