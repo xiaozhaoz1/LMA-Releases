@@ -25,11 +25,12 @@ public final class ChainWoodPipeline implements TaskPipeline {
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
         ItemStack tool = maid.getMainHandItem();
+        // v36.1: 无斧不拦截 — 慢砍模式（斧影响速度而非可行性）
         if (!ToolStateReader.isAxe(tool)) {
-            return PipelineResult.failed("需要主手持斧才能砍树");
+            return PipelineResult.ok("无斧慢砍模式（持斧砍伐更快且更耐用）");
         }
         if (!ToolJudge.isToolUsable(tool, 1)) {
-            return PipelineResult.failed("斧耐久不足");
+            return PipelineResult.ok("斧即将损坏，将以慢砍模式作业");
         }
         return PipelineResult.ok("开始连锁砍树");
     }

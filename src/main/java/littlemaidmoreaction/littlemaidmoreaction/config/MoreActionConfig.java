@@ -18,6 +18,7 @@ public final class MoreActionConfig {
     public static final ForgeConfigSpec.IntValue CHAIN_MAX_BLOCKS;
     public static final ForgeConfigSpec.IntValue CHAIN_BREAK_INTERVAL;
     public static final ForgeConfigSpec.BooleanValue CHAIN_WOOD_NATURE_CHECK;
+    public static final ForgeConfigSpec.IntValue CHAIN_NO_AXE_MULTIPLIER;
 
     // ── 环境感知 (v37) ──
     public static final ForgeConfigSpec.IntValue ENV_SCAN_INTERVAL;
@@ -58,6 +59,9 @@ public final class MoreActionConfig {
         CHAIN_WOOD_NATURE_CHECK = b
                 .comment("砍树前校验天然树(原木需连接非手放树叶)，防止女仆拆玩家木建筑")
                 .define("wood_nature_check", true);
+        CHAIN_NO_AXE_MULTIPLIER = b
+                .comment("v36.1 无斧砍树减速倍率 (破坏间隔 × 此值)")
+                .defineInRange("no_axe_interval_multiplier", 4, 1, 10);
         b.pop();
 
         b.push("env_sense");

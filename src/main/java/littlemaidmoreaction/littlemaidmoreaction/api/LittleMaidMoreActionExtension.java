@@ -205,6 +205,9 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
                 // v37: 环境感知缓存清理（key 闭环）
                 littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.api.envsense
                     .EnvSenseScheduler.onMaidUnload(maid.getId());
+                // v36.1: 连锁采集跳过集清理
+                littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.execute
+                    .ChainHarvestExecute.onMaidUnload(maid.getId());
             }
         }
     }
