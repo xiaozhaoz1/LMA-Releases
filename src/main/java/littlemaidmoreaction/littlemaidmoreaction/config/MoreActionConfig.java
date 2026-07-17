@@ -15,10 +15,9 @@ public final class MoreActionConfig {
     public static final ForgeConfigSpec.BooleanValue DEBUG_MODE;
 
     // ── 连锁采集 (v36) ──
+    // v36.2: 破坏间隔改为按挖掘等级查表 (ToolJudge.harvestIntervalTicks)，不再配置
     public static final ForgeConfigSpec.IntValue CHAIN_MAX_BLOCKS;
-    public static final ForgeConfigSpec.IntValue CHAIN_BREAK_INTERVAL;
     public static final ForgeConfigSpec.BooleanValue CHAIN_WOOD_NATURE_CHECK;
-    public static final ForgeConfigSpec.IntValue CHAIN_NO_AXE_MULTIPLIER;
 
     // ── 环境感知 (v37) ──
     public static final ForgeConfigSpec.IntValue ENV_SCAN_INTERVAL;
@@ -53,15 +52,9 @@ public final class MoreActionConfig {
         CHAIN_MAX_BLOCKS = b
                 .comment("连锁采集(砍树/挖矿)单次最大方块数")
                 .defineInRange("max_blocks", 64, 1, 1024);
-        CHAIN_BREAK_INTERVAL = b
-                .comment("每破坏一块的间隔 (tick)")
-                .defineInRange("break_interval_ticks", 5, 1, 100);
         CHAIN_WOOD_NATURE_CHECK = b
                 .comment("砍树前校验天然树(原木需连接非手放树叶)，防止女仆拆玩家木建筑")
                 .define("wood_nature_check", true);
-        CHAIN_NO_AXE_MULTIPLIER = b
-                .comment("v36.1 无斧砍树减速倍率 (破坏间隔 × 此值)")
-                .defineInRange("no_axe_interval_multiplier", 4, 1, 10);
         b.pop();
 
         b.push("env_sense");

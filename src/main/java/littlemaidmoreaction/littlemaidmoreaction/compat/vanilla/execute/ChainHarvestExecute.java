@@ -38,10 +38,13 @@ import java.util.function.BiPredicate;
  * <ul>
  *   <li><b>跳过机制</b>: 镐等级不足的矿 / 非天然树 → 记入跳过集，接力搜索下一个目标
  *       （不再 FAILED 休眠）。跳过集按工具等级版本化 — 换镐后自动重置</li>
- *   <li><b>无斧慢砍</b>: 砍树不要求斧；持可用斧 = 正常速度+扣耐久，
- *       空手/非斧 = 慢速（interval × no_axe_interval_multiplier）+ 不扣耐久</li>
+ *   <li><b>无斧慢砍</b>: 砍树不要求斧；空手/非斧慢速且不扣耐久</li>
  *   <li><b>等级前置过滤</b>: 接力搜索时 ORE 模式直接排除挖不动的矿，不走冤枉路</li>
  * </ul>
+ *
+ * <h3>v36.2 速度模型（用户定义）</h3>
+ * 破坏间隔按挖掘等级查表 {@link ToolJudge#harvestIntervalTicks}:
+ * 空手40 / 木20 / 石15 / 铁10 / 钻5 / 下界合金5 (tick/块)。
  *
  * <h3>PersistentData key 闭环</h3>
  * lma_chain_queue / lma_chain_idx / lma_chain_tick —
@@ -63,8 +66,8 @@ public final class ChainHarvestExecute {
     private static final int NATURE_CHECK_MAX_LOGS = 100;
     /** 工具保留耐久 — 剩最后 1 点时停手，不打坏工具 */
     private static final int TOOL_RESERVE_DURABILITY = 1;
-    /** 跳过集容量上限（FIFO 淘汰） */
-    private static final int SKIP_MAX = 128;
+    /** 跳过集容量上限（FIFO 淘汰 — 覆盖范围内可数矿脉/树即可，v36.2 用户定 20） */
+    private static final int SKIP_MAX = 20;
 
     /** v36.1: entityId → 跳过集（挖不动的矿/非天然树），按工具等级版本化 */
     private static final Map<Integer, SkipState> SKIPPED = new ConcurrentHashMap<>();
@@ -133,14 +136,8 @@ public final class ChainHarvestExecute {
                                         CompoundTag data, Mode mode, ItemStack tool) {
         long now = world.getGameTime();
         long last = data.getLong(KEY_TICK);
-        // v36.1: 持可用斧=正常速度; 空手/非斧砍树=慢速
-        boolean fastAxe = mode == Mode.WOOD
-                && ToolStateReader.isAxe(tool)
-                && ToolJudge.isToolUsable(tool, TOOL_RESERVE_DURABILITY);
-        int interval = Math.max(1, MoreActionConfig.CHAIN_BREAK_INTERVAL.get());
-        if (mode == Mode.WOOD && !fastAxe) {
-            interval *= Math.max(1, MoreActionConfig.CHAIN_NO_AXE_MULTIPLIER.get());
-        }
+        // v36.2: 破坏间隔按挖掘等级查表（空手40/木20/石15/铁10/钻5/合金5）
+        int interval = ToolJudge.harvestIntervalTicks(tool, mode == Mode.WOOD);
         // 时间戳防护: last==0(尚未破坏) 或 last>now(跨session异常) 时不节流，直接推进
         if (last != 0 && last <= now && now - last < interval) {
             keepAlive(world, maid);
@@ -161,8 +158,11 @@ public final class ChainHarvestExecute {
             data.putInt(KEY_IDX, idx);
             if (maid.destroyBlock(target)) {
                 // TLM TaskSnow 样板: 掉落进背包由 destroyBlock 内部处理
-                // v36.1: 仅挖矿或持可用斧时消耗耐久（空手/非斧砍树不消耗）
-                if (mode == Mode.ORE || fastAxe) {
+                // v36.2: 仅挖矿或持可用斧时消耗耐久（空手/非斧砍树不消耗）
+                boolean consumeDurability = mode == Mode.ORE
+                        || (ToolStateReader.isAxe(tool)
+                            && ToolJudge.isToolUsable(tool, TOOL_RESERVE_DURABILITY));
+                if (consumeDurability) {
                     tool.hurtAndBreak(1, maid,
                             e -> e.broadcastBreakEvent(InteractionHand.MAIN_HAND));
                 }

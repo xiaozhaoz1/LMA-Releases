@@ -41,4 +41,31 @@ public final class ToolJudge {
         return !tool.isEmpty()
                 && ToolStateReader.getRemainingDurability(tool) > reserveDurability;
     }
+
+    // ── v36.2: 挖掘等级速度表（用户 2026-07-17 定义） ──
+
+    /** 按 tier 的破坏间隔 (tick/块): 木20 / 石15 / 铁10 / 钻5 / 下界合金5 */
+    private static final int[] TIER_INTERVAL_TICKS = {20, 15, 10, 5, 5};
+    /** 空手/非对应工具/将坏工具的破坏间隔 */
+    private static final int BARE_HAND_INTERVAL_TICKS = 40;
+
+    /**
+     * v36.2 挖掘间隔查表：等级越高破坏越快。
+     * 非对应类型工具/空手/将坏 → 40 tick（慢速兜底，砍树不拦截语义）。
+     *
+     * @param requireAxe true=砍树(需斧提速) / false=挖矿(需镐提速)
+     */
+    public static int harvestIntervalTicks(ItemStack tool, boolean requireAxe) {
+        boolean properTool = requireAxe
+                ? ToolStateReader.isAxe(tool)
+                : ToolStateReader.isPickaxe(tool);
+        if (!properTool || !isToolUsable(tool, 1)) {
+            return BARE_HAND_INTERVAL_TICKS;
+        }
+        int tier = ToolStateReader.getTierLevel(tool);
+        if (tier < 0) {
+            return BARE_HAND_INTERVAL_TICKS;
+        }
+        return TIER_INTERVAL_TICKS[Math.min(tier, TIER_INTERVAL_TICKS.length - 1)];
+    }
 }
