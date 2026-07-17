@@ -64,19 +64,6 @@ public final class TaskRegistry {
                 return TaskResult.SUCCESS;
             });
 
-        register("altar_craft", null,
-            state -> true,
-            new littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.pipeline.AltarCraftPipeline(),
-            (w, m, p, d) -> {
-                var action = new littlemaidmoreaction.littlemaidmoreaction.impl.action.world.PlaceAltarItemAction();
-                var params = new java.util.HashMap<String, String>();
-                String target = d.getString("lma_task_target");
-                params.put("item_id", target.isEmpty() ? "minecraft:coal" : target);
-                params.put("range", String.valueOf((int) m.getRestrictRadius()));
-                action.execute(new RuleContext(m), params);
-                return TaskResult.SUCCESS;
-            });
-
         // ── v36: 连锁采集（环境感知任务 — searchPredicate 按标签搜索目标） ──
         registerSearch("collect_wood",
             (p, s) -> s.is(net.minecraft.tags.BlockTags.LOGS),

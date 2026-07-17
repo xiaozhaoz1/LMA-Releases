@@ -20,7 +20,7 @@ import java.util.Map;
 public final class TaskTimeoutCondition implements ICondition {
     private static final List<TypedParam<?>> PARAMS = List.of(
         new TypedParam.IntParam("timeout_ticks", "超时tick", 200),
-        new TypedParam.StringParam("task_type", "任务类型", "altar_craft")
+        new TypedParam.StringParam("task_type", "任务类型", "craft_chain")
     );
 
     @Override public String key() { return "task_timeout"; }
@@ -33,7 +33,7 @@ public final class TaskTimeoutCondition implements ICondition {
     public String evaluate(RuleContext ctx, Map<String, String> rawParams) {
         var data = ctx.maid().getPersistentData();
         String currentTask = data.getString("lma_flow_task");
-        String expected = rawParams.getOrDefault("task_type", "altar_craft");
+        String expected = rawParams.getOrDefault("task_type", "craft_chain");
         if (!currentTask.equals(expected)) return "false";
 
         long lastTick = data.getLong("lma_flow_tick");

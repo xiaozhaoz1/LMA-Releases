@@ -36,7 +36,7 @@ import java.util.Map;
 public abstract class AbstractTaskCondition implements ICondition {
 
     protected static final List<TypedParam<?>> TASK_PARAMS = List.of(
-        new TypedParam.StringParam("task_type", "任务类型", "altar_craft"),
+        new TypedParam.StringParam("task_type", "任务类型", "craft_chain"),
         new TypedParam.StringParam("task_id", "任务ID", "0"),
         new TypedParam.SelectParam("expected_state", "期望状态", "in_progress",
             List.of("any", "queued", "in_progress", "completed", "failed", "stopped")),
@@ -53,7 +53,7 @@ public abstract class AbstractTaskCondition implements ICondition {
     public String evaluate(RuleContext ctx, Map<String, String> rawParams) {
         var data = ctx.maid().getPersistentData();
         String currentTask = data.getString("lma_flow_task");
-        String expected = rawParams.getOrDefault("task_type", "altar_craft");
+        String expected = rawParams.getOrDefault("task_type", "craft_chain");
 
         // 任务类型不匹配
         if (!currentTask.equals(expected)) return "false";

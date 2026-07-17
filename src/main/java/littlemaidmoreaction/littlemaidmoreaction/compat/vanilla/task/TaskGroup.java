@@ -42,7 +42,7 @@ public final class TaskGroup {
     private static void loadDefaults() {
         if (GROUPS.isEmpty()) {
             GROUPS.add(new GroupDef("crafting", "合成", List.of("craft_chain", "furnace")));
-            GROUPS.add(new GroupDef("interact", "交互", List.of("jukebox", "bell_ring", "altar_craft")));
+            GROUPS.add(new GroupDef("interact", "交互", List.of("jukebox", "bell_ring")));
         }
     }
 

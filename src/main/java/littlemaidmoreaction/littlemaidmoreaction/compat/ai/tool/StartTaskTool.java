@@ -52,8 +52,8 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
     @Override
     public String summary(EntityMaid maid) {
         return "Start a task for the maid. Call this DIRECTLY when the owner wants the maid to " +
-               "craft/smelt/play music/ring bell/use altar. " +
-               "task_type: craft_chain | furnace | jukebox | bell_ring | altar_craft. " +
+               "craft/smelt/play music/ring bell. " +
+               "task_type: craft_chain | furnace | jukebox | bell_ring. " +
                "target: the item ID (e.g. minecraft:stick). For jukebox: music disc ID. For bell_ring: empty string. " +
                "target_count: -1=unlimited (default), positive number when owner says exact quantity. " +
                "Do NOT query inventory, recipes, or create rules — the system handles everything internally.";
@@ -63,7 +63,7 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
     public Parameter parameters(ObjectParameter root, EntityMaid maid) {
         root.addProperties("task_type", StringParameter.create()
                 .setDescription("Task type: craft_chain (crafting), furnace (smelt/cook), " +
-                        "jukebox (play music), bell_ring, altar_craft. brewing is DELETED."));
+                        "jukebox (play music), bell_ring. brewing is DELETED."));
         root.addProperties("target", StringParameter.create()
                 .setDescription("Target item ID (e.g. minecraft:stick). For jukebox: music disc ID (optional). " +
                         "For bell_ring: empty string."));

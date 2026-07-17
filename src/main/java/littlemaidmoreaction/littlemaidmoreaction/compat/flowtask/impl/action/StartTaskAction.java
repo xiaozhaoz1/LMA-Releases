@@ -32,7 +32,7 @@ public final class StartTaskAction implements IAction {
 
     private static final List<TypedParam<?>> PARAMS = List.of(
         new TypedParam.SelectParam("task_type", "任务类型", "craft_chain",
-            List.of("craft_chain", "furnace", "jukebox", "bell_ring", "altar_craft")),
+            List.of("craft_chain", "furnace", "jukebox", "bell_ring")),
         new TypedParam.StringParam("target", "目标物品ID", "minecraft:stick"),
         new TypedParam.IntParam("target_count", "目标数量(-1=无限)", -1)
     );

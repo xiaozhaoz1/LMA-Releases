@@ -36,7 +36,6 @@ public final class LmaDocsTool implements ITool<String> {
               "smelt X" / "烧X" → furnace
               "ring bell" / "敲钟" → bell_ring
               "play music" / "放音乐" → jukebox
-              "do altar" / "祭坛" → altar_craft
               (brewing is DELETED — maid cannot brew potions)
             ☆ Example:
               lma_start_task(task_type="craft_chain", target="minecraft:stick", target_count=16)
@@ -88,7 +87,6 @@ public final class LmaDocsTool implements ITool<String> {
             furnace      — smelt/cook items (auto fuel+input+output loop)
             jukebox      — play music discs (auto insert/eject/rotate)
             bell_ring    — ring nearby bell
-            altar_craft  — Touhou Little Maid altar crafting
 
             === target_count PARAMETER ===
             -1 = unlimited (make until materials run out) — DEFAULT

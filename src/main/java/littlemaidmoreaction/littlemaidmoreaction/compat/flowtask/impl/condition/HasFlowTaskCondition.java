@@ -16,7 +16,7 @@ import java.util.Map;
 @RuleCondition
 public final class HasFlowTaskCondition implements ICondition {
     private static final List<TypedParam<?>> PARAMS = List.of(
-        new TypedParam.StringParam("task_type", "任务类型", "altar_craft")
+        new TypedParam.StringParam("task_type", "任务类型", "craft_chain")
     );
 
     @Override public String key() { return "has_flow_task"; }
@@ -29,7 +29,7 @@ public final class HasFlowTaskCondition implements ICondition {
     public String evaluate(RuleContext ctx, Map<String, String> rawParams) {
         var data = ctx.maid().getPersistentData();
         String currentTask = data.getString("lma_flow_task");
-        String expected = rawParams.getOrDefault("task_type", "altar_craft");
+        String expected = rawParams.getOrDefault("task_type", "craft_chain");
         return currentTask.equals(expected) ? "true" : "false";
     }
 }

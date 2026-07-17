@@ -44,7 +44,6 @@ public final class LmaTaskTypeRegistry {
 
     /** 图标映射: 关键词 → Item */
     private static final Map<String, Item> ICON_MAP = Map.ofEntries(
-        Map.entry("altar",     Items.ENCHANTING_TABLE),
         Map.entry("craft",     Items.CRAFTING_TABLE),
         Map.entry("furnace",   Items.FURNACE),
         Map.entry("smelt",     Items.FURNACE),
@@ -207,9 +206,7 @@ public final class LmaTaskTypeRegistry {
         Map.entry("唱片", "jukebox"),
         Map.entry("farm", "farm"),
         Map.entry("harvest", "farm"),
-        Map.entry("种地", "farm"),
-        Map.entry("altar", "altar_craft"),
-        Map.entry("祭坛", "altar_craft")
+        Map.entry("种地", "farm")
     );
 
     /** 生成任务关键词 AI prompt 文本 (所有 AI 工具/上下文共用) */
@@ -217,7 +214,7 @@ public final class LmaTaskTypeRegistry {
         StringBuilder sb = new StringBuilder();
         sb.append("ALL crafting table work = craft_chain with item_id in data. ");
         sb.append("target_count: 0=craft ALL, >0=specific. ");
-        sb.append("Other: altar→altar_craft, furnace/smelt→furnace, ");
+        sb.append("Other: furnace/smelt→furnace, ");
         sb.append("brew→brewing, bell→bell_ring, music→jukebox, farm→farm. ");
         sb.append("Do NOT query inventory — just assign task directly.");
         return sb.toString();

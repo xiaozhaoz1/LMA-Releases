@@ -97,7 +97,6 @@ public final class LmaTaskProgressDisplay {
     private static String friendlyName(String taskType) {
         if (taskType == null) return "未知任务";
         return switch (taskType) {
-            case "altar_craft"  -> "祭坛合成";
             case "craft_chain"  -> "配方链合成";
             case "furnace"      -> "熔炉烧炼";
             case "brewing"      -> "炼药";
@@ -111,7 +110,7 @@ public final class LmaTaskProgressDisplay {
     private static String verbFor(String taskType) {
         if (taskType == null) return "做";
         return switch (taskType) {
-            case "altar_craft", "craft_chain" -> "合成";
+            case "craft_chain" -> "合成";
             case "furnace", "brewing" -> "烧炼";
             case "bell_ring" -> "敲";
             default -> "做";

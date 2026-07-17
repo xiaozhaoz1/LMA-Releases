@@ -2,7 +2,6 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.adapter;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidCheckRateTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.tartaricacid.touhoulittlemaid.tileentity.TileEntityAltar;
 import com.google.common.collect.ImmutableMap;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.task.TaskRegistry;
@@ -157,7 +156,6 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         } else {
             predicate = switch (handler.taskType()) {
                 case "furnace" -> (p, s) -> world.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity;
-                case "altar_craft" -> (p, s) -> world.getBlockEntity(p) instanceof TileEntityAltar;
                 default -> null;
             };
             if (predicate == null) return null;
@@ -176,7 +174,6 @@ public final class LmaFlowCoordinationBehavior extends MaidCheckRateTask {
         // targetBlock==null → BlockEntity 验证
         return switch (handler.taskType()) {
             case "furnace" -> world.getBlockEntity(pos) instanceof AbstractFurnaceBlockEntity;
-            case "altar_craft" -> world.getBlockEntity(pos) instanceof TileEntityAltar;
             default -> false;
         };
     }

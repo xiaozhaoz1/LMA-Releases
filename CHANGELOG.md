@@ -1,5 +1,11 @@
 # Changelog
 
+## [v36.7] — 2026-07-17 — 删除祭坛合成任务
+
+- 任务栏移除"祭坛合成"（有合成台不需要祭坛 — 用户决策）：TaskRegistry 注册 + AltarCraftPipeline 删除、协调行为 altar_craft 分支清理、AI 工具/关键词/图标/分组/语言键同步移除
+- **保留**规则引擎祭坛生态：place_altar_item 动作 / AltarPresets 预设 / AltarOutput/AltarExecute IO — 玩家仍可用规则驱动祭坛
+- 条件默认参数值 altar_craft → craft_chain（3 文件 6 处）
+
 ## [v36.6] — 2026-07-17 — 状态原子化 + 采集目标抽象 + TaskEngine 打架修复
 
 - **P0 根因**: lma_flow_tick 无心跳 → TaskEngine 60 秒超时杀活任务 → auto-restart 无限 churn（"卡住"的真凶，日志实锤）
