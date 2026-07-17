@@ -78,7 +78,7 @@ public final class MoreActionConfig {
                 .defineInRange("hot_threshold", 1.0, 0.0, 2.0);
         ENV_PLAYER_GATE_RADIUS = b
                 .comment("玩家门控半径: 仅此范围内的女仆参与环境感知, 0=不门控 (v37.2)")
-                .defineInRange("player_gate_radius", 64, 0, 256);
+                .defineInRange("player_gate_radius", 20, 0, 256);
         ENV_DARKNESS_THRESHOLD = b
                 .comment("黑暗判定亮度阈值 (低于此值触发 env_darkness, 怪物生成亮度默认 7)")
                 .defineInRange("darkness_threshold", 7, 0, 15);

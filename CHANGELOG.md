@@ -3,7 +3,7 @@
 ## [v37.2] — 2026-07-17 — EnvSense 扩展：生物分类/时间段/亮度/死亡感知/玩家门控/结构探测
 
 ### 新增感知能力
-- **玩家门控**（性能闸）：仅玩家 64 格（config player_gate_radius, 0=关）内的女仆参与一切感知 — 挂机农场女仆零开销
+- **玩家门控**（性能闸）：仅玩家 20 格（config player_gate_radius, 0=关）内的女仆参与一切感知 — 挂机农场女仆零开销
 - **实体分类感知**（存在即命中，快照含实体列表）：`env_nearby_monster`（MobCategory.MONSTER, TLM 先例）/ `env_nearby_friendly`（非怪物非杂项 Mob）/ `env_nearby_maid`
 - **时间段**：WorldInfo 新增 timeSegment（DAY/DUSK/NIGHT/DAWN 自定义四段）+ `env_time_segment_change` 边沿
 - **亮度**：`env_darkness`（亮度 < 7 进入黑暗时触发，config darkness_threshold）
