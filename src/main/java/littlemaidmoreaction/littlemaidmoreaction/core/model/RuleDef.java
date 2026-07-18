@@ -59,27 +59,27 @@ public record RuleDef(
 
     // ===== 便捷工厂 =====
 
-    /** 最简 — 全部默认：启用、100%、无冷却、优先级0、ALL 模式 */
+    /** 最简 — 默认禁用、100%、无冷却、优先级0、ALL 模式 */
     public static RuleDef simple(int id, String name, String eventId,
                                   List<ConditionDef> conditions, List<ActionStep> actions) {
-        return new RuleDef(id, name, true, eventId, 1.0, 0, 0,
+        return new RuleDef(id, name, false, eventId, 1.0, 0, 0,
                 MatchMode.ALL, conditions, actions, List.of());
     }
 
-    /** 完整 — 指定概率、冷却、优先级、匹配模式（无 compat） */
+    /** 完整 — 指定概率、冷却、优先级、匹配模式（无 compat），默认禁用 */
     public static RuleDef full(int id, String name, String eventId,
                                 double chance, int cooldown, int priority, MatchMode mode,
                                 List<ConditionDef> conditions, List<ActionStep> actions) {
-        return new RuleDef(id, name, true, eventId, chance, cooldown, priority,
+        return new RuleDef(id, name, false, eventId, chance, cooldown, priority,
                 mode, conditions, actions, List.of());
     }
 
-    /** 完整 + compat — 指定依赖的兼容模组 */
+    /** 完整 + compat — 指定依赖的兼容模组，默认禁用 */
     public static RuleDef full(int id, String name, String eventId,
                                 double chance, int cooldown, int priority, MatchMode mode,
                                 List<ConditionDef> conditions, List<ActionStep> actions,
                                 List<String> compat) {
-        return new RuleDef(id, name, true, eventId, chance, cooldown, priority,
+        return new RuleDef(id, name, false, eventId, chance, cooldown, priority,
                 mode, conditions, actions, compat);
     }
 

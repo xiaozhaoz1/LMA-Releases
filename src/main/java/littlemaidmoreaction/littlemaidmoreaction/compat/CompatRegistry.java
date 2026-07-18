@@ -1,5 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat;
 
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.CreateCompat;
 import littlemaidmoreaction.littlemaidmoreaction.compat.slashblade.SlashBladeCompat;
 import littlemaidmoreaction.littlemaidmoreaction.compat.tpm.TpmCompat;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaCompat;
@@ -60,6 +61,7 @@ public final class CompatRegistry {
         checkModLoad(YSM, YsmCompat::init);
         checkModLoad(SLASHBLADE, SlashBladeCompat::init);
         checkModLoad(TPM, TpmCompat::init);
+        checkModLoad(CREATE, CreateCompat::init);
     }
 
     private static void checkModLoad(String modId, Runnable runnable) {

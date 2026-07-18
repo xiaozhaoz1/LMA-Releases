@@ -27,9 +27,6 @@ import java.util.function.Predicate;
 
 /**
  * 任务注册中心 — 所有任务类型的单一真相源。
- *
- * 合并了旧 TaskOrchestrator (Pipeline 验证) + TaskHandlerRegistry (导航执行)。
- * 新增任务类型只需一行 register()。
  */
 public final class TaskRegistry {
 
@@ -66,7 +63,7 @@ public final class TaskRegistry {
                 return TaskResult.SUCCESS;
             });
 
-        // ── v36: 连锁采集（环境感知任务 — searchPredicate 按标签搜索目标） ──
+        // ── v36: 连锁采集 ──
         registerSearch("collect_wood",
             (p, s) -> s.is(net.minecraft.tags.BlockTags.LOGS),
             state -> state.is(net.minecraft.tags.BlockTags.LOGS),
@@ -83,64 +80,44 @@ public final class TaskRegistry {
                 .ChainHarvestExecute.execute(w, m, p, d,
                     littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.Mode.ORE));
 
-        // ── v38: 机械臂搬运任务 (Create 兼容, compat/create/) ──
-        registerSearch("arm_transfer",
-            (p, s) -> false,
-            state -> true,
-            new littlemaidmoreaction.littlemaidmoreaction.compat.create.ArmTransferPipeline(),
-            (w, m, p, d) -> littlemaidmoreaction.littlemaidmoreaction.compat.create.ArmTransferPipeline
-                .tick(w, m, p, d));
+        // ── v38: 女仆搬运 (仅 Create 加载时注册到任务栏) ──
+        if (net.minecraftforge.fml.ModList.get().isLoaded("create")) {
+            registerSearch("arm_transfer",
+                (p, s) -> false,
+                state -> true,
+                new littlemaidmoreaction.littlemaidmoreaction.compat.create.ArmTransferPipeline(),
+                littlemaidmoreaction.littlemaidmoreaction.compat.create.ArmTransferPipeline.executor());
+        }
     }
 
-    /** 注册任务类型 (targetBlock 精确匹配搜索) */
     public static void register(String taskType, Block block, Predicate<BlockState> valid,
                                  TaskPipeline pipeline, IExecutor executor) {
         HANDLERS.put(taskType, new TaskHandler(taskType, block, null, valid, pipeline, executor));
     }
 
-    /** v36: 注册任务类型 (searchPredicate 自定义搜索 — 标签/多方块匹配) */
     public static void registerSearch(String taskType, BiPredicate<BlockPos, BlockState> searchPredicate,
                                        Predicate<BlockState> valid,
                                        TaskPipeline pipeline, IExecutor executor) {
         HANDLERS.put(taskType, new TaskHandler(taskType, null, searchPredicate, valid, pipeline, executor));
     }
 
-    /**
-     * v18: 验证材料 + 写任务参数到 PersistentData。
-     * Brain Behavior 直接读取参数执行导航+交互。
-     */
     public static PipelineResult validate(EntityMaid maid, String taskType, String taskId,
                                           String target, int targetCount) {
         LittleMaidMoreAction.LOGGER.info("[V35] [TaskRegistry] validate: task_type={}, target={}, count={}",
             taskType, target, targetCount);
-
         TaskHandler handler = HANDLERS.get(taskType);
-        if (handler == null) {
-            return PipelineResult.failed("未知任务类型: " + taskType);
-        }
-
-        if (!(maid.level() instanceof ServerLevel level)) {
-            return PipelineResult.failed("仅在服务端可用");
-        }
-
-        return handler.pipeline().validate(level, maid,
-            new PipelineContext(target, targetCount, taskId));
+        if (handler == null) return PipelineResult.failed("未知任务类型: " + taskType);
+        if (!(maid.level() instanceof ServerLevel level)) return PipelineResult.failed("仅在服务端可用");
+        return handler.pipeline().validate(level, maid, new PipelineContext(target, targetCount, taskId));
     }
-
-    // ── Queries ──
 
     public static TaskHandler get(String taskType) { return HANDLERS.get(taskType); }
     public static Set<String> taskTypes() { return HANDLERS.keySet(); }
 
-    // ── Types ──
-
     public record TaskHandler(
-        String taskType,
-        Block targetBlock,
+        String taskType, Block targetBlock,
         BiPredicate<BlockPos, BlockState> searchPredicate,
         Predicate<BlockState> isValid,
-        TaskPipeline pipeline,
-        IExecutor executor
+        TaskPipeline pipeline, IExecutor executor
     ) {}
-
 }

@@ -85,9 +85,9 @@ public final class ChainHarvestExecute {
         ItemStack tool = maid.getMainHandItem();
 
         if (mode == Mode.ORE && !ToolJudge.isToolUsable(tool, TOOL_RESERVE_DURABILITY)) {
-            LittleMaidMoreAction.LOGGER.info("[ChainHarvest] {} 工具缺失或将坏，停止", target.label());
-            clearChainData(data);
-            return TaskResult.FAILED;
+            // 无限等待 — 不 fail, 女仆会待机直到拿到新镐
+            keepAlive(world, maid);
+            return TaskResult.CONTINUE;
         }
 
         if (data.contains(KEY_QUEUE)) {
@@ -130,8 +130,8 @@ public final class ChainHarvestExecute {
                 vein = vein.subList(0, Math.max(0, budget));
             }
             if (vein.isEmpty()) {
-                clearChainData(data);
-                return TaskResult.FAILED;
+                // 耐久不足无法采任何块 → 回空闲扫描等待 (不 fail)
+                return idleScan(world, maid, data, target, tool, true);
             }
         }
 
