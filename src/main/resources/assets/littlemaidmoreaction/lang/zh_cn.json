@@ -8,6 +8,14 @@
   "task.littlemaidmoreaction.collect_ore": "采集矿石",
   "task.littlemaidmoreaction.go_to_bed": "去睡觉",
   "task.littlemaidmoreaction.flow_task": "流程任务",
+  "task.littlemaidmoreaction.arm_transfer": "搬运",
+  "task.littlemaidmoreaction.crank": "手摇曲柄",
+  "task.littlemaidmoreaction.power": "动力齿轮",
+  "task.littlemaidmoreaction.press": "女仆冲压",
+  "task.littlemaidmoreaction.mix": "女仆搅拌",
+  "task.littlemaidmoreaction.running_belt": "跑步发电",
+
+  "block.littlemaidmoreaction.maid_power_belt": "女仆发电皮带",
 
   "overlay.lma.task_can_execute": "可直接执行",
   "overlay.lma.task_needs_ai_content": "需要 AI 设定内容"

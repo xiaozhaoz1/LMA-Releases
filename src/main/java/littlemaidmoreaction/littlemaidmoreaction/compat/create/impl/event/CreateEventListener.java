@@ -4,7 +4,12 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.InteractMaidEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.compat.create.ArmTransferPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.ArmTransferPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.CrankPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.MixPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PressPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.RunningBeltPipeline;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.TaskStateService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -102,7 +107,7 @@ public final class CreateEventListener {
         player.sendSystemMessage(comp("§a女仆开始搬运: " + takePos.toShortString() + " → " + depositPos.toShortString()));
     }
 
-    // ── ③ ServerTick: 驱动搬运 ──
+    // ── ③ ServerTick: 驱动所有 Create 任务 ──
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -111,10 +116,20 @@ public final class CreateEventListener {
             for (var e : sl.getAllEntities()) {
                 if (!(e instanceof EntityMaid maid)) continue;
                 var d = maid.getPersistentData();
-                if (!"arm_transfer".equals(d.getString("lma_flow_task"))) continue;
                 if (!"in_progress".equals(d.getString("lma_flow_state"))) continue;
+
+                String task = d.getString("lma_flow_task");
+                if (task.isEmpty()) continue;
+
                 TaskStateService.heartbeat(maid, sl.getGameTime());
-                ArmTransferPipeline.tick(sl, maid);
+                switch (task) {
+                    case "arm_transfer" -> ArmTransferPipeline.tick(sl, maid);
+                    case "crank"        -> CrankPipeline.tick(sl, maid);
+                    case "power"        -> PowerPipeline.tick(sl, maid);
+                    case "press"        -> PressPipeline.tick(sl, maid);
+                    case "mix"          -> MixPipeline.tick(sl, maid);
+                    case "running_belt" -> RunningBeltPipeline.tick(sl, maid);
+                }
             }
         }
     }

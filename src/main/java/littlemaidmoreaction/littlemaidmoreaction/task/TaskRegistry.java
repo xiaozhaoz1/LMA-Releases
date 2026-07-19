@@ -14,6 +14,9 @@ import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import com.simibubi.create.content.kinetics.crank.HandCrankBlock;
+import com.simibubi.create.content.logistics.depot.DepotBlock;
+import com.simibubi.create.content.processing.basin.BasinBlock;
 import net.minecraft.world.level.block.BellBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -80,13 +83,51 @@ public final class TaskRegistry {
                 .ChainHarvestExecute.execute(w, m, p, d,
                     littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.Mode.ORE));
 
-        // ── v38: 女仆搬运 (仅 Create 加载时注册到任务栏) ──
+        // ── v38-39: Create 女仆专属任务 (仅 Create 加载时注册) ──
         if (net.minecraftforge.fml.ModList.get().isLoaded("create")) {
+            // v38: 搬运
             registerSearch("arm_transfer",
                 (p, s) -> false,
                 state -> true,
-                new littlemaidmoreaction.littlemaidmoreaction.compat.create.ArmTransferPipeline(),
-                littlemaidmoreaction.littlemaidmoreaction.compat.create.ArmTransferPipeline.executor());
+                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.ArmTransferPipeline(),
+                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.ArmTransferPipeline.executor());
+
+            // v39: 手摇曲柄
+            registerSearch("crank",
+                (p, s) -> s.getBlock() instanceof HandCrankBlock,
+                state -> state.getBlock() instanceof HandCrankBlock,
+                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.CrankPipeline(),
+                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.CrankPipeline.executor());
+
+            // v39: 动力齿轮
+            registerSearch("power",
+                (p, s) -> littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerService.isTargetBlock(s.getBlock()),
+                state -> littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerService.isTargetBlock(state.getBlock()),
+                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerPipeline(),
+                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerPipeline.executor());
+
+            // v39: 女仆冲压
+            registerSearch("press",
+                (p, s) -> { Block b = s.getBlock(); return b instanceof DepotBlock || b instanceof BasinBlock; },
+                state -> true,
+                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PressPipeline(),
+                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PressPipeline.executor());
+
+            // v39: 女仆搅拌
+            registerSearch("mix",
+                (p, s) -> s.getBlock() instanceof BasinBlock,
+                state -> true,
+                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.MixPipeline(),
+                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.MixPipeline.executor());
+
+            // v40: 女仆跑步发电
+            registerSearch("running_belt",
+                (p, s) -> s.getBlock() instanceof com.simibubi.create.content.kinetics.belt.BeltBlock
+                    && s.getValue(com.simibubi.create.content.kinetics.belt.BeltBlock.SLOPE)
+                        == com.simibubi.create.content.kinetics.belt.BeltSlope.HORIZONTAL,
+                state -> state.getBlock() instanceof com.simibubi.create.content.kinetics.belt.BeltBlock,
+                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.RunningBeltPipeline(),
+                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.RunningBeltPipeline.executor());
         }
     }
 

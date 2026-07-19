@@ -1,5 +1,14 @@
 # Changelog
 
+## [v40] — 2026-07-19 — 女仆跑步发电
+
+- **女仆跑步发电任务** — 女仆站在Create传送带上冲刺产生旋转动力(~96RPM应力输出)
+- **MaidPowerBelt** — 自研发电皮带方块 (extends HorizontalKineticBlock + GeneratingKineticBlockEntity)
+- **皮带渲染** — BER复用Create BeltRenderer模型, UV滚动动画
+- **食物消耗** — 每5秒消耗1背包食物, 无食物不启动
+- **智能恢复** — 停跑/切换任务/无食物→自动恢复普通皮带
+- **注册系统** — LMA首个DeferredRegister<Block> + <BlockEntityType>
+
 ## [v38.2] — 2026-07-18 — 机械臂任务重写 + 预设默认禁用
 
 - **机械臂任务重写** — 木棍(stick)标记容器替机械臂, TAKE↔DEPOSIT两状态, 任务栏注册, 空源无限等待, 不拦截Create事件

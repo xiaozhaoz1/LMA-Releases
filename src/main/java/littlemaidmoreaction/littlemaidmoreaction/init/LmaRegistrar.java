@@ -67,5 +67,15 @@ public final class LmaRegistrar {
         littlemaidmoreaction.littlemaidmoreaction.adapter.LmaMemoryModuleRegistry.register(modBus);
     }
 
+    /** v40: 注册方块 DeferredRegister */
+    public static void registerBlocks(IEventBus modBus) {
+        LmaBlocks.register(modBus);
+    }
+
+    /** v40: 注册方块实体 DeferredRegister */
+    public static void registerBlockEntityTypes(IEventBus modBus) {
+        LmaBlockEntityTypes.register(modBus);
+    }
+
     private LmaRegistrar() {}
 }

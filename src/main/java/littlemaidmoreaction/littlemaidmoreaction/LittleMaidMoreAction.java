@@ -73,6 +73,9 @@ public final class LittleMaidMoreAction {
         LmaRegistrar.registerSounds(modBus);
         // ★ v12.7 P0: MemoryModuleType 注册 (DeferredRegister → LmaMemoryModuleRegistry)
         LmaRegistrar.registerMemoryModules(modBus);
+        // v40: 方块 + 方块实体注册 (DeferredRegister → LmaBlocks/LmaBlockEntityTypes)
+        LmaRegistrar.registerBlocks(modBus);
+        LmaRegistrar.registerBlockEntityTypes(modBus);
         // v10: TPM 事件由 TpmCompat.init() 统一注册 (Compat 模式)
 
         MinecraftForge.EVENT_BUS.register(this);
