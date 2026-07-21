@@ -101,7 +101,12 @@ public final class LmaTaskProgressDisplay {
             case "furnace"      -> "熔炉烧炼";
             case "brewing"      -> "炼药";
             case "bell_ring"    -> "敲钟";
-            case "jukebox"      -> "唱片机";
+            case "jukebox"       -> "唱片机";
+            case "arm_transfer" -> "搬运";
+            case "crank"        -> "手摇曲柄";
+            case "power"        -> "动力齿轮";
+            case "press"        -> "女仆冲压";
+            case "mix"          -> "女仆搅拌";
             default -> taskType;
         };
     }

@@ -22,7 +22,50 @@ public final class MaidStateReader implements IReader<EntityMaid> {
     @Override public String category() { return "maid"; }
     @Override public Class<EntityMaid> sourceType() { return EntityMaid.class; }
     @Override public <T> T read(EntityMaid m, String property, Class<T> type) {
-        throw new UnsupportedOperationException("Use static methods directly");
+        return switch (property) {
+            // 数值
+            case "health"        -> type.cast(getHealth(m));
+            case "max_health"    -> type.cast(getMaxHealth(m));
+            case "health_ratio"  -> type.cast(getHealthRatio(m));
+            case "hunger"        -> type.cast(getHunger(m));
+            case "favorability"  -> type.cast(getFavorability(m));
+            case "experience"    -> type.cast(getExperience(m));
+            case "luck"          -> type.cast(getLuck(m));
+            case "attack_damage" -> type.cast(getAttackDamage(m));
+            case "movement_speed"-> type.cast(getMovementSpeed(m));
+            case "armor"         -> type.cast(getArmor(m));
+            case "armor_toughness"-> type.cast(getArmorToughness(m));
+            case "restrict_radius"-> type.cast(getRestrictRadius(m));
+            // 布尔
+            case "is_on_fire"    -> type.cast(isOnFire(m));
+            case "is_in_water"   -> type.cast(isInWater(m));
+            case "is_sitting"    -> type.cast(isSitting(m));
+            case "is_sprinting"  -> type.cast(isSprinting(m));
+            case "is_swimming"   -> type.cast(isSwimming(m));
+            case "is_sleeping"   -> type.cast(isSleeping(m));
+            case "is_baby"       -> type.cast(isBaby(m));
+            case "is_tamed"      -> type.cast(isTamed(m));
+            case "has_target"    -> type.cast(hasTarget(m));
+            case "has_backpack"  -> type.cast(hasBackpack(m));
+            case "has_helmet"    -> type.cast(hasHelmet(m));
+            case "has_chestplate"-> type.cast(hasChestplate(m));
+            case "has_leggings"  -> type.cast(hasLeggings(m));
+            case "has_boots"     -> type.cast(hasBoots(m));
+            case "is_home_mode"  -> type.cast(isHomeMode(m));
+            case "is_pickup"     -> type.cast(isPickup(m));
+            case "is_riding"     -> type.cast(isRiding(m));
+            case "has_weapon"    -> type.cast(hasWeapon(m));
+            case "has_shield"    -> type.cast(hasShield(m));
+            // 字符串
+            case "task_uid"      -> type.cast(getTaskUid(m));
+            case "model_id"      -> type.cast(getModelId(m));
+            case "sound_pack_id" -> type.cast(getSoundPackId(m));
+            // 位置
+            case "block_pos"     -> type.cast(getBlockPos(m));
+            case "position"      -> type.cast(getPosition(m));
+            case "restrict_center"-> type.cast(getRestrictCenter(m));
+            default -> throw new IllegalArgumentException("Unknown property: " + property);
+        };
     }
     @Override public Number readNumber(EntityMaid m, String property) {
         return switch (property) {

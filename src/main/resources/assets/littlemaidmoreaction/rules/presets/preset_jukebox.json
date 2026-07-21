@@ -12,7 +12,7 @@
   ],
   "actions": [
     {
-      "type": "jukebox_interact",
+      "type": "submit_task",
       "params": {
         "target": "{{target}}",
         "target_count": "{{target_count}}"

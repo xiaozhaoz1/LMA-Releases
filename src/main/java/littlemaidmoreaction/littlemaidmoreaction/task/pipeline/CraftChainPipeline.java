@@ -7,6 +7,9 @@ import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.recipe.RecipeChai
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.*;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.ProgressNotifier;
 import littlemaidmoreaction.littlemaidmoreaction.core.MaterialChecker;
@@ -22,6 +25,7 @@ public final class CraftChainPipeline implements TaskPipeline {
 
     @Override
     public String taskType() { return "craft_chain"; }
+    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.is(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE); }
 
     @Override
     public List<TaskStep> steps() {
@@ -33,32 +37,19 @@ public final class CraftChainPipeline implements TaskPipeline {
         );
     }
 
+    /** v44: 纯验证 — 仅检查配方+材料(读操作)，不写日志 */
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
-        return execute(level, maid, ctx);
-    }
-
-    @Override
-    public PipelineResult execute(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
         String target = ctx.target();
-        int targetCount = ctx.targetCount();
-
-        LittleMaidMoreAction.LOGGER.info("[V18] [CraftChain] START: target={}, targetCount={}", target, targetCount);
-
         Map<Item, Integer> available = VanillaInputRegistry.readAllItems(maid);
         if (available.isEmpty()) return PipelineResult.failed("empty inventory");
-
         var chain = RecipeResolver.resolve(level, target, available);
         if (chain == null || chain.steps().isEmpty()) return PipelineResult.failed("no recipe for " + target);
-
-        Map<Item, Integer> required = extractRequired(chain);
-        MaterialReport<Item> report = MaterialChecker.check(required, available);
+        MaterialReport<Item> report = MaterialChecker.check(extractRequired(chain), available);
         if (!report.sufficient()) return PipelineResult.failed("insufficient materials");
-
-        // ★ v18: Brain Behavior handles execution directly — no RuleWriter needed
-        LittleMaidMoreAction.LOGGER.info("[V18] [CraftChain] validate OK: {} steps, taskId={}", chain.steps().size(), ctx.taskId());
         return PipelineResult.ok("craft_chain ready");
     }
+
 
     private static Map<Item, Integer> merge(Map<Item, Integer> a, Map<Item, Integer> b) {
         Map<Item, Integer> result = new LinkedHashMap<>();

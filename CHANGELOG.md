@@ -1,5 +1,52 @@
 # Changelog
 
+## [v53] — 2026-07-22 — 重启自动恢复
+
+- **重启自动恢复任务** — onEntityJoin 保留 FLOW_TASK 和配置键，写 GUI_INIT 自动重新提交。玩家无需手动重选任务。
+- **配置持久化** — arm_transfer 的 lma_arm_take/deposit 坐标在任务完成/取消后保留。
+- **木棍错误提示泛化** — "物品(木棍)不支持设置该任务({taskType})"。
+
+## [v52] — 2026-07-22 — 注册简化 + 删除废弃execute()
+
+- **register/registerSearch 合并** — 单一 register(name, pl, ex, showInBar)。参数从5减到3。方块过滤由 Pipeline.isTargetBlock() 自己决定。
+- **TaskPipeline.execute() 删除** — 从 v18 废弃的 execute() 正式移除。接口从 2 必须方法 → 1 必须方法 (taskType)。FurnacePipeline 配方逻辑移入 IExecutor。
+- **showInBar 参数** — register() 新增 boolean 控制 TLM 任务栏可见性。被动/环境任务传 false。
+- **TaskHandler 精简** — 6 字段 → 4 字段 (移除 targetBlock/searchPredicate/isValid)。
+
+## [v51] — 2026-07-21 — 注册文档
+
+## [v50] — 2026-07-21 — interact 层合并
+
+- **4→1 通用 SubmitTaskAction** — 删除 JukeboxInteractAction/FurnaceInteractAction/CraftingTableInteractAction/BellRingAction，合并为参数化 SubmitTaskAction。
+
+## [v49] — 2026-07-21 — adapter↔task 解耦
+
+- **adapter 零 TaskDispatcher 引用** — adapter 只写 NBT 标记(TLM_SWITCH/GUI_INIT)，TaskEngine 轮询决策。
+- **NavigationMemory → api/navigation/** — Brain Memory 访问封装移至 api 层。
+- **终态检测** — 修复 STATE_COMPLETED/FAILED 跌落 GUI-init 导致任务无限重启 Bug。
+
+## [v48] — 2026-07-21 — Brain 导航迁移
+
+- **TLM MaidMoveToBlockTask** — LmaFlowCoordinationBehavior 继承 TLM 螺旋 BFS 导航基类，删除手动导航代码 (~60行)。
+- **shouldMoveTo → pipeline.isTargetBlock** — 导航过滤委托给 Pipeline。
+
+## [v47] — 2026-07-21 — FSM 迁移
+
+- **CrankPipeline + PowerPipeline → TaskStateMachine** — 显式 3 态循环 (SEARCHING→NAVIGATING→WORKING)。
+- **消除 static ConcurrentHashMap** — PowerPipeline 目标位置改用 NBT 持久化。
+
+## [v46] — 2026-07-21 — TaskStateMachine 引擎
+
+- **泛型 FSM 基类** — TaskStateMachine\<S extends Enum\<S\>\> implements TaskPipeline。显式状态枚举 + 转换图验证 + onEnter/onExit 钩子 + 自动 executor。
+- **ArmTransferPipeline 迁移** — 4 态循环 (TO_TAKE→TAKING→TO_DEPOSIT→DEPOSITING)。
+
+## [v45] — 2026-07-21 — P2/P3 优化
+
+- **RetryPolicy 独立类** — never()/always()/fixed(N) + shouldRetry(attemptCount)。
+- **结构化日志** — TaskDispatcher 5 节点日志 ([LMA/Task] 前缀 + UUID + 任务类型)。
+- **STATE_CANCELLED 常量** — 全局消除硬编码 "cancelled" (8处→0)。
+- **生命周期对称化** — complete/fail/timeout 补全 executor.onStop/onComplete。
+
 ## [v40] — 2026-07-19 — 女仆跑步发电
 
 - **女仆跑步发电任务** — 女仆站在Create传送带上冲刺产生旋转动力(~96RPM应力输出)

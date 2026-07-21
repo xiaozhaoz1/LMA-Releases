@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.vanilla.execute;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskMemory;
+import littlemaidmoreaction.littlemaidmoreaction.api.navigation.NavigationMemory;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.item.ToolStateReader;
@@ -10,7 +10,7 @@ import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.BlockSearc
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.ConnectedBlockSearch;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.world.WorldOutput;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.HarvestTarget;
-import littlemaidmoreaction.littlemaidmoreaction.task.service.TaskStateService;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.ToolJudge;
 import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import net.minecraft.core.BlockPos;
@@ -81,6 +81,7 @@ public final class ChainHarvestExecute {
     /** TaskRegistry.TaskExecutor 入口 */
     public static TaskResult execute(ServerLevel world, EntityMaid maid, BlockPos pos,
                                      CompoundTag data, Mode mode) {
+        if (TaskStateManager.isCancelled(maid)) return TaskResult.FAILED;
         HarvestTarget target = mode.target;
         ItemStack tool = maid.getMainHandItem();
 
@@ -221,8 +222,8 @@ public final class ChainHarvestExecute {
         if (next.distSqr(maid.blockPosition()) < VanillaConstants.ARRIVE_DIST_SQR) {
             return tryStartVein(world, maid, next, data, target, tool);
         }
-        LmaTaskMemory.setNavTarget(maid, next);
-        LmaTaskMemory.setNavStartTick(maid, now);
+        NavigationMemory.setNavTarget(maid, next);
+        NavigationMemory.setNavStartTick(maid, now);
         BehaviorUtils.setWalkAndLookTargetMemories(maid, next, 1.0F, 2);
         keepAlive(world, maid);
         return TaskResult.CONTINUE;
@@ -272,9 +273,9 @@ public final class ChainHarvestExecute {
      * tick 循环维持 + TaskStateService.heartbeat 防 TaskEngine 超时误杀。
      */
     private static void keepAlive(ServerLevel world, EntityMaid maid) {
-        LmaTaskMemory.setNavTarget(maid, maid.blockPosition());
-        LmaTaskMemory.setNavStartTick(maid, world.getGameTime());
-        TaskStateService.heartbeat(maid, world.getGameTime());
+        NavigationMemory.setNavTarget(maid, maid.blockPosition());
+        NavigationMemory.setNavStartTick(maid, world.getGameTime());
+        TaskStateManager.heartbeat(maid, world.getGameTime());
     }
 
     /** 清除连锁状态 key（闭环，含旧版残留 key） */

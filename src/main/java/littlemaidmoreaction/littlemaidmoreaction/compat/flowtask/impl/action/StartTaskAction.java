@@ -9,8 +9,7 @@ import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
 
 import java.util.List;
 import java.util.Map;
@@ -51,36 +50,13 @@ public final class StartTaskAction implements IAction {
         String target = params.getOrDefault("target", "");
         int targetCount = parseInt(params.getOrDefault("target_count", "-1"), -1);
 
-        // 1. 写 PersistentData
-        var data = maid.getPersistentData();
-        String oldTask = data.getString("lma_flow_task");
-        if (!oldTask.isEmpty() && !oldTask.equals(taskType)) {
-            LmaFlowTask.restorePreviousTask(maid);
-        }
-        String sharedTaskId = String.valueOf(System.currentTimeMillis() % 100000);
-        data.putString("lma_flow_task", taskType);
-        data.putString("lma_flow_task_id", sharedTaskId);
-        data.putString("lma_flow_state", "in_progress");
-        data.putInt("lma_flow_step", 0);
-        data.putInt("lma_flow_max_count", targetCount > 0 ? targetCount : 0);
-        data.putInt("lma_flow_counter", 0);
-        data.putLong("lma_flow_tick", maid.level().getGameTime());
-        data.remove("lma_flow_cached");
+        // v43: 通过中央调度器提交 (替代手动8字段NBT写入)
         LmaFlowTask.savePreviousTask(maid);
-
-        // 2. 验证材料 + 切换 Brain
-        PipelineResult result = TaskRegistry.validate(maid, taskType, sharedTaskId, target, targetCount);
-        if (!result.completed()) {
-            data.remove("lma_flow_task"); data.remove("lma_flow_task_id");
-            data.remove("lma_flow_state"); data.remove("lma_flow_step");
+        if (!TaskDispatcher.submit(maid, taskType, target, targetCount)) {
             LmaFlowTask.restorePreviousTask(maid);
-            LittleMaidMoreAction.LOGGER.warn("[V18] [StartTaskAction] validation failed: {}", result.feedback());
+            LittleMaidMoreAction.LOGGER.warn("[V18] [StartTaskAction] validation failed for {}", taskType);
             return;
         }
-
-        data.remove("lma_flow_cached");
-        var newTask = LmaTaskTypeRegistry.findByTaskType(taskType);
-        maid.setTask(newTask);
         LittleMaidMoreAction.LOGGER.info("[V18] [StartTaskAction] task '{}' started via rule, target={}", taskType, target);
     }
 

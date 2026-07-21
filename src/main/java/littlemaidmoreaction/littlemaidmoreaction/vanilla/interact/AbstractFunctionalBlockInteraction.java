@@ -4,7 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.api.VanillaConstants;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.BlockSearch;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskMemory;
+import littlemaidmoreaction.littlemaidmoreaction.api.navigation.NavigationMemory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
 import net.minecraft.core.BlockPos;
@@ -23,7 +23,6 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import com.github.tartaricacid.touhoulittlemaid.item.ItemWirelessIO;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemHandlerHelper;
 import net.minecraftforge.registries.ForgeRegistries;
@@ -66,7 +65,7 @@ import java.util.function.Predicate;
  */
 public abstract class AbstractFunctionalBlockInteraction extends AbstractBlockInteraction {
 
-    // ★ v12.7 P0: 导航数据已迁移到 Brain Memory (LmaTaskMemory)
+    // ★ v12.7 P0: 导航数据已迁移到 Brain Memory (NavigationMemory)
 
     /** 到达判定距离平方 (3格 = 9) */
     private static final double ARRIVE_DIST_SQR = VanillaConstants.ARRIVE_DIST_SQR;
@@ -127,18 +126,18 @@ public abstract class AbstractFunctionalBlockInteraction extends AbstractBlockIn
             valid.isEmpty() ? "" : valid.get(0));
 
         // ── 第一阶段：检查 Brain Memory 中的导航目标 ──
-        BlockPos targetPos = LmaTaskMemory.getNavTarget(maid);
+        BlockPos targetPos = NavigationMemory.getNavTarget(maid);
         if (targetPos != null) {
-            long savedTick = LmaTaskMemory.getNavStartTick(maid);
+            long savedTick = NavigationMemory.getNavStartTick(maid);
             long now = maid.level().getGameTime();
 
             if (now - savedTick > NAV_TIMEOUT || savedTick > now) {
-                LmaTaskMemory.clearAllNav(maid);
+                NavigationMemory.clearAllNav(maid);
             } else if (isBlockStillValid(maid.level(), targetPos)) {
                 double distSqr = targetPos.distSqr(maid.blockPosition());
 
                 if (distSqr < ARRIVE_DIST_SQR) {
-                    LmaTaskMemory.clearAllNav(maid);
+                    NavigationMemory.clearAllNav(maid);
                     maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
                     BlockState state = maid.level().getBlockState(targetPos);
                     doInteract(targetPos, state, maid, rawParams, action);
@@ -148,7 +147,7 @@ public abstract class AbstractFunctionalBlockInteraction extends AbstractBlockIn
                 BehaviorUtils.setWalkAndLookTargetMemories(maid, targetPos, 1.0F, 2);
                 return;
             } else {
-                LmaTaskMemory.clearAllNav(maid);
+                NavigationMemory.clearAllNav(maid);
             }
         }
 
@@ -178,8 +177,8 @@ public abstract class AbstractFunctionalBlockInteraction extends AbstractBlockIn
         }
 
         // ★ v12.7 P0: 保存到 Brain Memory
-        LmaTaskMemory.setNavTarget(maid, nearest);
-        LmaTaskMemory.setNavStartTick(maid, maid.level().getGameTime());
+        NavigationMemory.setNavTarget(maid, nearest);
+        NavigationMemory.setNavStartTick(maid, maid.level().getGameTime());
         BehaviorUtils.setWalkAndLookTargetMemories(maid, nearest, 1.0F, 2);
     }
 
@@ -361,16 +360,11 @@ public abstract class AbstractFunctionalBlockInteraction extends AbstractBlockIn
      *
      * @param maid 女仆实体
      */
+    /** v43: 委托到 TaskDispatcher (统一入口) */
     protected void completeFlowTask(EntityMaid maid) {
-        CompoundTag data = maid.getPersistentData();
-        String task = data.getString("lma_flow_task");
-        if (!task.isEmpty()) {
-            data.putString("lma_flow_state", "completed");
-            data.remove("lma_flow_cached");
-            data.putLong("lma_flow_tick", maid.level().getGameTime());
-            RuleEngine.handleEvent("task_changed",
-                new littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext(maid, null, null));
-        }
+        littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher.complete(maid);
+        RuleEngine.handleEvent("task_changed",
+            new littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext(maid, null, null));
     }
 
     // ─── 视觉/音效反馈 ───
@@ -395,73 +389,33 @@ public abstract class AbstractFunctionalBlockInteraction extends AbstractBlockIn
         try { return Integer.parseInt(s); } catch (Exception e) { return def; }
     }
 
-    // ─── ★ v13: WirelessIO 隙间箱子搜索 ───
+    // ─── ★ v43: WirelessIO — 委托到 IO 原语 ───
 
-    /**
-     * 从女仆背包 + 隙间箱子中提取物品。
-     * 优先搜索女仆背包，未找到时搜索隙间连接的箱子。
-     */
+    /** 从女仆背包 + 隙间箱子中提取物品。优先背包，其次箱子。 */
     public static ItemStack extractFromMaidAndWirelessChest(EntityMaid maid,
                                                                 Predicate<ItemStack> filter, int amount) {
-        // 1. 先查女仆背包
-        IItemHandler maidInv = maid.getAvailableInv(true);
-        for (int i = 0; i < maidInv.getSlots(); i++) {
-            ItemStack stack = maidInv.getStackInSlot(i);
-            if (!stack.isEmpty() && filter.test(stack)) {
-                return maidInv.extractItem(i, Math.min(amount, stack.getCount()), false);
-            }
-        }
-        // 2. 查隙间箱子
-        IItemHandler chestInv = getWirelessChestHandler(maid);
-        if (chestInv != null) {
-            for (int i = 0; i < chestInv.getSlots(); i++) {
-                ItemStack stack = chestInv.getStackInSlot(i);
-                if (!stack.isEmpty() && filter.test(stack)) {
-                    return chestInv.extractItem(i, Math.min(amount, stack.getCount()), false);
-                }
-            }
+        // 1. 女仆背包 → ItemTransfer
+        ItemStack fromMaid = littlemaidmoreaction.littlemaidmoreaction.vanilla.output.ItemTransfer.extractFromMaid(maid, filter, amount);
+        if (!fromMaid.isEmpty()) return fromMaid;
+        // 2. 隙间箱子 → WirelessChestSpace
+        IItemHandler chestInv = littlemaidmoreaction.littlemaidmoreaction.vanilla.input.container.WirelessChestSpace.getWirelessHandler(maid);
+        if (chestInv == null) return ItemStack.EMPTY;
+        for (int i = 0; i < chestInv.getSlots(); i++) {
+            ItemStack s = chestInv.getStackInSlot(i);
+            if (!s.isEmpty() && filter.test(s)) return chestInv.extractItem(i, Math.min(amount, s.getCount()), false);
         }
         return ItemStack.EMPTY;
     }
 
-    /** 检查女仆背包+隙间箱子是否有匹配物品 */
+    /** 检查女仆背包+隙间箱子是否有匹配物品 → VanillaInputRegistry */
     public static boolean hasInMaidOrWirelessChest(EntityMaid maid, Predicate<ItemStack> filter) {
-        IItemHandler maidInv = maid.getAvailableInv(true);
-        for (int i = 0; i < maidInv.getSlots(); i++) {
-            if (!maidInv.getStackInSlot(i).isEmpty() && filter.test(maidInv.getStackInSlot(i))) return true;
-        }
-        IItemHandler chestInv = getWirelessChestHandler(maid);
-        if (chestInv != null) {
-            for (int i = 0; i < chestInv.getSlots(); i++) {
-                if (!chestInv.getStackInSlot(i).isEmpty() && filter.test(chestInv.getStackInSlot(i))) return true;
-            }
-        }
-        return false;
+        return littlemaidmoreaction.littlemaidmoreaction.api.VanillaInputRegistry.readAllItems(maid)
+            .keySet().stream().anyMatch(item -> filter.test(new ItemStack(item)));
     }
 
-    /** ★ v15: 公开包装 — 供 AI 工具查询隙间箱子 */
+    /** v43: 委托到 WirelessChestSpace (IO原语) */
     @javax.annotation.Nullable
     public static IItemHandler getWirelessChestHandlerPublic(EntityMaid maid) {
-        return getWirelessChestHandler(maid);
-    }
-
-    /** 获取隙间饰品连接的箱子 IItemHandler */
-    @javax.annotation.Nullable
-    private static IItemHandler getWirelessChestHandler(EntityMaid maid) {
-        var baubleInv = maid.getMaidBauble();
-        for (int i = 0; i < baubleInv.getSlots(); i++) {
-            ItemStack bauble = baubleInv.getStackInSlot(i);
-            if (bauble.isEmpty()) continue;
-            BlockPos bindingPos = ItemWirelessIO.getBindingPos(bauble);
-            if (bindingPos == null) continue;
-            // 检查距离
-            float maxDist = maid.getRestrictRadius();
-            if (maid.distanceToSqr(bindingPos.getX(), bindingPos.getY(), bindingPos.getZ()) > maxDist * maxDist) continue;
-            var be = maid.level().getBlockEntity(bindingPos);
-            if (be == null) continue;
-            var handler = be.getCapability(ForgeCapabilities.ITEM_HANDLER, null).resolve();
-            if (handler.isPresent()) return handler.get();
-        }
-        return null;
+        return littlemaidmoreaction.littlemaidmoreaction.vanilla.input.container.WirelessChestSpace.getWirelessHandler(maid);
     }
 }

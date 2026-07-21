@@ -8,7 +8,7 @@ import littlemaidmoreaction.littlemaidmoreaction.core.model.ActionStep;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ActionRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
-import littlemaidmoreaction.littlemaidmoreaction.engine.TickScheduler;
+import littlemaidmoreaction.littlemaidmoreaction.core.spi.ITickScheduler;
 
 import java.util.List;
 import java.util.Map;
@@ -33,6 +33,12 @@ import java.util.concurrent.TimeUnit;
  * @return true 表示序列中有 cancel_event 步骤（事件应被取消）
  */
 public final class ActionPipeline {
+
+    /** ITickScheduler 实例 — 由 LmaRegistrar 在服务端初始化时注入。 */
+    private static ITickScheduler scheduler = null;
+
+    /** 设置 TickScheduler 实例（启动时注入，解除循环依赖）。 */
+    public static void setScheduler(ITickScheduler s) { scheduler = s; }
 
     /**
      * 执行规则的全部动作序列。
@@ -65,8 +71,9 @@ public final class ActionPipeline {
                 }
                 LittleMaidMoreAction.LOGGER.debug("[LMA/Pipeline] <<< ASYNC maid={} type={} resumeIdx={}", maidId, step.typeId(), group.resumeIndex());
                 // ★ 修复: resumeIdx+1 跳过 wait 步骤自身，防止恢复时重新遇到同一 wait 步骤导致无限循环
-                TickScheduler.schedule(rule, ctx.maid(), ctx.target(),
-                    group.resumeIndex() + 1, group.repeatIdx(), group.repeatCount());
+                if (scheduler != null) scheduler.schedule(0,
+                    () -> resumeFrom(rule, ctx, group.resumeIndex() + 1, group.repeatIdx(), group.repeatCount()),
+                    ctx.maid().getId());
                 return shouldCancel;
             }
 
@@ -121,7 +128,9 @@ public final class ActionPipeline {
                     && "true".equals(first.params().getOrDefault("auto_wait", "true"))) {
                     int resumeIdx = steps.indexOf(first) + 1;
                     if (resumeIdx < steps.size()) {
-                        TickScheduler.schedule(rule, ctx.maid(), ctx.target(), resumeIdx);
+                        if (scheduler != null) scheduler.schedule(0,
+                            () -> resumeFrom(rule, ctx, resumeIdx, -1, 0),
+                            ctx.maid().getId());
                         LittleMaidMoreAction.LOGGER.info("[LMA/Pipeline] auto_wait suspend maid={} resumeIdx={}", maidId, resumeIdx);
                         return shouldCancel;
                     }
@@ -210,8 +219,9 @@ public final class ActionPipeline {
 
         // REPEAT: 回跳到指定位置，减计数
         if (repeatIdx >= 0 && repeatCount > 0) {
-            TickScheduler.schedule(rule, ctx.maid(), ctx.target(),
-                repeatIdx, repeatIdx, repeatCount - 1);
+            if (scheduler != null) scheduler.schedule(0,
+                () -> resumeFrom(rule, ctx, repeatIdx, repeatIdx, repeatCount - 1),
+                ctx.maid().getId());
             LittleMaidMoreAction.LOGGER.debug("[LMA/Pipeline] REPEAT resume maid={} from={} remaining={}", maidId, repeatIdx, repeatCount);
             resumeIdx = repeatIdx;
         }
@@ -234,6 +244,9 @@ public final class ActionPipeline {
         RuleTracer.TraceRecord trace = RuleTracer.start(rule, "resume", ctx.maid());
         if (trace != null) trace.matched = true;
 
+        // 创建不可变副本供 lambda 捕获（resumeIdx 可能在 REPEAT 块中被重赋值）
+        int finalResumeIdx = resumeIdx;
+
         for (int i = 0; i < groups.size(); i++) {
             ParallelGroup group = groups.get(i);
             if (group.isAsync()) {
@@ -243,8 +256,9 @@ public final class ActionPipeline {
                     Map<String, String> merged = ParamMerger.merge(action, step, ctx);
                     action.execute(ctx, merged);
                 }
-                TickScheduler.schedule(rule, ctx.maid(), ctx.target(),
-                    resumeIdx + group.resumeIndex() + 1, group.repeatIdx(), group.repeatCount());
+                if (scheduler != null) scheduler.schedule(0,
+                    () -> resumeFrom(rule, ctx, finalResumeIdx + group.resumeIndex() + 1, group.repeatIdx(), group.repeatCount()),
+                    ctx.maid().getId());
                 RuleTracer.finish();
                 return;
             }
@@ -277,7 +291,9 @@ public final class ActionPipeline {
                     && "true".equals(first.params().getOrDefault("auto_wait", "true"))) {
                     int absIdx = resumeIdx + remaining.indexOf(first);
                     if (absIdx + 1 < steps.size()) {
-                        TickScheduler.schedule(rule, ctx.maid(), ctx.target(), absIdx + 1);
+                        if (scheduler != null) scheduler.schedule(0,
+                            () -> resumeFrom(rule, ctx, absIdx + 1, -1, 0),
+                            ctx.maid().getId());
                         LittleMaidMoreAction.LOGGER.info("[LMA/Pipeline] RESUME auto_wait suspend maid={} absIdx={}", maidId, absIdx);
                         RuleTracer.finish();
                         return;

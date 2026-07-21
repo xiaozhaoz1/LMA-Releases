@@ -3,8 +3,9 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.create.task;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.BeltBlock;
 import com.simibubi.create.content.kinetics.belt.BeltSlope;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskMemory;
+import littlemaidmoreaction.littlemaidmoreaction.api.navigation.NavigationMemory;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.compat.create.block.MaidPowerBeltBlock;
 import littlemaidmoreaction.littlemaidmoreaction.compat.create.block.MaidPowerBeltBlockEntity;
@@ -22,6 +23,9 @@ import java.util.List;
  * 女仆跑步发电管线 v4.6 — 脚下检测 + 直接BE注入 + 冷却防重转。
  */
 public final class RunningBeltPipeline implements TaskPipeline {
+    @Override public boolean isLongRunning() { return true; }
+    @Override public void onCleanup(EntityMaid maid) { cleanup(maid); }
+    @Override public void interrupt(EntityMaid maid) { maid.setSprinting(false); }
 
     private static final String KEY_TARGET = "lma_running_belt_target";
     private static final String KEY_CONVERTED = "lma_running_belt_converted";
@@ -35,7 +39,7 @@ public final class RunningBeltPipeline implements TaskPipeline {
 
     @Override public String taskType() { return "running_belt"; }
     @Override public List<TaskStep> steps() { return List.of(new TaskStep("run", "跑步发电", StepType.INTERACT, List.of())); }
-    @Override public PipelineResult execute(ServerLevel l, EntityMaid m, PipelineContext c) { return PipelineResult.ok(""); }
+
     @Override public PipelineResult validate(ServerLevel l, EntityMaid m, PipelineContext c) { return PipelineResult.ok(""); }
 
     public static IExecutor executor() {
@@ -49,6 +53,8 @@ public final class RunningBeltPipeline implements TaskPipeline {
 
     public static void tick(ServerLevel world, EntityMaid maid) {
         var d = maid.getPersistentData();
+        // v44: 取消检测
+        if (TaskKeys.STATE_CANCELLED.equals(d.getString(TaskKeys.FLOW_STATE))) { cleanup(maid); return; }
         if ("true".equals(d.getString(KEY_CONVERTED))) {
             tickRunning(world, maid, d);
         } else {
@@ -122,7 +128,7 @@ public final class RunningBeltPipeline implements TaskPipeline {
         maid.setSprinting(false);
         if (!(maid.level() instanceof ServerLevel world)) return;
         revertAndClear(world, maid, maid.getPersistentData());
-        LmaTaskMemory.clearAllNav(maid);
+        NavigationMemory.clearAllNav(maid);
     }
 
     private static void revertAndClear(ServerLevel world, EntityMaid maid, CompoundTag d) {

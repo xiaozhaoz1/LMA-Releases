@@ -52,7 +52,7 @@ public final class JukeboxExecute {
             phaseTick = now;
             LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} init: phase=INSERTING", maid.getId());
         }
-        data.putLong("lma_flow_tick", now);
+        littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager.heartbeat(maid, now);
 
         switch (phase) {
             case INSERTING -> {

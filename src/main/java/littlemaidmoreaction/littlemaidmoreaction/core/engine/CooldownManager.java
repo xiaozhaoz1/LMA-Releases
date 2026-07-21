@@ -1,52 +1,41 @@
 // core/engine/CooldownManager.java
 package littlemaidmoreaction.littlemaidmoreaction.core.engine;
 
-import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;
 
 /**
- * 规则冷却管理器 — 从 RuleMatcher 提取的冷却逻辑。
+ * 规则冷却管理器 — 零 Minecraft 依赖，纯数值操作。
  *
- * <p>冷却数据存储在女仆 PersistentData 中，键前缀: "lma_rule_"。
- * 时间基准使用 game tick（maid.level().getGameTime()），
- * 与旧 RuleMatcher 的 PersistentData 键完全兼容。
+ * <p>冷却数据存储在 PersistentData 中，键前缀: "lma_rule_"。
+ * 时间基准使用 game tick，调用方负责从 PersistentData 读取/写入。
+ * isExpired() 可独立单元测试。
  */
 public final class CooldownManager {
 
-    /** 冷却持久化键前缀，与旧 RuleMatcher.COOLDOWN_PREFIX 兼容 */
-    static final String COOLDOWN_KEY_PREFIX = "lma_rule_";
+    /** 冷却持久化键前缀 */
+    public static final String COOLDOWN_KEY_PREFIX = "lma_rule_";
 
     /**
      * 检查规则是否处于冷却中。
      *
-     * @param rule 规则定义
-     * @param maid 女仆实体
+     * @param rule       规则定义
+     * @param lastUsed   上次触发 tick (从 PersistentData 读取, 0=从未)
+     * @param gameTime   当前游戏 tick
      * @return true 表示冷却未过，应跳过此规则
      */
-    public static boolean isOnCooldown(RuleDef rule, EntityMaid maid) {
+    public static boolean isOnCooldown(RuleDef rule, long lastUsed, long gameTime) {
         if (rule.cooldown() <= 0) return false;
-        long lastUsed = maid.getPersistentData().getLong(COOLDOWN_KEY_PREFIX + rule.id());
-        long now = maid.level().getGameTime();
-        return now - lastUsed < rule.cooldown();
+        return !isExpired(gameTime, lastUsed, rule.cooldown());
     }
 
     /**
-     * 应用冷却 — 规则成功匹配并执行后调用。
+     * 计算应用冷却后的新 lastUsed 值（当前时间）。
+     * 调用方负责写入 PersistentData。
+     *
+     * @return 当前 gameTime (即新的 lastUsed)
      */
-    public static void applyCooldown(RuleDef rule, EntityMaid maid) {
-        if (rule.cooldown() > 0) {
-            maid.getPersistentData().putLong(
-                COOLDOWN_KEY_PREFIX + rule.id(),
-                maid.level().getGameTime()
-            );
-        }
-    }
-
-    /**
-     * 清除指定规则的冷却（调试/hot-reload 用）。
-     */
-    public static void clearCooldown(RuleDef rule, EntityMaid maid) {
-        maid.getPersistentData().remove(COOLDOWN_KEY_PREFIX + rule.id());
+    public static long newCooldownStamp(long gameTime) {
+        return gameTime;
     }
 
     /**

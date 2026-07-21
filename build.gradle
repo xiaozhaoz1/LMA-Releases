@@ -195,6 +195,10 @@ dependencies {
     compileOnly fg.deobf(files("libs/【墨染琴弦的拔刀剑核心】mrqxs_Slashblade_Core-1.20.1-1.4.1.jar"))
     compileOnly fg.deobf(files("libs/【真正的力量】True_POWER-1.20.1-1.1.8.jar"))
     compileOnly fg.deobf(files("libs/【车万女仆：真正的力量】True_POWER_of_Maid-1.20.1-1.2.2.jar"))
+    // v39 Create 机械动力兼容 (jar-in-jar: Ponder+Flywheel+Registrate)
+    implementation fg.deobf(files("libs/create-1.20.1-6.0.8.jar"))
+    compileOnly fg.deobf(files("libs/Ponder-Forge-1.20.1-1.0.91.jar"))
+    compileOnly fg.deobf(files("libs/flywheel-forge-1.20.1-1.0.5.jar"))
 
     // v5 测试
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'

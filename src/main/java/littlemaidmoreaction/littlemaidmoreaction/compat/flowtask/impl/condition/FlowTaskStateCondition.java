@@ -6,12 +6,13 @@ import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionCat
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionValueType;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 检查流程任务当前状态 (v10 系统三)。
+ * 检查流程任务当前状态 (v44: TaskKeys 常量化)。
  */
 @RuleCondition
 public final class FlowTaskStateCondition implements ICondition {
@@ -28,7 +29,6 @@ public final class FlowTaskStateCondition implements ICondition {
 
     @Override
     public String evaluate(RuleContext ctx, Map<String, String> rawParams) {
-        var data = ctx.maid().getPersistentData();
-        return data.getString("lma_flow_state");
+        return ctx.maid().getPersistentData().getString(TaskKeys.FLOW_STATE);
     }
 }

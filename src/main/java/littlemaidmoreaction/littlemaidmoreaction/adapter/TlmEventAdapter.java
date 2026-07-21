@@ -5,6 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskEngine;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 import littlemaidmoreaction.littlemaidmoreaction.core.engine.RuleEngine;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -216,31 +217,31 @@ public final class TlmEventAdapter {
         if (maid.level().isClientSide()) return;
 
         var data = maid.getPersistentData();
-        String task = data.getString("lma_flow_task");
+        String task = data.getString(TaskKeys.FLOW_TASK);
         if (task.isEmpty()) return;
 
-        // ★ Bug #68 fix: 无条件清理跨session残留任务。
-        // 原时间戳检测 (savedTick > now) 在单人游戏中无效 — gameTime 随存档持久化，
-        // 上次session的 tick < 本次session的 tick → 条件永不为真。
-        // 改为无条件清理 — EntityJoinLevelEvent 在实体从磁盘加载时触发，cleanup 安全。
-        {
-            long savedTick = data.getLong("lma_flow_tick");
-            long now = maid.level().getGameTime();
-            LittleMaidMoreAction.LOGGER.warn("[LMA/Cleanup] stale task '{}' from previous session (tick={} >> now={}), cleaning",
-                task, savedTick, now);
-            LmaFlowTask.restorePreviousTask(maid);
-            data.remove("lma_flow_task"); data.remove("lma_flow_task_id");
-            data.remove("lma_flow_state"); data.remove("lma_flow_step");
-            data.remove("lma_flow_counter"); data.remove("lma_flow_max_count");
-            data.remove("lma_flow_tick"); data.remove("lma_flow_timeout");
-            data.remove("lma_flow_data"); data.remove("lma_flow_cached");
-            // v36: 连锁采集队列跨 session 清理（防止残留队列指向远处坐标）
-            littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
-                .ChainHarvestExecute.clearChainData(data);
-            // 恢复原TLM任务 → brain回到正常状态
-            var defaultTask = com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager.getIdleTask();
-            maid.setTask(defaultTask);
-        }
+        // v52: 保存任务类型, 清理瞬态数据, 自动恢复任务
+        LittleMaidMoreAction.LOGGER.info("[LMA/Restore] restoring task '{}' after restart", task);
+
+        // 清理跨 session 残留的瞬态数据
+        data.remove(TaskKeys.FLOW_STATE);
+        data.remove(TaskKeys.FLOW_TICK);
+        data.remove(TaskKeys.FLOW_STEP);
+        data.remove(TaskKeys.FLOW_TIMEOUT);
+        // 保留: FLOW_TASK (任务类型), TASK_TARGET (目标物品), lma_arm_* (配置)
+        // 保留: SAVED_HOME/SAVED_PICKUP (女仆状态)
+
+        // 恢复 TLM 任务 → Brain 重新调度
+        LmaFlowTask.restorePreviousTask(maid);
+        var defaultTask = com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager.getIdleTask();
+        maid.setTask(defaultTask);
+
+        // v36: 连锁采集队列清理
+        littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
+            .ChainHarvestExecute.clearChainData(data);
+
+        // 写 GUI_INIT — TaskEngine 下次 tick 自动重新提交任务
+        data.putString(TaskKeys.GUI_INIT, task);
     }
 
     private TlmEventAdapter() {}

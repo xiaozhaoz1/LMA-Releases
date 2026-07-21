@@ -4,13 +4,10 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.InteractMaidEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.ArmTransferPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.CrankPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.MixPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PressPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.RunningBeltPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.task.service.TaskStateService;
+import littlemaidmoreaction.littlemaidmoreaction.task.LmaTaskDataHelper;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
@@ -27,8 +24,8 @@ import net.minecraftforge.fml.common.Mod;
 /**
  * 女仆搬运事件 — 木棍标记容器 + 木棍右键女仆启动。
  *
- * <p>完全不拦截 Create 机械臂任何事件。
- * 仅在女仆当前任务是 arm_transfer 时，木棍右键才启动搬运。</p>
+ * <p>v44: tick/cleanup 改为 TaskRegistry.CREATE_TICK 注册表驱动，
+ * 新增 Create 任务无需修改此文件。</p>
  */
 @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID)
 public final class CreateEventListener {
@@ -78,10 +75,10 @@ public final class CreateEventListener {
         if (!held.is(Items.STICK)) { held = player.getOffhandItem(); if (!held.is(Items.STICK)) return; }
         if (maid.level().isClientSide) return;
 
-        // ★ 必须女仆当前任务是 arm_transfer
         String taskType = LmaTaskTypeRegistry.extractTaskType(maid.getTask().getUid().getPath());
         if (!"arm_transfer".equals(taskType)) {
-            player.sendSystemMessage(comp("§c请先将女仆任务切换为「搬运」"));
+            String name = taskType != null ? taskType : "idle";
+            player.sendSystemMessage(comp("§c物品(木棍)不支持设置该任务(" + name + ")"));
             return;
         }
 
@@ -98,7 +95,7 @@ public final class CreateEventListener {
         data.put("lma_arm_deposit", NbtUtils.writeBlockPos(depositPos));
         data.putString("lma_arm_state", "TAKE");
 
-        TaskStateService.init(maid, "arm_transfer", maid.level().getGameTime());
+        littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher.submit(maid, "arm_transfer", null, 0);
 
         tag.remove("take");
         tag.remove("deposit");
@@ -107,7 +104,7 @@ public final class CreateEventListener {
         player.sendSystemMessage(comp("§a女仆开始搬运: " + takePos.toShortString() + " → " + depositPos.toShortString()));
     }
 
-    // ── ③ ServerTick: 驱动所有 Create 任务 ──
+    // ── ③ ServerTick: 驱动所有 Create 任务 (v44: 注册表驱动) ──
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event) {
@@ -115,23 +112,30 @@ public final class CreateEventListener {
         for (ServerLevel sl : event.getServer().getAllLevels()) {
             for (var e : sl.getAllEntities()) {
                 if (!(e instanceof EntityMaid maid)) continue;
-                var d = maid.getPersistentData();
-                if (!"in_progress".equals(d.getString("lma_flow_state"))) continue;
+                String state = LmaTaskDataHelper.getFlowState(maid);
+                if (!TaskKeys.STATE_IN_PROGRESS.equals(state)) {
+                    if (TaskKeys.STATE_CANCELLED.equals(state)) cleanupMaid(maid);
+                    continue;
+                }
 
-                String task = d.getString("lma_flow_task");
+                String task = LmaTaskDataHelper.getFlowTask(maid);
                 if (task.isEmpty()) continue;
 
-                TaskStateService.heartbeat(maid, sl.getGameTime());
-                switch (task) {
-                    case "arm_transfer" -> ArmTransferPipeline.tick(sl, maid);
-                    case "crank"        -> CrankPipeline.tick(sl, maid);
-                    case "power"        -> PowerPipeline.tick(sl, maid);
-                    case "press"        -> PressPipeline.tick(sl, maid);
-                    case "mix"          -> MixPipeline.tick(sl, maid);
-                    case "running_belt" -> RunningBeltPipeline.tick(sl, maid);
-                }
+                TaskStateManager.heartbeat(maid, sl.getGameTime());
+                // v44: 注册表驱动 — 无需硬编码 switch
+                var handler = TaskRegistry.CREATE_TICK.get(task);
+                if (handler != null) handler.accept(sl, maid);
             }
         }
+    }
+
+    /** v44: 统一清理 — 通过 TaskRegistry 查 pipeline.onCleanup (避免 double-cleanup) */
+    private static void cleanupMaid(EntityMaid maid) {
+        String task = LmaTaskDataHelper.getFlowTask(maid);
+        if (task.isEmpty()) return;
+        var h = TaskRegistry.get(task);
+        if (h != null) h.pipeline().onCleanup(maid);
+        TaskStateManager.clearAll(maid);
     }
 
     // ── 工具 ──

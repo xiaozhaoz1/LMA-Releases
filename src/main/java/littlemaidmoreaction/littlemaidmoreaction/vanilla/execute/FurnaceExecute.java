@@ -46,7 +46,7 @@ public final class FurnaceExecute {
             }
         }
 
-        data.putLong("lma_flow_tick", world.getGameTime());
+        littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager.heartbeat(maid, world.getGameTime());
         return meaningful;
     }
 

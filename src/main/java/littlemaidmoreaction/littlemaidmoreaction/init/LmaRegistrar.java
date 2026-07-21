@@ -7,6 +7,8 @@ import littlemaidmoreaction.littlemaidmoreaction.core.registry.BuiltinRegistrar;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ClassScanner;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ConditionRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ForgeClassScanner;
+import littlemaidmoreaction.littlemaidmoreaction.core.engine.ActionPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.engine.TickScheduler;
 import littlemaidmoreaction.littlemaidmoreaction.storage.RuleActionStorage;
 import littlemaidmoreaction.littlemaidmoreaction.storage.StartupLoader;
 import net.minecraft.network.chat.Component;
@@ -51,6 +53,8 @@ public final class LmaRegistrar {
             var owner = maid.getOwner();
             if (owner instanceof Player player) player.sendSystemMessage(Component.literal(msg));
         });
+        // v41: 注入 TickScheduler 实例，解除 ActionPipeline ↔ TickScheduler 循环依赖
+        ActionPipeline.setScheduler(new TickScheduler());
         littlemaidmoreaction.littlemaidmoreaction.adapter.ForgeTaskQueueBridge.init();
         littlemaidmoreaction.littlemaidmoreaction.core.doc.DocGenerator.generateAll(
                 LittleMaidMoreAction.CONFIG_DIR.resolve("introduce"));

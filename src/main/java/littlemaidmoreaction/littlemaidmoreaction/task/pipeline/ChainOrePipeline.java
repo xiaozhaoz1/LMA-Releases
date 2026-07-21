@@ -5,6 +5,9 @@ import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.item.ToolStateRea
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.ToolJudge;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -17,10 +20,9 @@ import java.util.List;
  */
 public final class ChainOrePipeline implements TaskPipeline {
 
-    @Override
-    public String taskType() {
-        return "collect_ore";
-    }
+    @Override public String taskType() { return "collect_ore"; }
+    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.is(net.minecraftforge.common.Tags.Blocks.ORES); }
+    @Override public boolean isLongRunning() { return true; }
 
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
@@ -34,11 +36,6 @@ public final class ChainOrePipeline implements TaskPipeline {
         return PipelineResult.ok("开始连锁挖矿");
     }
 
-    @Override
-    @Deprecated
-    public PipelineResult execute(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
-        return validate(level, maid, ctx);
-    }
 
     @Override
     public List<TaskStep> steps() {

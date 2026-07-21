@@ -6,15 +6,13 @@ import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionCat
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionValueType;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 任务超时检测 — 任务卡在某个步骤超过指定 tick 数时返回 true (v10)。
- *
- * <p>从 PersistentData 读取 lmma_flow_tick (最后更新时间戳)，
- * 与当前 gameTime 比较。超时后可触发 fail_task 或重试逻辑。</p>
+ * 任务超时检测 (v44: TaskKeys 常量化)。
  */
 @RuleCondition
 public final class TaskTimeoutCondition implements ICondition {
@@ -32,11 +30,11 @@ public final class TaskTimeoutCondition implements ICondition {
     @Override
     public String evaluate(RuleContext ctx, Map<String, String> rawParams) {
         var data = ctx.maid().getPersistentData();
-        String currentTask = data.getString("lma_flow_task");
+        String currentTask = data.getString(TaskKeys.FLOW_TASK);
         String expected = rawParams.getOrDefault("task_type", "craft_chain");
         if (!currentTask.equals(expected)) return "false";
 
-        long lastTick = data.getLong("lma_flow_tick");
+        long lastTick = data.getLong(TaskKeys.FLOW_TICK);
         long currentTick = ctx.maid().level().getGameTime();
         int timeout = parseInt(rawParams.get("timeout_ticks"), 200);
 

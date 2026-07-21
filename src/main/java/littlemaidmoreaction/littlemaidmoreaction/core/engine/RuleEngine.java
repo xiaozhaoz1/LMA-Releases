@@ -27,7 +27,7 @@ import java.util.UUID;
  *     <li>CooldownManager.isOnCooldown() 冷却检查</li>
  *     <li>ConditionMatcher.matches() 条件匹配</li>
  *   </ol>
- *   <li>命中 → CooldownManager.applyCooldown() → ActionPipeline.execute()</li>
+ *   <li>命中 → CooldownManager.newCooldownStamp() + PersistentData → ActionPipeline.execute()</li>
  * </ol>
  */
 public final class RuleEngine {
@@ -109,7 +109,10 @@ public final class RuleEngine {
                 if (!rule.enabled()) continue;
 
                 // 冷却检查（先于概率 — 更轻量，更可能拦住）
-                if (CooldownManager.isOnCooldown(rule, ctx.maid())) continue;
+                // ★ 调用方负责从 PersistentData 读取 lastUsed，core/ 零 MC 依赖
+                long lastUsed = ctx.maid().getPersistentData().getLong(CooldownManager.COOLDOWN_KEY_PREFIX + rule.id());
+                long gameTime = ctx.maid().level().getGameTime();
+                if (CooldownManager.isOnCooldown(rule, lastUsed, gameTime)) continue;
 
                 // 概率检查
                 if (rule.chance() < 1.0
@@ -123,7 +126,9 @@ public final class RuleEngine {
                     rule.name(), eventId, maidId, rule.actions().size());
                 RuleTracer.TraceRecord trace = RuleTracer.start(rule, eventId, ctx.maid());
                 trace.matched = true;
-                CooldownManager.applyCooldown(rule, ctx.maid());
+                ctx.maid().getPersistentData().putLong(
+                    CooldownManager.COOLDOWN_KEY_PREFIX + rule.id(),
+                    CooldownManager.newCooldownStamp(gameTime));
                 boolean result = ActionPipeline.execute(rule, ctx);
                 RuleTracer.finish();
                 // ★ break 检查: 规则内 break 动作会设置 _break 属性，中断后续候选规则

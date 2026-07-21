@@ -21,7 +21,29 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
     @Override public String category() { return "maid_state"; }
     @Override public Class<EntityMaid> targetType() { return EntityMaid.class; }
     @Override public <T> void write(EntityMaid m, String property, T value) {
-        throw new UnsupportedOperationException("Use static methods directly");
+        switch (property) {
+            case "sitting"      -> setSitting(m, (Boolean) value);
+            case "invisible"    -> setInvisible(m, (Boolean) value);
+            case "glowing"      -> setGlowing(m, (Boolean) value);
+            case "invulnerable" -> setInvulnerable(m, (Boolean) value);
+            case "silent"       -> setSilent(m, (Boolean) value);
+            case "home_mode"    -> setHomeMode(m, (Boolean) value);
+            case "aiming"       -> setAiming(m, (Boolean) value);
+            case "begging"      -> setBegging(m, (Boolean) value);
+            case "pickup"       -> setPickup(m, (Boolean) value, null);
+            case "sprinting"    -> setSprinting(m, (Boolean) value);
+            case "swimming"     -> setSwimming(m, (Boolean) value);
+            case "sneaking"     -> setSneaking(m, (Boolean) value);
+            case "hunger"       -> setHunger(m, ((Number) value).intValue());
+            case "favor"        -> setFavor(m, ((Number) value).intValue());
+            case "health"       -> setHealth(m, ((Number) value).floatValue());
+            case "experience"   -> setExperience(m, ((Number) value).intValue());
+            case "model"        -> setModel(m, (String) value);
+            case "restrict_radius" -> setRestrictRadius(m, ((Number) value).intValue());
+            case "attack_damage"   -> setAttackDamage(m, ((Number) value).doubleValue());
+            case "movement_speed"  -> setMovementSpeed(m, ((Number) value).doubleValue());
+            default -> throw new IllegalArgumentException("Unknown property: " + property);
+        }
     }
 
     public static void setSitting(EntityMaid m, boolean v) { m.setInSittingPose(v); }

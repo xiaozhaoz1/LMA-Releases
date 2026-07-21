@@ -6,12 +6,13 @@ import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionCat
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionValueType;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * 女仆有指定类型的流程任务 (v10 系统三)。
+ * 女仆有指定类型的流程任务 (v44: TaskKeys 常量化)。
  */
 @RuleCondition
 public final class HasFlowTaskCondition implements ICondition {
@@ -28,7 +29,7 @@ public final class HasFlowTaskCondition implements ICondition {
     @Override
     public String evaluate(RuleContext ctx, Map<String, String> rawParams) {
         var data = ctx.maid().getPersistentData();
-        String currentTask = data.getString("lma_flow_task");
+        String currentTask = data.getString(TaskKeys.FLOW_TASK);
         String expected = rawParams.getOrDefault("task_type", "craft_chain");
         return currentTask.equals(expected) ? "true" : "false";
     }

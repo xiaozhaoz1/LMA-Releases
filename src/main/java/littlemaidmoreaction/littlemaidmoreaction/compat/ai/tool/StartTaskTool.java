@@ -12,8 +12,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaFlowTask;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.LmaTaskDataHelper;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
 
 /**
  * v16: AI 唯一任务入口 — 取代 AssignTaskTool + CreateRuleTool + QueryRecipeTool + ...
@@ -133,28 +133,14 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
             LittleMaidMoreAction.LOGGER.info("[V16] [StartTaskTool] cleaning old task '{}' before starting '{}'", oldTask, p.taskType);
             LmaFlowTask.restorePreviousTask(maid);
         }
-        // 写入新任务标识（先写数据，等Pipeline写完规则后再切换Task触发Brain）
-        data.putString("lma_flow_task", p.taskType);
-        data.putString("lma_flow_state", "in_progress");
-        data.putInt("lma_flow_step", 0);
-        data.putInt("lma_flow_max_count", p.targetCount > 0 ? p.targetCount : 0);
-        data.putInt("lma_flow_counter", 0);
-        data.putLong("lma_flow_tick", maid.level().getGameTime());
-        data.putString("lma_task_target", p.target);  // ★ v18.1: Brain 直接读这个字段
-        data.remove("lma_flow_cached");
+        // v43: 通过中央调度器提交 (替代手动8字段NBT写入)
         LmaFlowTask.savePreviousTask(maid);
-
-        // ★ v18: Pipeline 验证材料 → Brain Behavior 直接执行
-        String sharedTaskId = String.valueOf(System.currentTimeMillis() % 100000);
-        data.putString("lma_flow_task_id", sharedTaskId);
-        PipelineResult result = TaskRegistry.validate(maid, p.taskType, sharedTaskId, p.target, p.targetCount);
-
-        if (!result.completed()) {
-            data.remove("lma_flow_task"); data.remove("lma_flow_task_id");
-            data.remove("lma_flow_state"); data.remove("lma_flow_step");
+        // v43: lma_task_target 仍需单独写 (TaskDispatcher.submit 不处理额外字段)
+        maid.getPersistentData().putString("lma_task_target", p.target);
+        if (!TaskDispatcher.submit(maid, p.taskType, p.target, p.targetCount)) {
             LmaFlowTask.restorePreviousTask(maid);
-            LittleMaidMoreAction.LOGGER.warn("[V18] [StartTaskTool] validation failed for {}: {}", p.taskType, result.feedback());
-            return cb.addToolResult("无法执行" + p.taskType + "任务: " + result.feedback(), toolCallId);
+            LittleMaidMoreAction.LOGGER.warn("[V18] [StartTaskTool] validation failed for {}", p.taskType);
+            return cb.addToolResult("无法执行" + p.taskType + "任务", toolCallId);
         }
 
         // 清除 Brain dedup 缓存 + 切换任务 → Brain Behavior 直接导航+交互
@@ -163,13 +149,7 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
         maid.setTask(newTask);
         LittleMaidMoreAction.LOGGER.info("[V18] [StartTaskTool] validated, switching to task {}", newTask.getUid());
 
-        LittleMaidMoreAction.LOGGER.info("[V16] [StartTaskTool] result: completed={}, feedback={}", result.completed(), result.feedback());
-
-        String message = result.completed()
-                ? "Task '" + p.taskType + "' started: " + result.feedback()
-                : "Task '" + p.taskType + "' failed: " + result.feedback();
-
-        return cb.addToolResult(message, toolCallId);
+        return cb.addToolResult("Task '" + p.taskType + "' started successfully", toolCallId);
     }
 
     @Override

@@ -145,7 +145,9 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
             littlemaidmoreaction.littlemaidmoreaction.compat.ai.model.FlowTask.CODEC.listOf(),
             littlemaidmoreaction.littlemaidmoreaction.compat.ai.model.FlowTask.CODEC.listOf()
         );
-        LittleMaidMoreAction.LOGGER.info("[LMA] TaskData 已注册 (flow_tasks)");
+        // v43: 注册 LmaTaskDataKeys (备用, v44切换)
+        littlemaidmoreaction.littlemaidmoreaction.task.LmaTaskDataKeys.registerAll(register);
+        LittleMaidMoreAction.LOGGER.info("[LMA] TaskData 已注册 (flow_tasks + lma_flow_*)");
     }
 
     /**

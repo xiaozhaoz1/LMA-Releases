@@ -95,8 +95,8 @@ public final class LmaTaskTypeRegistry {
 
         for (String known : getKnownTaskTypes()) {
             if ("brewing".equals(known)) continue;
-            // ★ v35.4: 只注册 showInBar=true 的任务到 TLM 任务栏
-            if (!littlemaidmoreaction.littlemaidmoreaction.task.TaskToggle.isVisible(known)) continue;
+            // v52: TaskRegistry.showInBar 控制 TLM 任务栏可见性
+            if (!littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry.isShowInBar(known)) continue;
             registerIfNew(known);
         }
 

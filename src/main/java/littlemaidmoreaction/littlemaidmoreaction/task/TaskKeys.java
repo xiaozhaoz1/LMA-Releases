@@ -33,9 +33,11 @@ public final class TaskKeys {
     public static final String STATE_FAILED      = "failed";
     public static final String STATE_STOPPED     = "stopped";
     public static final String STATE_QUEUED      = "queued";
+    public static final String STATE_CANCELLED   = "cancelled";
 
     // ── 任务目标/反馈 ──
     public static final String TASK_TARGET    = "lma_task_target";
+    public static final String TASK_INPUT     = "lma_task_input";
     public static final String TASK_COMPLETED = "lma_task_completed";
     public static final String FAIL_REASON    = "lma_fail_reason";
 
@@ -56,8 +58,26 @@ public final class TaskKeys {
     public static final String JUKEBOX_TICK  = "lma_jukebox_tick";
     public static final String JUKEBOX_LAST  = "lma_jukebox_last";
 
+    // ── adapter→task 通信标记 (v49) ──
+    /** TLM 任务切换标记 — TlmTaskMonitor 写，TaskEngine 读 */
+    public static final String TLM_SWITCH = "lma_tlm_switch";
+    /** GUI 启动新任务标记 — LmaFlowCoordinationBehavior 写，TaskEngine 读 */
+    public static final String GUI_INIT = "lma_gui_init";
+
     // ── 任务开关 ──
     public static final String TASK_ENABLED_PREFIX = "lma_task_enabled_";
+
+    // ── 任务类型常量 (v42) ──
+    public static final String TASK_CRAFT_CHAIN  = "craft_chain";
+    public static final String TASK_FURNACE      = "furnace";
+    public static final String TASK_JUKEBOX      = "jukebox";
+    public static final String TASK_BELL_RING    = "bell_ring";
+    public static final String TASK_ARM_TRANSFER = "arm_transfer";
+    public static final String TASK_CRANK        = "crank";
+    public static final String TASK_POWER        = "power";
+    public static final String TASK_PRESS        = "press";
+    public static final String TASK_MIX          = "mix";
+    public static final String TASK_RUNNING_BELT = "running_belt";
 
     private TaskKeys() {}
 }

@@ -2,150 +2,186 @@ package littlemaidmoreaction.littlemaidmoreaction.task;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaTasks;
 import littlemaidmoreaction.littlemaidmoreaction.api.SlotLayout;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
-
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
-import com.simibubi.create.content.kinetics.crank.HandCrankBlock;
-import com.simibubi.create.content.logistics.depot.DepotBlock;
-import com.simibubi.create.content.processing.basin.BasinBlock;
-import net.minecraft.world.level.block.BellBlock;
-import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.crafting.SmeltingRecipe;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
-import java.util.function.BiPredicate;
-import java.util.function.Predicate;
+import java.util.function.BiConsumer;
 
 /**
- * 任务注册中心 — 所有任务类型的单一真相源。
+ * 任务注册中心 (v52: 注册简化 — 只指定 pipeline + executor, 方块过滤由 Pipeline 自己负责)
  */
 public final class TaskRegistry {
 
     private static final Map<String, TaskHandler> HANDLERS = new LinkedHashMap<>();
+    public static final Map<String, BiConsumer<ServerLevel, EntityMaid>> CREATE_TICK = new LinkedHashMap<>();
 
     static {
-        register("craft_chain", Blocks.CRAFTING_TABLE,
-            state -> state.is(Blocks.CRAFTING_TABLE),
+        register("craft_chain",
             new littlemaidmoreaction.littlemaidmoreaction.task.pipeline.CraftChainPipeline(),
-            (w, m, p, d) -> VanillaTasks.craft(w, m, p, d.getString("lma_task_target"))
-                ? TaskResult.SUCCESS : TaskResult.FAILED);
+            new IExecutor() {
+                @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                    return VanillaTasks.craft(w, m, p, d.getString("lma_task_target"))
+                        ? TaskResult.SUCCESS : TaskResult.FAILED;
+                }
+                @Override public void onStop(EntityMaid maid) {}
+            });
 
-        register("furnace", null,
-            state -> true,
+        register("furnace",
             new littlemaidmoreaction.littlemaidmoreaction.task.pipeline.FurnacePipeline(),
-            (w, m, p, d) -> {
-                VanillaTasks.furnace(w, m, p, d.getString("lma_task_input"), SlotLayout.FURNACE);
-                return TaskResult.SUCCESS;
+            new IExecutor() {
+                @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                    String ingredientKey = resolveSmeltIngredient(w, m, d);
+                    if (ingredientKey.isEmpty()) return TaskResult.FAILED;
+                    d.putString("lma_task_input", ingredientKey);
+                    VanillaTasks.furnace(w, m, p, ingredientKey, SlotLayout.FURNACE);
+                    return TaskResult.SUCCESS;
+                }
+                @Override public void onStop(EntityMaid maid) {}
+
+                private String resolveSmeltIngredient(ServerLevel level, EntityMaid maid, CompoundTag d) {
+                    String target = d.getString("lma_task_target");
+                    if (target.isEmpty()) return "";
+                    Item targetItem = net.minecraftforge.registries.ForgeRegistries.ITEMS
+                        .getValue(net.minecraft.resources.ResourceLocation.tryParse(target));
+                    if (targetItem == null) return "";
+                    Map<Item, Integer> allItems = littlemaidmoreaction.littlemaidmoreaction.api
+                        .VanillaInputRegistry.readAllItems(maid);
+                    for (SmeltingRecipe recipe : level.getRecipeManager()
+                         .getAllRecipesFor(net.minecraft.world.item.crafting.RecipeType.SMELTING)) {
+                        if (!recipe.getResultItem(level.registryAccess()).is(targetItem)) continue;
+                        for (ItemStack ing : recipe.getIngredients().get(0).getItems()) {
+                            if (allItems.getOrDefault(ing.getItem(), 0) > 0)
+                                return net.minecraftforge.registries.ForgeRegistries.ITEMS
+                                    .getKey(ing.getItem()).toString();
+                        }
+                    }
+                    // fallback: target itself in inventory
+                    if (allItems.getOrDefault(targetItem, 0) > 0)
+                        return target;
+                    return "";
+                }
             });
 
-        register("jukebox", Blocks.JUKEBOX,
-            state -> state.is(Blocks.JUKEBOX),
+        register("jukebox",
             new littlemaidmoreaction.littlemaidmoreaction.task.pipeline.JukeboxPipeline(),
-            (w, m, p, d) -> {
-                VanillaTasks.jukebox(w, m, p, d.getString("lma_task_target"));
-                return TaskResult.CONTINUE;
+            new IExecutor() {
+                @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                    VanillaTasks.jukebox(w, m, p, d.getString("lma_task_target"));
+                    return TaskResult.CONTINUE;
+                }
+                @Override public void onStop(EntityMaid maid) {}
             });
 
-        register("bell_ring", Blocks.BELL,
-            state -> state.getBlock() instanceof BellBlock,
+        register("bell_ring",
             new littlemaidmoreaction.littlemaidmoreaction.task.pipeline.BellRingPipeline(),
-            (w, m, p, d) -> {
-                VanillaTasks.bell(w, m, p);
-                return TaskResult.SUCCESS;
+            new IExecutor() {
+                @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                    VanillaTasks.bell(w, m, p);
+                    return TaskResult.SUCCESS;
+                }
+                @Override public void onStop(EntityMaid maid) {}
             });
 
         // ── v36: 连锁采集 ──
-        registerSearch("collect_wood",
-            (p, s) -> s.is(net.minecraft.tags.BlockTags.LOGS),
-            state -> state.is(net.minecraft.tags.BlockTags.LOGS),
+        register("collect_wood",
             new littlemaidmoreaction.littlemaidmoreaction.task.pipeline.ChainWoodPipeline(),
-            (w, m, p, d) -> littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
-                .ChainHarvestExecute.execute(w, m, p, d,
-                    littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.Mode.WOOD));
+            new IExecutor() {
+                @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                    return littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
+                        .ChainHarvestExecute.execute(w, m, p, d,
+                            littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.Mode.WOOD);
+                }
+                @Override public void onStop(EntityMaid maid) {
+                    littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
+                        .ChainHarvestExecute.onMaidUnload(maid.getId());
+                }
+            });
 
-        registerSearch("collect_ore",
-            (p, s) -> s.is(net.minecraftforge.common.Tags.Blocks.ORES),
-            state -> state.is(net.minecraftforge.common.Tags.Blocks.ORES),
+        register("collect_ore",
             new littlemaidmoreaction.littlemaidmoreaction.task.pipeline.ChainOrePipeline(),
-            (w, m, p, d) -> littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
-                .ChainHarvestExecute.execute(w, m, p, d,
-                    littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.Mode.ORE));
+            new IExecutor() {
+                @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                    return littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
+                        .ChainHarvestExecute.execute(w, m, p, d,
+                            littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.Mode.ORE);
+                }
+                @Override public void onStop(EntityMaid maid) {
+                    littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
+                        .ChainHarvestExecute.onMaidUnload(maid.getId());
+                }
+            });
 
-        // ── v38-39: Create 女仆专属任务 (仅 Create 加载时注册) ──
+        // ── v44: 祭坛合成 ──
+        register("altar_craft",
+            new TaskPipeline() {
+                @Override public String taskType() { return "altar_craft"; }
+                @Override public PipelineResult validate(ServerLevel l, EntityMaid m, PipelineContext c) {
+                    return PipelineResult.ok("");
+                }
+                
+            },
+            new IExecutor() {
+                @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                    return TaskResult.SUCCESS;
+                }
+                @Override public void onStop(EntityMaid maid) {}
+            });
+
+        // ── v38-40: Create 女仆专属任务 ──
         if (net.minecraftforge.fml.ModList.get().isLoaded("create")) {
-            // v38: 搬运
-            registerSearch("arm_transfer",
-                (p, s) -> false,
-                state -> true,
-                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.ArmTransferPipeline(),
-                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.ArmTransferPipeline.executor());
+            var armTransferPl = new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.ArmTransferPipeline();
+            register("arm_transfer", armTransferPl, armTransferPl.executor());
+            CREATE_TICK.put("arm_transfer", armTransferPl::tick);
 
-            // v39: 手摇曲柄
-            registerSearch("crank",
-                (p, s) -> s.getBlock() instanceof HandCrankBlock,
-                state -> state.getBlock() instanceof HandCrankBlock,
-                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.CrankPipeline(),
-                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.CrankPipeline.executor());
+            var crankPl = new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.CrankPipeline();
+            register("crank", crankPl, crankPl.executor());
+            CREATE_TICK.put("crank", crankPl::tick);
 
-            // v39: 动力齿轮
-            registerSearch("power",
-                (p, s) -> littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerService.isTargetBlock(s.getBlock()),
-                state -> littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerService.isTargetBlock(state.getBlock()),
-                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerPipeline(),
-                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerPipeline.executor());
+            var powerPl = new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PowerPipeline();
+            register("power", powerPl, powerPl.executor());
+            CREATE_TICK.put("power", powerPl::tick);
 
-            // v39: 女仆冲压
-            registerSearch("press",
-                (p, s) -> { Block b = s.getBlock(); return b instanceof DepotBlock || b instanceof BasinBlock; },
-                state -> true,
-                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PressPipeline(),
-                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PressPipeline.executor());
+            var pressPL = new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.PressPipeline();
+            register("press", pressPL, pressPL.executor());
+            CREATE_TICK.put("press", pressPL::tick);
 
-            // v39: 女仆搅拌
-            registerSearch("mix",
-                (p, s) -> s.getBlock() instanceof BasinBlock,
-                state -> true,
-                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.MixPipeline(),
-                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.MixPipeline.executor());
+            var mixPL = new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.MixPipeline();
+            register("mix", mixPL, mixPL.executor());
+            CREATE_TICK.put("mix", mixPL::tick);
 
-            // v40: 女仆跑步发电
-            registerSearch("running_belt",
-                (p, s) -> s.getBlock() instanceof com.simibubi.create.content.kinetics.belt.BeltBlock
-                    && s.getValue(com.simibubi.create.content.kinetics.belt.BeltBlock.SLOPE)
-                        == com.simibubi.create.content.kinetics.belt.BeltSlope.HORIZONTAL,
-                state -> state.getBlock() instanceof com.simibubi.create.content.kinetics.belt.BeltBlock,
-                new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.RunningBeltPipeline(),
-                littlemaidmoreaction.littlemaidmoreaction.compat.create.task.RunningBeltPipeline.executor());
+            var beltPl = new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.RunningBeltPipeline();
+            register("running_belt", beltPl, beltPl.executor());
+            CREATE_TICK.put("running_belt", (w, m) -> littlemaidmoreaction.littlemaidmoreaction.compat.create.task.RunningBeltPipeline.tick(w, m));
         }
     }
 
-    public static void register(String taskType, Block block, Predicate<BlockState> valid,
-                                 TaskPipeline pipeline, IExecutor executor) {
-        HANDLERS.put(taskType, new TaskHandler(taskType, block, null, valid, pipeline, executor));
+    /**
+     * v52: 注册任务 — showInBar=true 的任务会出现在 TLM 任务栏 GUI。
+     * 被动/环境任务应传 false，只内部注册不暴露给玩家。
+     */
+    public static void register(String taskType, TaskPipeline pipeline, IExecutor executor,
+                                 boolean showInBar) {
+        HANDLERS.put(taskType, new TaskHandler(taskType, pipeline, executor, showInBar));
     }
 
-    public static void registerSearch(String taskType, BiPredicate<BlockPos, BlockState> searchPredicate,
-                                       Predicate<BlockState> valid,
-                                       TaskPipeline pipeline, IExecutor executor) {
-        HANDLERS.put(taskType, new TaskHandler(taskType, null, searchPredicate, valid, pipeline, executor));
+    /** v52: 默认 showInBar=true — 大多数任务在 TLM 任务栏可见 */
+    public static void register(String taskType, TaskPipeline pipeline, IExecutor executor) {
+        register(taskType, pipeline, executor, true);
     }
 
     public static PipelineResult validate(EntityMaid maid, String taskType, String taskId,
                                           String target, int targetCount) {
-        LittleMaidMoreAction.LOGGER.info("[V35] [TaskRegistry] validate: task_type={}, target={}, count={}",
-            taskType, target, targetCount);
         TaskHandler handler = HANDLERS.get(taskType);
         if (handler == null) return PipelineResult.failed("未知任务类型: " + taskType);
         if (!(maid.level() instanceof ServerLevel level)) return PipelineResult.failed("仅在服务端可用");
@@ -155,10 +191,17 @@ public final class TaskRegistry {
     public static TaskHandler get(String taskType) { return HANDLERS.get(taskType); }
     public static Set<String> taskTypes() { return HANDLERS.keySet(); }
 
-    public record TaskHandler(
-        String taskType, Block targetBlock,
-        BiPredicate<BlockPos, BlockState> searchPredicate,
-        Predicate<BlockState> isValid,
-        TaskPipeline pipeline, IExecutor executor
-    ) {}
+    /** v52: 是否在 TLM 任务栏显示 */
+    public static boolean isShowInBar(String taskType) {
+        TaskHandler h = HANDLERS.get(taskType);
+        return h != null && h.showInBar();
+    }
+
+    public static BiConsumer<ServerLevel, EntityMaid> getCreateTick(String taskType) {
+        return CREATE_TICK.get(taskType);
+    }
+
+    /** v52: showInBar=true → TLM 任务栏可见; false → 仅内部注册 (被动/环境任务) */
+    public record TaskHandler(String taskType, TaskPipeline pipeline, IExecutor executor,
+                               boolean showInBar) {}
 }

@@ -5,9 +5,14 @@ import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import net.minecraft.core.BlockPos;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.block.state.BlockState;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.*;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.ProgressNotifier;
 import net.minecraft.server.level.ServerLevel;
+
+import java.util.List;
 
 /**
  * 敲钟管道 — 处理女仆自动寻找并敲响钟的工作流。
@@ -22,26 +27,14 @@ import net.minecraft.server.level.ServerLevel;
  */
 public final class BellRingPipeline implements TaskPipeline {
 
+    @Override public String taskType() { return "bell_ring"; }
+    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.getBlock() instanceof net.minecraft.world.level.block.BellBlock; }
+    @Override public List<TaskStep> steps() { return List.of(new TaskStep("ring", "敲响钟", StepType.INTERACT, List.of())); }
+
+    /** v44: 纯验证 — 敲钟无前置条件，始终可用 */
     @Override
-    public String taskType() {
-        return "bell_ring";
+    public PipelineResult validate(ServerLevel l, EntityMaid m, PipelineContext c) {
+        return PipelineResult.ok("");
     }
 
-    @Override
-    public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
-        return execute(level, maid, ctx);
-    }
-
-    @Override
-    public PipelineResult execute(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
-        LittleMaidMoreAction.LOGGER.info("[V16] [BellRing] ====== START: target={}", ctx.target());
-
-        // TODO Phase 2: find bell → navigate → ring
-
-        // ★ v18: Brain Behavior 直接执行，不写规则文件
-        String taskId = ctx.taskId();
-        ProgressNotifier.notify(maid, ProgressNotifier.BELL_DONE);
-        LittleMaidMoreAction.LOGGER.info("[V16] [BellRing] ====== END: {}", ProgressNotifier.BELL_DONE);
-        return PipelineResult.ok(ProgressNotifier.BELL_DONE);
-    }
 }
