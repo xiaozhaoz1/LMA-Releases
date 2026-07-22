@@ -1,4 +1,4 @@
-# LittleMaidMoreAction — 车万女仆「更多动作」
+﻿# LittleMaidMoreAction — 车万女仆「更多动作」
 
 为 Touhou Little Maid 添加可视化规则编辑器与事件驱动的女仆战斗动作系统。
 
@@ -21,58 +21,52 @@
 
 ## 版本
 
-**v34.2** — 2026-07-15 — 注册模式重构 + MaidEditorScreen apply/save + execute Bug修复
+**v53** — 2026-07-22 — 执行引擎收尾 + 重启自动恢复
 
-| 指标 | v7.1 | v8.2 | v8.4 | v8.7 | v9.0 |
-|------|------|------|------|------|------|
-| 条件 | 35 | 100 | 100 | 107 | 107 |
-| 动作 | 53 | 75 | 70 | 75 | 75 |
-| 事件 | 29 | 29 | 28 | 28 | 28 |
-| 源文件 | 169 | 258 | 258 | 278 | 285 |
-| 测试 | 85 | 85 | 85 | 85 |
+| 指标 | 值 |
+|------|-----|
+| 任务类型 | 13 (7 Vanilla + 6 Create) |
+| 条件/动作/事件 | 111 / 83 / 36 |
+| 源文件 | 582 |
+| 测试 | 144 |
+| 兼容模块 | 6 (Create · SlashBlade · TPM · YSM · AI · FlowTask) |
+| 架构层 | 6 (调度→状态→注册→引擎→执行→IO) |
+| 版本演进 | v1→v53, 八轮重构 (v45-v53) |
 
 ## 开发
 
-v5 工业级规则引擎 — 六边形架构, 零 Minecraft 依赖的 core 模块, 异步执行管道。
+v53 架构 — 六层: 调度/状态/注册/引擎/执行/IO。规则引擎六边形架构, 零 Minecraft 依赖 core 模块。
 
 | 层 | 包 | 说明 |
 |----|-----|------|
+| 调度 | `task/TaskDispatcher.java` | 所有任务唯一入口/出口 — submit/cancel/complete/fail/timeout |
+| 状态 | `task/TaskStateManager.java` + `TaskEngine.java` | NBT 25键读写 + heartbeat 防超时 + adapter 解耦轮询 |
+| 注册 | `task/TaskRegistry.java` | `register(name, pipeline, executor, showInBar)` — 统一入口 |
+| 引擎 | `task/TaskStateMachine.java` | 泛型 FSM — 显式枚举状态·转换图验证·onEnter/onExit |
+| 执行 | `adapter/` + `compat/` | Brain 驱动 (Vanilla) + Tick 驱动 (Create) · 双路径 |
+| IO | `task/TaskKeys.java` + `LmaTaskDataHelper.java` | 26 NBT 常量 · 19读取器+16写入器 |
 | core | `core/spi/` | 类型安全参数系统 (sealed TypedParam) |
 | core | `core/registry/` | 注解扫描 + ClassGraph 自动注册 + BuiltinRegistrar 三层回退 |
 | core | `core/engine/` | 异步管道 + 主线程安全执行 |
 | core | `core/model/` | 不可变数据模型 + 树形条件 + 参数化条件 |
-| adapter | `adapter/tlm/` | TLM 事件桥接 (29→RuleEngine) + MagicCasting Provider |
-| adapter | `adapter/gui/` | Visitor 模式动态表单 |
-| compat | `compat/ysm/` | YSM 兼容 — 门控扫描 + 条件/动作自动注册 |
-| network | `network/` | ID 同步 (旧系统) + PersistentData 同步 (专用服务器) |
-| storage | `storage/` | JSON 持久化 + 动画元数据 (animationsetup/) |
 
 新增条件: 实现 `ICondition` + `@RuleCondition` → 自动注册
 新增动作: 实现 `IAction` + `@RuleAction` → 自动注册
 
-### Compat 模块 — 模组兼容层
+### Compat 模块 — 6 模组兼容层
 
-参考 TLM 既有 compat 架构，每个兼容模组独立子包，门控加载。
+| 模块 | 路径 | 功能 |
+|------|------|------|
+| Create | `compat/create/` | 6 机械动力任务 — crank/power/press/mix/running_belt/arm_transfer |
+| SlashBlade | `compat/slashblade/` | 拔刀剑 Sa 槽 + 连段攻击 |
+| TPM | `compat/tpm/` | True Power of Maid 连段修改 |
+| YSM | `compat/ysm/` | Yes Steve Model — 条件/动作自动注册 |
+| AI | `compat/ai/` | 多个 AI 模型集成 |
+| FlowTask | `compat/flowtask/` | 通用流程任务基类
 
-```
-compat/
-├── CompatRegistry.java            # 调度中心 (InterModEnqueueEvent + checkModLoad)
-└── ysm/                           # YSM (Yes Steve Model)
-    ├── YsmCompat.java             # 门控 + 限定包扫描 + 自动注册
-    ├── YsmEvent.java              # 事件订阅（预留）
-    └── impl/
-        ├── condition/             # @RuleCondition → ICondition
-        │   ├── IsYsmModelCondition.java   # is_ysm_model (BOOL)
-        │   └── YsmModelIdCondition.java   # ysm_model_id (STR)
-        └── action/                # @RuleAction → IAction
-            └── SetYsmModelAction.java     # set_ysm_model
-```
+参考 TLM compat 架构。每个模块 `compat/<modid>/impl/condition/` + `action/`。门控加载 `CompatRegistry.checkModLoad()`。
 
 **新增兼容模组**：创建 `compat/<modid>/` 文件夹 → 实现条件/动作 → 在 `CompatRegistry` 添加一行 `checkModLoad`。
-
-**条件/动作**：放在 `compat/<modid>/impl/condition/` 和 `compat/<modid>/impl/action/` 下，
-使用 `@RuleCondition`/`@RuleAction` 注解，由 `XxxCompat.scanAndRegister()` 自动发现。
-仅在目标模组加载时注册到编辑器。
 
 ## 安装
 
@@ -99,7 +93,7 @@ compat/
 ## 贡献者 / Contributors
 
 - **xiaozhaoz1** — 作者、设计、开发
-- **DeepSeek AI** (deepseek-v4-pro) — AI 协作开发: 代码生成、架构设计、文档撰写、Bug 诊断修复、测试编写。累计贡献 258 源文件中大量代码，100 条件 + 75 动作实现，v5 六边形架构设计，v7 模块化重构
+- **DeepSeek AI** (deepseek-v4-pro) — AI 协作开发: 代码生成、架构设计、文档撰写、Bug 诊断修复、测试编写。累计贡献 582 源文件中大量代码，111 条件 + 83 动作实现，v5 六边形架构设计，v7 模块化重构
 
 ## 许可
 
