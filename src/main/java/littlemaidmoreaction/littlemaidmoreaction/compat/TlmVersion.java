@@ -16,7 +16,7 @@ import org.apache.maven.artifact.versioning.ComparableVersion;
  * }</pre>
  */
 public final class TlmVersion {
-    private static final String MOD_ID = "touhou_little_maid";
+    public static final String MOD_ID = "touhou_little_maid";
     private static volatile String cachedNumeric;
     private static volatile boolean cached = false;
 

@@ -6,6 +6,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;
 import littlemaidmoreaction.littlemaidmoreaction.storage.RuleActionStorage;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 
 import java.util.List;
 
@@ -88,20 +89,20 @@ public final class LmaStatusContext {
 
             // 流程任务
             var data = maid.getPersistentData();
-            String task = data.getString("lma_flow_task");
+            String task = data.getString(TaskKeys.FLOW_TASK);
             if (!task.isEmpty()) {
-                String state = data.getString("lma_flow_state");
-                int step = data.getInt("lma_flow_step");
+                String state = data.getString(TaskKeys.FLOW_STATE);
+                int step = data.getInt(TaskKeys.FLOW_STEP);
                 sb.append(" | Flow task: ").append(task)
                   .append(" (").append(state).append(", step ").append(step).append(")");
             }
 
             // ★ v12.5: 任务完成通知 — 读取后清除
-            String completed = data.getString("lma_task_completed");
+            String completed = data.getString(TaskKeys.TASK_COMPLETED);
             if (!completed.isEmpty()) {
                 sb.append(" | TASK COMPLETED: ").append(completed)
                   .append(". Tell the owner the task is done!");
-                data.remove("lma_task_completed");
+                data.remove(TaskKeys.TASK_COMPLETED);
             }
 
             return sb.toString();

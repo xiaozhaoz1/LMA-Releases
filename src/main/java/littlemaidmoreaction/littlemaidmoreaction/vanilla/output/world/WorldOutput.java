@@ -2,6 +2,8 @@ package littlemaidmoreaction.littlemaidmoreaction.vanilla.output.world;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.implement.TextChatBubbleData;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.compat.TlmVersion;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -56,7 +58,7 @@ public final class WorldOutput {
     public static void sendChatBroadcast(String message) { var s = ServerLifecycleHooks.getCurrentServer(); if (s != null) s.getPlayerList().broadcastSystemMessage(Component.literal(message), false); }
     public static void sendBubble(EntityMaid maid, String text) { maid.getChatBubbleManager().addTextChatBubble(text); }
     public static void sendBubble(EntityMaid maid, String text, int duration) {
-        var bubble = TextChatBubbleData.create(duration, Component.literal(text), ResourceLocation.fromNamespaceAndPath("touhou_little_maid", "textures/gui/chat_bubble/type_1.png"), 0);
+        var bubble = TextChatBubbleData.create(duration, Component.literal(text), ResourceLocation.fromNamespaceAndPath(TlmVersion.MOD_ID, "textures/gui/chat_bubble/type_1.png"), 0);
         maid.getChatBubbleManager().addChatBubble(bubble);
     }
     public static boolean openGui(Level world, Player player, BlockPos pos) { var state = world.getBlockState(pos); var provider = state.getMenuProvider(world, pos); if (provider == null) return false; player.openMenu(provider); return true; }
@@ -68,7 +70,7 @@ public final class WorldOutput {
         for (int i = 0; i < count; i++) { var entity = type.create(world); if (entity == null) continue;
             double ox = (world.random.nextDouble()-0.5)*spread*2, oz = (world.random.nextDouble()-0.5)*spread*2;
             entity.setPos(pos.getX()+0.5+ox, pos.getY()+0.5, pos.getZ()+0.5+oz);
-            if (!nbtStr.isEmpty()) { try { var tag = net.minecraft.nbt.TagParser.parseTag(nbtStr); if (tag != null) entity.load(tag); } catch (Exception ex) {} }
+            if (!nbtStr.isEmpty()) { try { var tag = net.minecraft.nbt.TagParser.parseTag(nbtStr); if (tag != null) entity.load(tag); } catch (Exception ex) { LittleMaidMoreAction.LOGGER.warn("spawnEntityAt: failed to parse NBT", ex); } }
             world.addFreshEntity(entity);
         }
     }

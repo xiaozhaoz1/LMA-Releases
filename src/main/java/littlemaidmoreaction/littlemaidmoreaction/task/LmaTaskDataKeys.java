@@ -3,6 +3,7 @@ package littlemaidmoreaction.littlemaidmoreaction.task;
 import com.github.tartaricacid.touhoulittlemaid.api.entity.data.TaskDataKey;
 import com.github.tartaricacid.touhoulittlemaid.entity.data.TaskDataRegister;
 import com.mojang.serialization.Codec;
+import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -37,7 +38,7 @@ public final class LmaTaskDataKeys {
     }
 
     private static ResourceLocation rl(String path) {
-        return ResourceLocation.fromNamespaceAndPath("lma", path);
+        return ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, path);
     }
 
     private LmaTaskDataKeys() {}

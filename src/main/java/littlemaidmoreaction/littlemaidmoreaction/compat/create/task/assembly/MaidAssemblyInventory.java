@@ -1,0 +1,157 @@
+package littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly;
+
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.world.item.ItemStack;
+import net.minecraftforge.items.ItemStackHandler;
+
+import javax.annotation.Nonnull;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * 便携装配库存 — 仿 Biotech SpiderAssemblyTable: 每 Maid 单一实例, 通过 {@link #of} 获取.
+ *
+ * <p>Pipeline 和 Menu 共享同一实例 → Pipeline修改实时可见, Menu关闭时保存.
+ * <p>客户端 Menu 使用单独实例 (不共享), 通过容器数据包同步.
+ */
+public final class MaidAssemblyInventory extends ItemStackHandler {
+
+    private static final Map<UUID, MaidAssemblyInventory> CACHE = new ConcurrentHashMap<>();
+
+    public static final int MACHINE_SLOTS = 8;
+    public static final int MATERIAL_SLOT = 8;
+    public static final int INTERMEDIATE_SLOT = 9;
+    public static final int OUTPUT1_SLOT = 10;
+    public static final int OUTPUT2_SLOT = 11;
+    public static final int TOTAL_SLOTS = 12;
+
+    private static final String NBT_KEY = "maid_assembly", INV_KEY = "Inventory",
+        LOCKS_KEY = "Locks", BLOCKED_KEY = "Blocked", MAT_LOCK_KEY = "MatLock";
+
+    private final EntityMaid maid;
+    private final boolean serverSide;
+    private final ItemStack[] itemLocks = new ItemStack[MACHINE_SLOTS];
+    private final boolean[] slotBlocked = new boolean[MACHINE_SLOTS];
+    private ItemStack materialLock = ItemStack.EMPTY;
+
+    /** 获取/创建此 Maid 的唯一 Inventory 实例 (服务端共享) */
+    public static MaidAssemblyInventory of(EntityMaid maid) {
+        return CACHE.computeIfAbsent(maid.getUUID(), k -> new MaidAssemblyInventory(maid, true));
+    }
+
+    /** 服务端用: 共享实例, serverSide=true */
+    private MaidAssemblyInventory(EntityMaid maid, boolean serverSide) {
+        super(TOTAL_SLOTS);
+        this.maid = maid;
+        this.serverSide = serverSide;
+        for (int i = 0; i < MACHINE_SLOTS; i++) itemLocks[i] = ItemStack.EMPTY;
+        loadFromNBT();
+        LittleMaidMoreAction.LOGGER.info("[AssemblyInv] created serverSide={} maid={}", serverSide, maid.getStringUUID());
+    }
+
+    /** 客户端用: 独立实例, 不同步 NBT */
+    public static MaidAssemblyInventory client(EntityMaid maid) {
+        return new MaidAssemblyInventory(maid, false);
+    }
+
+    @Override public int getSlotLimit(int slot) { return slot < MACHINE_SLOTS ? 1 : 64; }
+
+    @Override public boolean isItemValid(int slot, @Nonnull ItemStack stack) {
+        if (slot < MACHINE_SLOTS) return MaidAssemblyService.MachineKind.fromStack(stack) != null;
+        return true;
+    }
+
+    // ── Material slot lock ──
+
+    public boolean isMaterialLocked() { return !materialLock.isEmpty(); }
+    public ItemStack getMaterialLock() { return materialLock.copy(); }
+
+    public void handleMaterialLock(ItemStack carried) {
+        if (!carried.isEmpty()) {
+            materialLock = carried.copyWithCount(1);
+        } else {
+            if (isMaterialLocked()) materialLock = ItemStack.EMPTY;
+            else { ItemStack mat = getStackInSlot(MATERIAL_SLOT); if (!mat.isEmpty()) materialLock = mat.copyWithCount(1); }
+        }
+        LittleMaidMoreAction.LOGGER.info("[AssemblyInv] matLock set={}", !materialLock.isEmpty());
+        if (serverSide) saveToNBT();
+    }
+
+    public boolean autoRefillMaterial() {
+        if (!isMaterialLocked()) return true;
+        ItemStack cur = getStackInSlot(MATERIAL_SLOT);
+        if (!cur.isEmpty()) return true;
+        var bp = maid.getAvailableBackpackInv();
+        for (int s = 0; s < bp.getSlots(); s++) {
+            ItemStack st = bp.getStackInSlot(s);
+            if (!st.isEmpty() && ItemStack.isSameItemSameTags(st, materialLock)) {
+                setStackInSlot(MATERIAL_SLOT, bp.extractItem(s, 64, false));
+                return true;
+            }
+        }
+        if (maid.level() != null) {
+            ItemStack extracted = MaidAssemblyService.extractNearbyItem(maid.level(), maid.blockPosition(), materialLock);
+            if (!extracted.isEmpty()) { setStackInSlot(MATERIAL_SLOT, extracted); return true; }
+        }
+        return false;
+    }
+
+    // ── NBT persistence ──
+
+    private void loadFromNBT() {
+        CompoundTag root = maid.getPersistentData().getCompound(NBT_KEY);
+        if (root.contains(INV_KEY, Tag.TAG_COMPOUND)) {
+            CompoundTag invTag = root.getCompound(INV_KEY);
+            deserializeNBT(invTag);
+            LittleMaidMoreAction.LOGGER.info("[AssemblyInv] loadFromNBT items={}", invTag.getList("Items", Tag.TAG_COMPOUND).size());
+        }
+        setSize(TOTAL_SLOTS);
+        ListTag lt = root.getList(LOCKS_KEY, Tag.TAG_COMPOUND);
+        for (int i = 0; i < MACHINE_SLOTS; i++)
+            itemLocks[i] = i < lt.size() ? ItemStack.of(lt.getCompound(i)) : ItemStack.EMPTY;
+        byte[] bl = root.getByteArray(BLOCKED_KEY);
+        for (int i = 0; i < MACHINE_SLOTS; i++) slotBlocked[i] = i < bl.length && bl[i] != 0;
+        if (root.contains(MAT_LOCK_KEY, Tag.TAG_COMPOUND))
+            materialLock = ItemStack.of(root.getCompound(MAT_LOCK_KEY));
+    }
+
+    public void saveToNBT() {
+        if (!serverSide) return;
+        CompoundTag root = maid.getPersistentData().getCompound(NBT_KEY);
+        root.put(INV_KEY, serializeNBT());
+        ListTag lt = new ListTag(); for (ItemStack l : itemLocks) lt.add(l.save(new CompoundTag()));
+        root.put(LOCKS_KEY, lt);
+        byte[] bl = new byte[MACHINE_SLOTS]; for (int i = 0; i < MACHINE_SLOTS; i++) bl[i] = slotBlocked[i] ? (byte)1 : 0;
+        root.putByteArray(BLOCKED_KEY, bl);
+        if (isMaterialLocked()) root.put(MAT_LOCK_KEY, materialLock.save(new CompoundTag()));
+        else root.remove(MAT_LOCK_KEY);
+        maid.getPersistentData().put(NBT_KEY, root);
+        LittleMaidMoreAction.LOGGER.info("[AssemblyInv] saved slots: 0={} 8={} 10={}",
+            getStackInSlot(0).isEmpty() ? "-" : getStackInSlot(0).getDisplayName().getString(),
+            getStackInSlot(8).isEmpty() ? "-" : getStackInSlot(8).getDisplayName().getString(),
+            getStackInSlot(10).isEmpty() ? "-" : getStackInSlot(10).getDisplayName().getString());
+    }
+
+    // ── Convenience ──
+
+    public int filledMachineSlots() { int c = 0; for (int i = 0; i < MACHINE_SLOTS; i++) if (!getStackInSlot(i).isEmpty()) c++; return c; }
+    public boolean hasAnyMachine() { return filledMachineSlots() > 0; }
+    public MaidAssemblyService.MachineKind getMachineKind(int slot) { return MaidAssemblyService.MachineKind.fromStack(getStackInSlot(slot)); }
+
+    public ItemStack tryInsertOutput(ItemStack stack) {
+        if (stack.isEmpty()) return ItemStack.EMPTY;
+        for (int slot : new int[]{OUTPUT1_SLOT, OUTPUT2_SLOT}) {
+            ItemStack ex = getStackInSlot(slot);
+            if (ex.isEmpty()) { setStackInSlot(slot, stack.copy()); return ItemStack.EMPTY; }
+            if (ItemStack.isSameItemSameTags(ex, stack) && ex.getCount() + stack.getCount() <= ex.getMaxStackSize()) {
+                ex.grow(stack.getCount()); setStackInSlot(slot, ex); return ItemStack.EMPTY;
+            }
+        }
+        return stack;
+    }
+}

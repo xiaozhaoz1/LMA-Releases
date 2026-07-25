@@ -2,12 +2,17 @@ package littlemaidmoreaction.littlemaidmoreaction.task.pipeline;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.VanillaInputRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaTasks;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.recipe.RecipeChain;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.*;
@@ -56,6 +61,16 @@ public final class CraftChainPipeline implements TaskPipeline {
         if (a != null) result.putAll(a);
         if (b != null) b.forEach((k, v) -> result.merge(k, v, Integer::sum));
         return result;
+    }
+
+    public static IExecutor executor() {
+        return new IExecutor() {
+            @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                return VanillaTasks.craft(w, m, p, d.getString(TaskKeys.TASK_TARGET))
+                    ? TaskResult.SUCCESS : TaskResult.FAILED;
+            }
+            @Override public void onStop(EntityMaid maid) {}
+        };
     }
 
     private static Map<Item, Integer> extractRequired(RecipeChain chain) {

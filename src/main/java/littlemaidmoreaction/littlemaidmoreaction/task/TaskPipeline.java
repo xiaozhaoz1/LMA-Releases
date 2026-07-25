@@ -43,6 +43,11 @@ public interface TaskPipeline {
     /** v45: 失败/超时后重试策略。默认不重试。 */
     default RetryPolicy retryPolicy() { return RetryPolicy.NEVER; }
 
+    /** v53: 超时回调 — 默认气泡 "⏰ {task} 超时"。isLongRunning 管线可覆写。 */
+    default void onTimeout(EntityMaid maid) {
+        maid.getChatBubbleManager().addTextChatBubble("⏰ " + taskType() + " 超时");
+    }
+
     /**
      * v52: 目标方块判断 — 供 Brain shouldMoveTo 使用。
      * 返回 false 表示无目标方块（原地执行，如 altar_craft/env_sense）。
@@ -50,8 +55,26 @@ public interface TaskPipeline {
      */
     default boolean isTargetBlock(ServerLevel world, BlockPos pos, BlockState state) { return false; }
 
+    /** v53: 持续 tick — 仅 isLongRunning() 子类覆写。默认 Brain (~100tick) 驱动。 */
+    default void tick(ServerLevel world, EntityMaid maid) {}
+
+    /** v53: 需要每游戏 tick (20/s) — 仅持续发电/注入的管线覆写。默认走 Brain tick。 */
+    default boolean needsGameTick() { return false; }
+
     /** 任务子步骤 */
     record TaskStep(String id, String label, StepType type, List<String> dependsOn) {}
 
     enum StepType { COLLECT, CRAFT, INTERACT, DELIVER, WAIT }
+
+    // ── 默认行为 (Pipeline 覆写以启用) ──
+
+    /** 工作时自动吃食物 (好感高吃得少). 默认不开. */
+    default boolean enableWorkEat() { return false; }
+
+    /** 附近容器收集过滤: null=关闭, Predicate=开启. 默认关闭.
+     *  <p>仅当女仆正在执行此管线任务时被调用. */
+    @javax.annotation.Nullable
+    default java.util.function.Predicate<net.minecraft.world.item.ItemStack> collectFilter(
+            com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid) { return null; }
+
 }

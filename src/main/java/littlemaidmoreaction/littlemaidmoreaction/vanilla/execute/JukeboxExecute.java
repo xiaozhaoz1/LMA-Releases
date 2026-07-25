@@ -52,6 +52,14 @@ public final class JukeboxExecute {
             phaseTick = now;
             LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} init: phase=INSERTING", maid.getId());
         }
+        // v53: anti-stale — 检测异常时间戳，强制重置为 INSERTING
+        if (phaseTick > now || phaseTick == 0) {
+            LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} stale phaseTick={}, resetting to INSERTING", maid.getId(), phaseTick);
+            data.putInt("lma_jukebox_phase", Phase.INSERTING.ordinal());
+            data.putLong("lma_jukebox_tick", now);
+            phase = Phase.INSERTING;
+            phaseTick = now;
+        }
         littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager.heartbeat(maid, now);
 
         switch (phase) {

@@ -10,12 +10,12 @@ import static org.junit.jupiter.api.Assertions.*;
 class RuleDefTest {
 
     @Test
-    @DisplayName("simple() factory sets defaults: enabled, chance=1.0, cooldown=0, priority=0, ALL")
+    @DisplayName("simple() factory: disabled by default, chance=1.0, cooldown=0, priority=0, ALL")
     void simple_factory() {
         var rule = RuleDef.simple(1, "test", "maid_tick",
             List.of(new ConditionDef("is_on_fire")),
             List.of(new ActionStep("play_anim")));
-        assertTrue(rule.enabled());
+        assertFalse(rule.enabled(), "presets default to disabled");
         assertEquals(1.0, rule.chance());
         assertEquals(0, rule.cooldown());
         assertEquals(0, rule.priority());

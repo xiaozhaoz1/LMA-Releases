@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.vanilla;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.compat.TlmVersion;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -81,7 +82,7 @@ public final class MaidAttrRegistry {
         if (e == null) return null;
         // TLM 属性：从 ForgeRegistries 解析
         Attribute resolved = ForgeRegistries.ATTRIBUTES.getValue(
-                ResourceLocation.fromNamespaceAndPath("touhou_little_maid", key));
+                ResourceLocation.fromNamespaceAndPath(TlmVersion.MOD_ID, key));
         ATTR_CACHE.put(key, resolved);
         return resolved;
     }

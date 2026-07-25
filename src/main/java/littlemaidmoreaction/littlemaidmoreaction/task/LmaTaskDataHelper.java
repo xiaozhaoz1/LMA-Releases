@@ -162,7 +162,7 @@ public final class LmaTaskDataHelper {
         data.remove(TaskKeys.JUKEBOX_PHASE);
         data.remove(TaskKeys.JUKEBOX_TICK);
         data.remove(TaskKeys.JUKEBOX_LAST);
-        data.remove("lma_task_input"); // v45 TODO: migrate to TaskKeys.TASK_INPUT
+        data.remove(TaskKeys.TASK_INPUT);
     }
 
     private LmaTaskDataHelper() {}

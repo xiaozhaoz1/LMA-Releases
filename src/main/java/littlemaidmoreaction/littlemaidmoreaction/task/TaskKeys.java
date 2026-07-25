@@ -67,6 +67,9 @@ public final class TaskKeys {
     // ── 任务开关 ──
     public static final String TASK_ENABLED_PREFIX = "lma_task_enabled_";
 
+    // ── 重试计数 (v53) ──
+    public static final String RETRY_COUNT = "lma_retry_count";
+
     // ── 任务类型常量 (v42) ──
     public static final String TASK_CRAFT_CHAIN  = "craft_chain";
     public static final String TASK_FURNACE      = "furnace";

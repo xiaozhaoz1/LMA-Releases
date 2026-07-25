@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.task;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
+import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import net.minecraft.resources.ResourceLocation;
 
 /**
@@ -21,8 +22,9 @@ public final class TaskStateManager {
         LmaTaskDataHelper.setFlowTask(maid, taskType);
         LmaTaskDataHelper.setFlowState(maid, TaskKeys.STATE_IN_PROGRESS);
         LmaTaskDataHelper.setFlowTick(maid, now);
-        // TLM 任务切换 — TaskManager.findTask 返回 IMaidTask
-        TaskManager.findTask(ResourceLocation.fromNamespaceAndPath("lma", taskType))
+        // TLM 任务切换 — 先查 lma:task/<type> (typed), 再查 lma:<type> (fallback)
+        TaskManager.findTask(ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, "task/" + taskType))
+            .or(() -> TaskManager.findTask(ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, taskType)))
             .ifPresent(maid::setTask);
     }
 

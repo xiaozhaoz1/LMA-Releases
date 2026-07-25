@@ -1,11 +1,17 @@
 package littlemaidmoreaction.littlemaidmoreaction.task.pipeline;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.api.SlotLayout;
+import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.VanillaInputRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaTasks;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
@@ -45,6 +51,36 @@ public final class FurnacePipeline implements TaskPipeline {
         // Fallback: target本身在背包中
         if (allItems.getOrDefault(targetItem, 0) > 0) return PipelineResult.ok("");
         return PipelineResult.failed("no smeltable material for " + target);
+    }
+
+    public static IExecutor executor() {
+        return new IExecutor() {
+            @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                String ingredientKey = resolveSmeltIngredient(w, m, d);
+                if (ingredientKey.isEmpty()) return TaskResult.FAILED;
+                d.putString(TaskKeys.TASK_INPUT, ingredientKey);
+                VanillaTasks.furnace(w, m, p, ingredientKey, SlotLayout.FURNACE);
+                return TaskResult.SUCCESS;
+            }
+            @Override public void onStop(EntityMaid maid) {}
+        };
+    }
+
+    private static String resolveSmeltIngredient(ServerLevel level, EntityMaid maid, CompoundTag d) {
+        String target = d.getString(TaskKeys.TASK_TARGET);
+        if (target.isEmpty()) return "";
+        Item targetItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(target));
+        if (targetItem == null) return "";
+        Map<Item, Integer> allItems = VanillaInputRegistry.readAllItems(maid);
+        for (SmeltingRecipe recipe : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
+            if (!recipe.getResultItem(level.registryAccess()).is(targetItem)) continue;
+            for (ItemStack ing : recipe.getIngredients().get(0).getItems()) {
+                if (allItems.getOrDefault(ing.getItem(), 0) > 0)
+                    return ForgeRegistries.ITEMS.getKey(ing.getItem()).toString();
+            }
+        }
+        if (allItems.getOrDefault(targetItem, 0) > 0) return target;
+        return "";
     }
 
 }

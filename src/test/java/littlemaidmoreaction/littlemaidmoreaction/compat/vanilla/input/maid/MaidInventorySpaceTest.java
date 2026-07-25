@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.maid;
+package littlemaidmoreaction.littlemaidmoreaction.vanilla.input.maid;
 
 import net.minecraftforge.items.IItemHandler;
 import net.minecraft.world.item.ItemStack;

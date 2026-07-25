@@ -36,6 +36,7 @@ public final class PowerPipeline extends TaskStateMachine<PowerPipeline.State> {
     @Override protected Class<State> stateClass() { return State.class; }
     @Override protected State initialState() { return State.SEARCHING; }
     @Override public String taskType() { return "power"; }
+    @Override public boolean needsGameTick() { return true; }
 
     @Override
     protected Map<State, Set<State>> transitions() {

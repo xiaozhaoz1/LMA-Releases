@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.adapter;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidMoveToBlockTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
@@ -15,7 +16,15 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 
 /**
- * v52: Brain 导航 — shouldMoveTo 委托 Pipeline.isTargetBlock()。
+ * v53: Brain 导航 + 循环执行。
+ *
+ * <p>每 ~100tick 执行一轮:
+ * <ul>
+ *   <li>SUCCESS → counter++ → 达到 max_count? → 切 idle : 继续</li>
+ *   <li>FAILED  → 气泡 → 继续</li>
+ *   <li>CONTINUE → heartbeat → 继续 (Create)</li>
+ * </ul>
+ * <p>FLOW_TASK 为空 + TLM task 是 LMA → 自动 GUI_INIT 恢复。
  */
 public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
 
@@ -43,26 +52,24 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
                 return true;
             }
             String flowState = maid.getPersistentData().getString(TaskKeys.FLOW_STATE);
-            if (TaskKeys.STATE_COMPLETED.equals(flowState) || TaskKeys.STATE_FAILED.equals(flowState)) {
-                return false;
-            }
-            var curTask = maid.getTask();
-            String curType = LmaFlowTask.isLmaTask(curTask)
-                    ? LmaTaskTypeRegistry.extractTaskType(curTask.getUid().getPath()) : null;
-            if (curType == null || TaskRegistry.get(curType) == null) {
+            if (!flowState.isEmpty() && !TaskKeys.STATE_IN_PROGRESS.equals(flowState)) {
                 return false;
             }
         }
 
+        // v53: FLOW_TASK 为空 + TLM task 是 LMA + 非 CANCELLED → 自动启动
         var maidTask = maid.getTask();
-        if (!LmaFlowTask.isLmaTask(maidTask)) return false;
-        String taskType = LmaTaskTypeRegistry.extractTaskType(maidTask.getUid().getPath());
-        if (taskType == null) return false;
-        if (!TaskToggle.isEnabled(taskType)) return false;
-
-        maid.getPersistentData().putString(TaskKeys.GUI_INIT, taskType);
-        LittleMaidMoreAction.LOGGER.debug("[V52] GUI-init task '{}'", taskType);
-        return true;
+        if (LmaFlowTask.isLmaTask(maidTask)) {
+            if (TaskKeys.STATE_CANCELLED.equals(maid.getPersistentData().getString(TaskKeys.FLOW_STATE))) {
+                return false;
+            }
+            String taskType = LmaTaskTypeRegistry.extractTaskType(maidTask.getUid().getPath());
+            if (taskType != null && TaskRegistry.get(taskType) != null && TaskToggle.isEnabled(taskType)) {
+                maid.getPersistentData().putString(TaskKeys.GUI_INIT, taskType);
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -78,13 +85,14 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
         if (taskType.isEmpty()) return;
 
         var handler = TaskRegistry.get(taskType);
-        if (handler == null) { failTask(maid, "未知任务类型: " + taskType); return; }
+        if (handler == null) return;
 
         searchForDestination(world, maid);
 
         if (!maid.getBrain().hasMemoryValue(InitEntities.TARGET_POS.get())) {
-            // v52: 无目标=原地执行, 有目标但没找到=也原地执行 (idle scan)
-            doExecute(world, maid, maid.blockPosition(), handler);
+            if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(TaskKeys.FLOW_STATE))) {
+                doExecute(world, maid, maid.blockPosition(), handler);
+            }
         }
     }
 
@@ -118,20 +126,28 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
         }
         TaskResult result = handler.executor().execute(world, maid, pos, maid.getPersistentData());
         switch (result) {
-            case SUCCESS -> completeTask(maid);
-            case FAILED -> failTask(maid, handler.taskType() + " 执行失败");
-            case CONTINUE -> { /* 任务继续 */ }
+            case SUCCESS -> {
+                var data = maid.getPersistentData();
+                int counter = data.getInt(TaskKeys.FLOW_COUNTER) + 1;
+                data.putInt(TaskKeys.FLOW_COUNTER, counter);
+                int max = data.getInt(TaskKeys.FLOW_MAX_COUNT);
+                if (max > 0 && counter >= max) {
+                    maid.getChatBubbleManager().addTextChatBubble(
+                        "✅ " + handler.taskType() + " 完成 (" + counter + "/" + max + ")");
+                    maid.setTask(TaskManager.getIdleTask());
+                    LmaTaskDataHelper.setFlowState(maid, TaskKeys.STATE_COMPLETED);
+                    return;
+                }
+                String progress = max > 0 ? " (" + counter + "/" + max + ")" : "";
+                maid.getChatBubbleManager().addTextChatBubble(
+                    "✔ " + handler.taskType() + " 完成" + progress);
+            }
+            case FAILED -> {
+                maid.getChatBubbleManager().addTextChatBubble(
+                    "✘ " + handler.taskType() + " 失败");
+                LittleMaidMoreAction.LOGGER.debug("[LMA] task '{}' execute failed", handler.taskType());
+            }
+            case CONTINUE -> { /* 持续执行 */ }
         }
-    }
-
-    static void completeTask(EntityMaid maid) {
-        LmaTaskDataHelper.setFlowState(maid, TaskKeys.STATE_COMPLETED);
-    }
-
-    static void failTask(EntityMaid maid, String reason) {
-        maid.getPersistentData().putString(TaskKeys.FAIL_REASON, reason);
-        LmaTaskDataHelper.setFlowState(maid, TaskKeys.STATE_FAILED);
-        LittleMaidMoreAction.LOGGER.warn("[V52] task '{}' failed: {}",
-            LmaTaskDataHelper.getFlowTask(maid), reason);
     }
 }

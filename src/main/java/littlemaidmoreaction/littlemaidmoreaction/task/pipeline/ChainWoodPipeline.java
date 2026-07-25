@@ -1,11 +1,15 @@
 package littlemaidmoreaction.littlemaidmoreaction.task.pipeline;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
+import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.item.ToolStateReader;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.ToolJudge;
@@ -37,6 +41,16 @@ public final class ChainWoodPipeline implements TaskPipeline {
         return PipelineResult.ok("开始连锁砍树");
     }
 
+    public static IExecutor executor() {
+        return new IExecutor() {
+            @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                return ChainHarvestExecute.execute(w, m, p, d, ChainHarvestExecute.Mode.WOOD);
+            }
+            @Override public void onStop(EntityMaid maid) {
+                ChainHarvestExecute.onMaidUnload(maid.getId());
+            }
+        };
+    }
 
     @Override
     public List<TaskStep> steps() {

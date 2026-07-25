@@ -78,12 +78,13 @@ public final class TickScheduler implements ITickScheduler {
             // v11: 条件等待模式 — 检查 wait_until 条件是否满足
             String waitUntilCond = data.getString("lma_wait_until_cond");
             if (!waitUntilCond.isEmpty()) {
+                long now = maid.level().getGameTime();
                 long start = data.getLong("lma_wait_until_start");
                 int timeout = data.getInt("lma_wait_until_timeout");
-                long elapsed = maid.level().getGameTime() - start;
+                long elapsed = now - start;
 
-                // 超时检测
-                if (timeout > 0 && elapsed > timeout) {
+                // 超时检测 + 防残留 (v53: anti-stale timestamp)
+                if (timeout > 0 && (elapsed > timeout || start > now || start == 0)) {
                     data.remove("lma_wait_until_cond");
                     data.remove("lma_wait_until_val");
                     data.remove("lma_wait_until_timeout");

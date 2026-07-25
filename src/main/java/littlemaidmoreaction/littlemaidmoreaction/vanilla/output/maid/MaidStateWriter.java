@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.vanilla.output.maid;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
+import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IWriter;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.MaidAttrRegistry;
 import com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager;
@@ -210,7 +211,7 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
         if (!nbtStr.isEmpty()) try {
             var t = net.minecraft.nbt.TagParser.parseTag(nbtStr);
             if (t != null) stack.setTag(t);
-        } catch (Exception ignored) {}
+        } catch (Exception e) { LittleMaidMoreAction.LOGGER.warn("giveItem: failed to parse NBT", e); }
         if ("owner".equals(target)) {
             var o = m.getOwner();
             if (o instanceof Player p && !p.addItem(stack)) p.drop(stack, false);

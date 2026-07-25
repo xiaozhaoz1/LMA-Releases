@@ -35,6 +35,7 @@ import java.util.List;
 public abstract class TimerBasedCreatePipeline implements TaskPipeline {
 
     @Override public boolean isLongRunning() { return true; }
+    @Override public boolean needsGameTick() { return true; } // 倒计时 tick— 需要每帧递减
     @Override public void onCleanup(EntityMaid maid) { cleanup(maid); }
     @Override public void interrupt(EntityMaid maid) { NavigationMemory.clearAllNav(maid); }
 

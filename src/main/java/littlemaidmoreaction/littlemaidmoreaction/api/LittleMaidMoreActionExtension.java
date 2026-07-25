@@ -67,6 +67,11 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
     @Override
     public void addMaidTask(TaskManager manager) {
         LmaTaskTypeRegistry.scanAndRegister(manager);
+        // v56: 便携装配 (Create门控)
+        if (net.minecraftforge.fml.ModList.get().isLoaded("create")) {
+            manager.add(littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyTask.get());
+            LittleMaidMoreAction.LOGGER.info("[LMA] MaidAssemblyTask 已注册");
+        }
     }
 
     /** ★ v9.3 注册耕种种子白名单处理器 — 拦截 farmland 上的 canPlant 调用 */
@@ -133,7 +138,8 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
                 );
             }
         });
-        LittleMaidMoreAction.LOGGER.info("[LMA] ExtraMaidBrain 已注册 (NAV_TARGET, NAV_START_TICK)");
+        manager.addExtraMaidBrain(littlemaidmoreaction.littlemaidmoreaction.task.DefaultBehaviorBrain.INSTANCE);
+        LittleMaidMoreAction.LOGGER.info("[LMA] ExtraMaidBrain 已注册 (NAV_TARGET, NAV_START_TICK + default behaviors)");
     }
 
     // ── 任务数据注册 ──

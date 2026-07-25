@@ -47,13 +47,18 @@ public final class TaskDispatcher {
         if (target != null && !target.isEmpty()) {
             maid.getPersistentData().putString(TaskKeys.TASK_TARGET, target);
         }
+        // v53: 新任务启动时重置重试计数
+        maid.getPersistentData().remove(TaskKeys.RETRY_COUNT);
         LittleMaidMoreAction.LOGGER.info("[LMA/Task] submit maid={} task={} target={} count={}",
             maid.getStringUUID(), taskType, target, count);
         return true;
     }
 
-    /** 取消任务 — 通知管线中断 + onCleanup + 设取消标记 */
+    /** 取消任务 — 通知管线中断 + onCleanup + 设取消标记 + 清理 */
     public static void cancel(EntityMaid maid) {
+        LittleMaidMoreAction.LOGGER.warn("[LMA/Task] cancel CALLED from: {}",
+            java.util.Arrays.stream(Thread.currentThread().getStackTrace()).skip(1).limit(5)
+                .map(StackTraceElement::toString).reduce((a,b) -> a + "\n  <- " + b).orElse("?"));
         // v44: 完整取消流程 — interrupt → onStop → onCleanup
         String task = LmaTaskDataHelper.getFlowTask(maid);
         if (!task.isEmpty()) {
@@ -65,15 +70,17 @@ public final class TaskDispatcher {
             }
         }
         LmaTaskDataHelper.setFlowState(maid, TaskKeys.STATE_CANCELLED);
+        TaskStateManager.clearAll(maid); // v53: cancel 后清除残留 NBT (同 complete/fail)
         LittleMaidMoreAction.LOGGER.info("[LMA/Task] cancel maid={} task={}",
             maid.getStringUUID(), task);
     }
 
-    /** 超时 — 由 TaskEngine 调用。编排 interrupt→onStop→onCleanup→retry */
+    /** 超时 — 由 TaskEngine 调用。编排 onTimeout→interrupt→onStop→onCleanup→retry */
     public static void timeout(EntityMaid maid) {
         String task = LmaTaskDataHelper.getFlowTask(maid);
         var h = getHandler(task);
         if (h != null) {
+            h.pipeline().onTimeout(maid); // v53: 管线自定义超时处理 (默认 no-op)
             h.pipeline().interrupt(maid);
             h.executor().onStop(maid);
             h.pipeline().onCleanup(maid);
@@ -82,11 +89,15 @@ public final class TaskDispatcher {
         TaskStateManager.clearAll(maid);
         LittleMaidMoreAction.LOGGER.warn("[LMA/Task] timeout maid={} task={}",
             maid.getStringUUID(), task);
-        // v45: 重试策略
-        if (h != null && h.pipeline().retryPolicy().shouldRetry(0)) {
-            LittleMaidMoreAction.LOGGER.info("[LMA/Task] retry submit maid={} task={}",
-                maid.getStringUUID(), task);
-            submit(maid, task, null, 0);
+        // v53: 重试策略 — NBT 计数器防止 fixed(N) 无限重试
+        if (h != null) {
+            int retryCount = maid.getPersistentData().getInt(TaskKeys.RETRY_COUNT);
+            if (h.pipeline().retryPolicy().shouldRetry(retryCount)) {
+                maid.getPersistentData().putInt(TaskKeys.RETRY_COUNT, retryCount + 1);
+                LittleMaidMoreAction.LOGGER.info("[LMA/Task] retry #{}/{} maid={} task={}",
+                    retryCount + 1, h.pipeline().retryPolicy().maxRetries(), maid.getStringUUID(), task);
+                submit(maid, task, null, 0);
+            }
         }
     }
 
@@ -119,10 +130,15 @@ public final class TaskDispatcher {
         TaskStateManager.clearAll(maid);
         LittleMaidMoreAction.LOGGER.warn("[LMA/Task] fail maid={} task={} reason={}",
             maid.getStringUUID(), task, reason);
-        if (h != null && h.pipeline().retryPolicy().shouldRetry(0)) {
-            LittleMaidMoreAction.LOGGER.info("[LMA/Task] retry submit maid={} task={}",
-                maid.getStringUUID(), task);
-            submit(maid, task, null, 0);
+        // v53: 重试策略 — NBT 计数器防止 fixed(N) 无限重试
+        if (h != null) {
+            int retryCount = maid.getPersistentData().getInt(TaskKeys.RETRY_COUNT);
+            if (h.pipeline().retryPolicy().shouldRetry(retryCount)) {
+                maid.getPersistentData().putInt(TaskKeys.RETRY_COUNT, retryCount + 1);
+                LittleMaidMoreAction.LOGGER.info("[LMA/Task] retry #{}/{} maid={} task={}",
+                    retryCount + 1, h.pipeline().retryPolicy().maxRetries(), maid.getStringUUID(), task);
+                submit(maid, task, null, 0);
+            }
         }
     }
 

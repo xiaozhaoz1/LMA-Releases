@@ -63,7 +63,8 @@ public final class LmaTaskTypeRegistry {
         Map.entry("transfer",  Items.PISTON),
         Map.entry("bed",       Items.RED_BED),
         Map.entry("sleep",     Items.RED_BED),
-        Map.entry("rest",      Items.RED_BED)
+        Map.entry("rest",      Items.RED_BED),
+        Map.entry("assembly",  Items.CRAFTING_TABLE)
     );
 
     private static final ItemStack DEFAULT_ICON = Items.CRAFTING_TABLE.getDefaultInstance();
@@ -72,6 +73,9 @@ public final class LmaTaskTypeRegistry {
     private static Set<String> getKnownTaskTypes() {
         return littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry.taskTypes();
     }
+
+    /** 使用自定义 IMaidTask 的任务类型 — scanAndRegister 跳过 */
+    private static final Set<String> CUSTOM_TASK_TYPES = Set.of("maid_assembly");
 
     /** 已知简单任务类型 (启动时初始化 + 可运行时注册) */
     static {
@@ -88,13 +92,9 @@ public final class LmaTaskTypeRegistry {
      * 调用时机: {@code LittleMaidMoreActionExtension.addMaidTask()}
      */
     public static void scanAndRegister(TaskManager manager) {
-        // ★ v16: TLM-native 任务全部删除，改用 LmaTypedFlowTask (Pipeline 决策)
-        //    old TLM-native: jukebox, bell_ring, furnace, craft_chain
-        // ★ v14: brewing 已完全删除
-        // altar_craft 保留 LmaTypedFlowTask (委派规则引擎)
-
         for (String known : getKnownTaskTypes()) {
             if ("brewing".equals(known)) continue;
+            if (CUSTOM_TASK_TYPES.contains(known)) continue; // 使用自定义 IMaidTask
             // v52: TaskRegistry.showInBar 控制 TLM 任务栏可见性
             if (!littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry.isShowInBar(known)) continue;
             registerIfNew(known);
@@ -127,6 +127,7 @@ public final class LmaTaskTypeRegistry {
 
     private static void registerIfNew(String taskType) {
         if (taskType == null || taskType.isEmpty() || TYPED.containsKey(taskType)) return;
+        if (CUSTOM_TASK_TYPES.contains(taskType)) return; // 双防护
         LmaTypedFlowTask task = new LmaTypedFlowTask(taskType);
         TYPED.put(taskType, task);
         LittleMaidMoreAction.LOGGER.debug("[LMA] Registered typed task: {}", task.getUid());
@@ -158,7 +159,6 @@ public final class LmaTaskTypeRegistry {
         if (idx >= 0) {
             return uidPath.substring(idx + prefix.length());
         }
-        // 兼容旧格式 lma:flow_task
         if (uidPath.equals("flow_task")) return "flow_task";
         return null;
     }
@@ -168,7 +168,6 @@ public final class LmaTaskTypeRegistry {
     /** 根据 task_type 获取图标 */
     public static ItemStack getIcon(String taskType) {
         if (taskType == null || taskType.isEmpty()) return DEFAULT_ICON;
-        // v36: 精确映射优先 — 关键词 contains 对 collect_wood 会误中 "collect"→镐
         switch (taskType) {
             case "collect_wood": return Items.IRON_AXE.getDefaultInstance();
             case "collect_ore": return Items.IRON_PICKAXE.getDefaultInstance();
@@ -190,16 +189,12 @@ public final class LmaTaskTypeRegistry {
 
     // ── ★ v12.7 P1: 任务关键词统一映射 (单一真相源) ──
 
-    /** 任务关键词 → task_type 映射 (用于 AI prompt 注入) */
     public static final Map<String, String> TASK_KEYWORD_MAP = Map.ofEntries(
         Map.entry("craft", "craft_chain"),
         Map.entry("make", "craft_chain"),
         Map.entry("smelt", "furnace"),
         Map.entry("cook", "furnace"),
         Map.entry("烧", "furnace"),
-        Map.entry("brew", "brewing"),
-        Map.entry("potion", "brewing"),
-        Map.entry("炼药", "brewing"),
         Map.entry("bell", "bell_ring"),
         Map.entry("ring", "bell_ring"),
         Map.entry("敲钟", "bell_ring"),
@@ -211,7 +206,7 @@ public final class LmaTaskTypeRegistry {
         Map.entry("种地", "farm")
     );
 
-    /** 生成任务关键词 AI prompt 文本 (所有 AI 工具/上下文共用) */
+    /** 生成任务关键词 AI prompt 文本 */
     public static String buildTaskKeywordPrompt() {
         StringBuilder sb = new StringBuilder();
         sb.append("ALL crafting table work = craft_chain with item_id in data. ");

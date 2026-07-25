@@ -24,6 +24,7 @@ import java.util.List;
  */
 public final class RunningBeltPipeline implements TaskPipeline {
     @Override public boolean isLongRunning() { return true; }
+    @Override public boolean needsGameTick() { return true; } // v53: 需要每 tick 注入动力的管线
     @Override public void onCleanup(EntityMaid maid) { cleanup(maid); }
     @Override public void interrupt(EntityMaid maid) { maid.setSprinting(false); }
 
@@ -42,7 +43,7 @@ public final class RunningBeltPipeline implements TaskPipeline {
 
     @Override public PipelineResult validate(ServerLevel l, EntityMaid m, PipelineContext c) { return PipelineResult.ok(""); }
 
-    public static IExecutor executor() {
+    public IExecutor executor() {
         return new IExecutor() {
             @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) { tick(w, m); return TaskResult.CONTINUE; }
             @Override public void onStop(EntityMaid maid) { cleanup(maid); }
@@ -51,7 +52,8 @@ public final class RunningBeltPipeline implements TaskPipeline {
 
     // ── Tick ──
 
-    public static void tick(ServerLevel world, EntityMaid maid) {
+    @Override
+    public void tick(ServerLevel world, EntityMaid maid) {
         var d = maid.getPersistentData();
         // v44: 取消检测
         if (TaskKeys.STATE_CANCELLED.equals(d.getString(TaskKeys.FLOW_STATE))) { cleanup(maid); return; }
@@ -124,7 +126,7 @@ public final class RunningBeltPipeline implements TaskPipeline {
 
     // ── 清理 ──
 
-    public static void cleanup(EntityMaid maid) {
+    public void cleanup(EntityMaid maid) {
         maid.setSprinting(false);
         if (!(maid.level() instanceof ServerLevel world)) return;
         revertAndClear(world, maid, maid.getPersistentData());

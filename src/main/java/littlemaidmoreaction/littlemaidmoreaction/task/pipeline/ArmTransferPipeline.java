@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.create.task;
+package littlemaidmoreaction.littlemaidmoreaction.task.pipeline;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.navigation.NavigationMemory;
@@ -6,6 +6,7 @@ import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.ArmTransferService;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskStateMachine;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -21,7 +22,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * 女仆搬运管线 (v46 迁移至 TaskStateMachine).
+ * 女仆搬运管线 (v46 迁移至 TaskStateMachine, v53 移出 compat/create).
  *
  * <p>四状态循环:
  * <pre>
@@ -35,8 +36,8 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
 
     enum State { TO_TAKE, TAKING, TO_DEPOSIT, DEPOSITING }
 
-    static final String KEY_TAKE = "lma_arm_take";
-    static final String KEY_DEPOSIT = "lma_arm_deposit";
+    public static final String KEY_TAKE = "lma_arm_take";
+    public static final String KEY_DEPOSIT = "lma_arm_deposit";
     static final String KEY_ITEM = "lma_arm_item";
 
     // ── 引擎必需 ──

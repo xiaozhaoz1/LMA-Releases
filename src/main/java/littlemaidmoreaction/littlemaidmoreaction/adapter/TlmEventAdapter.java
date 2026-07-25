@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.*;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskEngine;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 import littlemaidmoreaction.littlemaidmoreaction.core.engine.RuleEngine;
@@ -228,20 +229,29 @@ public final class TlmEventAdapter {
         data.remove(TaskKeys.FLOW_TICK);
         data.remove(TaskKeys.FLOW_STEP);
         data.remove(TaskKeys.FLOW_TIMEOUT);
+        data.remove(TaskKeys.TLM_SWITCH);   // v56: 防残留cancel
+        data.remove(TaskKeys.GUI_INIT);     // v56: 直接submit不用GUI_INIT
         // 保留: FLOW_TASK (任务类型), TASK_TARGET (目标物品), lma_arm_* (配置)
         // 保留: SAVED_HOME/SAVED_PICKUP (女仆状态)
 
-        // 恢复 TLM 任务 → Brain 重新调度
+        // 恢复 TLM 任务 — 直接设LMA任务 (v56: 跳过idle→GUI_INIT→cancel循环)
         LmaFlowTask.restorePreviousTask(maid);
-        var defaultTask = com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager.getIdleTask();
-        maid.setTask(defaultTask);
+        var tlmTask = com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager
+            .findTask(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, "task/" + task))
+            .or(() -> com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager
+                .findTask(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, task)));
+        if (tlmTask.isPresent()) {
+            maid.setTask(tlmTask.get());
+        } else {
+            maid.setTask(com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager.getIdleTask());
+        }
 
-        // v36: 连锁采集队列清理
+        // v36
         littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
             .ChainHarvestExecute.clearChainData(data);
 
-        // 写 GUI_INIT — TaskEngine 下次 tick 自动重新提交任务
-        data.putString(TaskKeys.GUI_INIT, task);
+        // 直接提交, 不等GUI_INIT
+        TaskDispatcher.submit(maid, task, null, 0);
     }
 
     private TlmEventAdapter() {}

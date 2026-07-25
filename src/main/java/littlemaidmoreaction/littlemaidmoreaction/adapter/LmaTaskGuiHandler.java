@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.MaidTaskEnableEvent;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 import net.minecraft.nbt.CompoundTag;
 
 /**
@@ -61,10 +62,10 @@ public final class LmaTaskGuiHandler {
     static boolean hasTaskData(EntityMaid maid) {
         CompoundTag data = maid.getPersistentData();
         // 1. 有活跃任务
-        String task = data.getString("lma_flow_task");
+        String task = data.getString(TaskKeys.FLOW_TASK);
         if (!task.isEmpty() && !"none".equals(task)) return true;
         // 2. 有 JSON 数据 (上次 AI 设定)
-        String flowData = data.getString("lma_flow_data");
+        String flowData = data.getString(TaskKeys.FLOW_DATA);
         return flowData != null && !flowData.isEmpty() && !"{}".equals(flowData);
     }
 }

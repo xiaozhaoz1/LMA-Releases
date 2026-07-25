@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.slashblade.output;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import mods.flammpfeil.slashblade.item.ItemSlashBlade;
 
 /** SlashBlade 拔刀剑输出原语 */
@@ -25,7 +26,7 @@ public final class SlashBladeWriter {
         if (!isSlashBlade(maid)) return;
         var rl = net.minecraft.resources.ResourceLocation.tryParse(combo);
         if (rl != null) maid.getMainHandItem().getCapability(ItemSlashBlade.BLADESTATE)
-            .ifPresent(s -> { try { s.updateComboSeq(maid, rl); } catch (Exception ignored) {} });
+            .ifPresent(s -> { try { s.updateComboSeq(maid, rl); } catch (Exception e) { LittleMaidMoreAction.LOGGER.warn("setCombo: failed to update combo sequence", e); } });
     }
     public static void repairKatana(EntityMaid maid, int exp) {
         var stack = maid.getMainHandItem(); if (stack.isEmpty() || exp <= 0) return;

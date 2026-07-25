@@ -5,6 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.mojang.datafixers.util.Pair;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
@@ -161,6 +162,6 @@ public final class LmaFlowTask implements IMaidTask {
      * 读取当前 LMA 流程任务类型（从 PersistentData）。
      */
     public static String getCurrentFlowTaskType(EntityMaid maid) {
-        return maid.getPersistentData().getString("lma_flow_task");
+        return maid.getPersistentData().getString(TaskKeys.FLOW_TASK);
     }
 }

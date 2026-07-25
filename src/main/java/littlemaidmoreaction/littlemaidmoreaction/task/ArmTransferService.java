@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.create.task;
+package littlemaidmoreaction.littlemaidmoreaction.task;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.core.BlockPos;
@@ -10,7 +10,7 @@ import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 /**
- * 机械臂搬运服务 — 原子化 input→compute→output 三步模式。
+ * 物品搬运服务 (v53: 移出 compat/create) — 原子化 input→compute→output 三步模式。
  */
 public final class ArmTransferService {
     private ArmTransferService() {}

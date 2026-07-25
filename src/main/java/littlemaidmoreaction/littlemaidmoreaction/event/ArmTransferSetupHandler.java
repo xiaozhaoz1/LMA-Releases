@@ -1,36 +1,29 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.create.impl.event;
+package littlemaidmoreaction.littlemaidmoreaction.event;
 
 import com.github.tartaricacid.touhoulittlemaid.api.event.InteractMaidEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.task.LmaTaskDataHelper;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
+import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.ArmTransferPipeline;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.Items;
 import net.minecraftforge.common.capabilities.ForgeCapabilities;
-import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * 女仆搬运事件 — 木棍标记容器 + 木棍右键女仆启动。
- *
- * <p>v44: tick/cleanup 改为 TaskRegistry.CREATE_TICK 注册表驱动，
- * 新增 Create 任务无需修改此文件。</p>
+ * 木棍标记容器 + 右键女仆启动 arm_transfer (v53: 移出 compat/create)。
  */
 @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID)
-public final class CreateEventListener {
+public final class ArmTransferSetupHandler {
 
-    private CreateEventListener() {}
+    private ArmTransferSetupHandler() {}
 
     // ── ① 木棍右键容器: 标记取出点/放入点 ──
 
@@ -91,51 +84,16 @@ public final class CreateEventListener {
         if (maid.getAvailableInv(false).getSlots() <= 0) { player.sendSystemMessage(comp("§c女仆没有背包")); return; }
 
         var data = maid.getPersistentData();
-        data.put("lma_arm_take", NbtUtils.writeBlockPos(takePos));
-        data.put("lma_arm_deposit", NbtUtils.writeBlockPos(depositPos));
-        data.putString("lma_arm_state", "TAKE");
+        data.put(ArmTransferPipeline.KEY_TAKE, NbtUtils.writeBlockPos(takePos));
+        data.put(ArmTransferPipeline.KEY_DEPOSIT, NbtUtils.writeBlockPos(depositPos));
 
-        littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher.submit(maid, "arm_transfer", null, 0);
+        TaskDispatcher.submit(maid, "arm_transfer", null, 0);
 
         tag.remove("take");
         tag.remove("deposit");
 
         event.setCanceled(true);
         player.sendSystemMessage(comp("§a女仆开始搬运: " + takePos.toShortString() + " → " + depositPos.toShortString()));
-    }
-
-    // ── ③ ServerTick: 驱动所有 Create 任务 (v44: 注册表驱动) ──
-
-    @SubscribeEvent
-    public static void onServerTick(TickEvent.ServerTickEvent event) {
-        if (event.phase != TickEvent.Phase.END) return;
-        for (ServerLevel sl : event.getServer().getAllLevels()) {
-            for (var e : sl.getAllEntities()) {
-                if (!(e instanceof EntityMaid maid)) continue;
-                String state = LmaTaskDataHelper.getFlowState(maid);
-                if (!TaskKeys.STATE_IN_PROGRESS.equals(state)) {
-                    if (TaskKeys.STATE_CANCELLED.equals(state)) cleanupMaid(maid);
-                    continue;
-                }
-
-                String task = LmaTaskDataHelper.getFlowTask(maid);
-                if (task.isEmpty()) continue;
-
-                TaskStateManager.heartbeat(maid, sl.getGameTime());
-                // v44: 注册表驱动 — 无需硬编码 switch
-                var handler = TaskRegistry.CREATE_TICK.get(task);
-                if (handler != null) handler.accept(sl, maid);
-            }
-        }
-    }
-
-    /** v44: 统一清理 — 通过 TaskRegistry 查 pipeline.onCleanup (避免 double-cleanup) */
-    private static void cleanupMaid(EntityMaid maid) {
-        String task = LmaTaskDataHelper.getFlowTask(maid);
-        if (task.isEmpty()) return;
-        var h = TaskRegistry.get(task);
-        if (h != null) h.pipeline().onCleanup(maid);
-        TaskStateManager.clearAll(maid);
     }
 
     // ── 工具 ──

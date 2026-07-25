@@ -30,7 +30,7 @@ import java.util.Set;
  * TaskDispatcher.fail(maid, reason); // 任务失败
  * }</pre>
  * 调用后 {@code TaskDispatcher} 设置 {@code STATE_COMPLETED/STATE_FAILED} 并 {@code clearAll}，
- * {@code CreateEventListener} 检测到非 {@code in_progress} 后自然停止 tick。
+ * {@code TaskTickHandler} 检测到非 {@code in_progress} 后自然停止 tick。
  *
  * <h3>子类必须实现</h3>
  * <ul>
@@ -113,8 +113,8 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
 
     @Override
     public void interrupt(EntityMaid maid) {
+        // v53: 只调 onExit, 不调 onCleanup — Dispatcher 统一调 onCleanup 避免 triple cleanup
         onExit(readState(maid), maid);
-        onCleanup(maid);
     }
 
     /**
@@ -158,7 +158,7 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
     // ── 主 tick ──
 
     /**
-     * 每 tick 由 {@code CreateEventListener} 或 {@link #executor()} 驱动.
+     * 每 tick 由 {@code TaskTickHandler} 或 {@link #executor()} 驱动.
      *
      * <p>流程:
      * <ol>
@@ -168,7 +168,8 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
      *   <li>转换验证 → {@link #onExit} → 写入 → {@link #onEnter}</li>
      * </ol>
      */
-    protected void tick(ServerLevel world, EntityMaid maid) {
+    @Override
+    public void tick(ServerLevel world, EntityMaid maid) {
         // 1. 取消检测
         if (TaskKeys.STATE_CANCELLED.equals(LmaTaskDataHelper.getFlowState(maid))) {
             interrupt(maid);

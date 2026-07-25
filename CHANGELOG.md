@@ -1,5 +1,27 @@
 # Changelog
 
+## [v60] — 2026-07-25 — 装配系统修复 + 机器精简
+
+### 崩溃修复
+- **ClassCastException** — SimpleContainer→RecipeWrapper 导致放机器方块时崩溃。改为 RecipeWrapper(ItemStackHandler)。
+- **中间产物冲刷** — 单机时产物永不到最终输出槽。advanceSlot 遍历完后自动冲刷。
+
+### 机器精简
+- 删除 MIXER (搅拌器): 配方杂、流体无法处理、消耗 Bug
+- 删除 BASIN (盆): 多材料消耗 Bug、压块无实用价值
+- 目前支持 4 台: 冲压机 / 锯子 / 部署器 / 辊压机
+
+### 部署器修复
+- 配方匹配回退: SequencedAssembly 子配方 → 常规 DeployerApplicationRecipe (支持斧头剥原木等)
+
+### 默认行为修复
+- **物品复制修复**: NearbyContainerService 改用 IItemHandler 直操作提取
+- **物品丢失修复**: NearbyCollectBehavior 溢出→隙间→扔地上
+- 满背包前置检查: hasDestSpace 避免空跑
+
+### 文档重构
+- 60+ 文件按功能 7 子目录整理, 清理重复, 设计文档整合
+
 ## [v53] — 2026-07-22 — 重启自动恢复
 
 - **重启自动恢复任务** — onEntityJoin 保留 FLOW_TASK 和配置键，写 GUI_INIT 自动重新提交。玩家无需手动重选任务。

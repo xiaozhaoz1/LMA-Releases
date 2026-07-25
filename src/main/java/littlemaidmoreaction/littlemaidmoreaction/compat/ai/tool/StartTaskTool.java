@@ -14,6 +14,7 @@ import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaFlowTask;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.task.LmaTaskDataHelper;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
+import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
 
 /**
  * v16: AI 唯一任务入口 — 取代 AssignTaskTool + CreateRuleTool + QueryRecipeTool + ...
@@ -86,22 +87,22 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
 
         // ★ 清除旧任务残留 (跨session PersistentData)
         var data = maid.getPersistentData();
-        String oldTask = data.getString("lma_flow_task");
-        String state = data.getString("lma_flow_state");
+        String oldTask = data.getString(TaskKeys.FLOW_TASK);
+        String state = data.getString(TaskKeys.FLOW_STATE);
 
         // ★ v23: 同任务热重载 — 更新参数但不重建Brain
         if (p.taskType.equals(oldTask) && !oldTask.isEmpty() && "in_progress".equals(state)) {
-            data.putString("lma_task_target", p.target);
-            data.remove("lma_flow_cached");
+            data.putString(TaskKeys.TASK_TARGET, p.target);
+            data.remove(TaskKeys.FLOW_CACHED);
 
             // 唱片机换碟: 根据当前阶段智能切换
             if ("jukebox".equals(p.taskType)) {
-                String jukeboxPhase = data.getString("lma_jukebox_phase");
-                data.putString("lma_task_target", p.target);
+                String jukeboxPhase = data.getString(TaskKeys.JUKEBOX_PHASE);
+                data.putString(TaskKeys.TASK_TARGET, p.target);
                 switch (jukeboxPhase) {
                     case "PLAYING" -> {
-                        data.putString("lma_jukebox_phase", "EJECTING");
-                        data.putLong("lma_jukebox_tick", maid.level().getGameTime());
+                        data.putString(TaskKeys.JUKEBOX_PHASE, "EJECTING");
+                        data.putLong(TaskKeys.JUKEBOX_TICK, maid.level().getGameTime());
                         LittleMaidMoreAction.LOGGER.info("[V23] [StartTaskTool] jukebox change disc: PLAYING→EJECTING, next={}", p.target);
                         return cb.addToolResult("弹出当前唱片，下一轮插入: " + (p.target.isEmpty() ? "随机" : p.target), toolCallId);
                     }
@@ -121,7 +122,7 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
 
             // 合成/熔炉: 更新目标物品和数量
             if ("craft_chain".equals(p.taskType) || "furnace".equals(p.taskType)) {
-                data.putInt("lma_flow_max_count", p.targetCount > 0 ? p.targetCount : 0);
+                data.putInt(TaskKeys.FLOW_MAX_COUNT, p.targetCount > 0 ? p.targetCount : 0);
                 LittleMaidMoreAction.LOGGER.info("[V23] [StartTaskTool] updated task params: target={}, count={}", p.target, p.targetCount);
                 return cb.addToolResult("更新任务参数: " + p.target, toolCallId);
             }
@@ -136,7 +137,7 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
         // v43: 通过中央调度器提交 (替代手动8字段NBT写入)
         LmaFlowTask.savePreviousTask(maid);
         // v43: lma_task_target 仍需单独写 (TaskDispatcher.submit 不处理额外字段)
-        maid.getPersistentData().putString("lma_task_target", p.target);
+        maid.getPersistentData().putString(TaskKeys.TASK_TARGET, p.target);
         if (!TaskDispatcher.submit(maid, p.taskType, p.target, p.targetCount)) {
             LmaFlowTask.restorePreviousTask(maid);
             LittleMaidMoreAction.LOGGER.warn("[V18] [StartTaskTool] validation failed for {}", p.taskType);
@@ -144,7 +145,7 @@ public final class StartTaskTool implements ITool<StartTaskTool.Params> {
         }
 
         // 清除 Brain dedup 缓存 + 切换任务 → Brain Behavior 直接导航+交互
-        data.remove("lma_flow_cached");
+        data.remove(TaskKeys.FLOW_CACHED);
         var newTask = LmaTaskTypeRegistry.findByTaskType(p.taskType);
         maid.setTask(newTask);
         LittleMaidMoreAction.LOGGER.info("[V18] [StartTaskTool] validated, switching to task {}", newTask.getUid());

@@ -1,4 +1,4 @@
-package littlemaidmoreaction.littlemaidmoreaction.compat.vanilla.input.recipe;
+package littlemaidmoreaction.littlemaidmoreaction.vanilla.input.recipe;
 
 import net.minecraft.resources.ResourceLocation;
 import org.junit.jupiter.api.Test;

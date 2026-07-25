@@ -2,13 +2,17 @@ package littlemaidmoreaction.littlemaidmoreaction;
 
 import littlemaidmoreaction.littlemaidmoreaction.api.MoreActionAPI;
 import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyMenu;
+import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyScreen;
 import littlemaidmoreaction.littlemaidmoreaction.init.LmaRegistrar;
 import littlemaidmoreaction.littlemaidmoreaction.network.LmaAnimSyncMessage;
 import littlemaidmoreaction.littlemaidmoreaction.network.OpenMaidEditorMessage;
 import littlemaidmoreaction.littlemaidmoreaction.screen.LMAConfigScreen;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraftforge.client.ConfigScreenHandler;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.common.extensions.IForgeMenuType;
 import net.minecraftforge.event.server.ServerStartingEvent;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -20,6 +24,9 @@ import net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext;
 import net.minecraftforge.network.NetworkDirection;
 import net.minecraftforge.network.NetworkRegistry;
 import net.minecraftforge.network.simple.SimpleChannel;
+import net.minecraftforge.registries.DeferredRegister;
+import net.minecraftforge.registries.ForgeRegistries;
+import net.minecraftforge.registries.RegistryObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,8 +51,6 @@ public final class LittleMaidMoreAction {
 
     /**
      * 模组网络通道。
-     *
-     * 用于服务端→客户端同步数据，驱动动画渲染和 GUI 交互。
      */
     public static final SimpleChannel NETWORK = NetworkRegistry.newSimpleChannel(
             ResourceLocation.fromNamespaceAndPath(MOD_ID, "network"),
@@ -54,28 +59,30 @@ public final class LittleMaidMoreAction {
             s -> s.equals("1.0")
     );
 
+    /** v56: MenuType 注册 (便携装配GUI) */
+    public static final DeferredRegister<MenuType<?>> MENU_TYPES =
+        DeferredRegister.create(ForgeRegistries.MENU_TYPES, MOD_ID);
+    public static final RegistryObject<MenuType<MaidAssemblyMenu>> MAID_ASSEMBLY_MENU =
+        MENU_TYPES.register("maid_assembly", () -> IForgeMenuType.create(MaidAssemblyMenu::new));
+
     public LittleMaidMoreAction() {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         modBus.addListener(this::commonSetup);
 
-        // 注册配置 + GUI 入口
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, MoreActionConfig.SPEC, MOD_ID + "-common.toml");
         ModLoadingContext.get().registerExtensionPoint(
                 ConfigScreenHandler.ConfigScreenFactory.class,
                 () -> new ConfigScreenHandler.ConfigScreenFactory(
                         (mc, parent) -> new LMAConfigScreen(parent)));
 
-        // v10: 核心初始化 (扫描/加载/文档) → LmaRegistrar
         LmaRegistrar.init();
-        // v10: 服务端初始化 (任务执行器/文档/版本门控)
         LmaRegistrar.initServer();
-        // v10: 音效注册 (DeferredRegister → LmaSounds)
         LmaRegistrar.registerSounds(modBus);
-        // ★ v12.7 P0: MemoryModuleType 注册 (DeferredRegister → LmaMemoryModuleRegistry)
         LmaRegistrar.registerMemoryModules(modBus);
-        // v40: 方块 + 方块实体注册 (DeferredRegister → LmaBlocks/LmaBlockEntityTypes)
         LmaRegistrar.registerBlocks(modBus);
         LmaRegistrar.registerBlockEntityTypes(modBus);
+        // v56: 便携装配 MenuType
+        MENU_TYPES.register(modBus);
         // v10: TPM 事件由 TpmCompat.init() 统一注册 (Compat 模式)
 
         MinecraftForge.EVENT_BUS.register(this);
@@ -98,12 +105,6 @@ public final class LittleMaidMoreAction {
         });
     }
 
-    /**
-     * 服务端启动时加载动画时长和武器映射数据。
-     *
-     * 在单人游戏中，客户端加载的动画数据已通过配置文件同步；
-     * 在专用服务器上，使用配置文件中的手动配置值。
-     */
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         MoreActionAPI.loadServerDurations();

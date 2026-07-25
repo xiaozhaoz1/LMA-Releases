@@ -2,10 +2,14 @@ package littlemaidmoreaction.littlemaidmoreaction.task.pipeline;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
+import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaTasks;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
 import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.*;
@@ -17,13 +21,7 @@ import java.util.List;
 /**
  * 敲钟管道 — 处理女仆自动寻找并敲响钟的工作流。
  *
- * <h3>流程</h3>
- * <ol>
- *   <li>写入规则文件（触发后续行为）</li>
- *   <li>TODO: Phase 2 — 寻找钟 → 导航 → 敲钟</li>
- * </ol>
- *
- * <p>Phase 2 将实现完整的导航和敲钟循环。当前为骨架实现。</p>
+ * <p>v52: isTargetBlock(BellBlock) → LmaFlowCoordinationBehavior 导航 → IExecutor 执行敲钟。</p>
  */
 public final class BellRingPipeline implements TaskPipeline {
 
@@ -35,6 +33,16 @@ public final class BellRingPipeline implements TaskPipeline {
     @Override
     public PipelineResult validate(ServerLevel l, EntityMaid m, PipelineContext c) {
         return PipelineResult.ok("");
+    }
+
+    public static IExecutor executor() {
+        return new IExecutor() {
+            @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
+                VanillaTasks.bell(w, m, p);
+                return TaskResult.SUCCESS;
+            }
+            @Override public void onStop(EntityMaid maid) {}
+        };
     }
 
 }

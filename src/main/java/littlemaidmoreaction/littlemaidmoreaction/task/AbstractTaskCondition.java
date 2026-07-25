@@ -52,7 +52,7 @@ public abstract class AbstractTaskCondition implements ICondition {
     @Override
     public String evaluate(RuleContext ctx, Map<String, String> rawParams) {
         var data = ctx.maid().getPersistentData();
-        String currentTask = data.getString("lma_flow_task");
+        String currentTask = data.getString(TaskKeys.FLOW_TASK);
         String expected = rawParams.getOrDefault("task_type", "craft_chain");
 
         // 任务类型不匹配
@@ -60,20 +60,20 @@ public abstract class AbstractTaskCondition implements ICondition {
 
         // 检查任务 ID
         String expectedId = rawParams.getOrDefault("task_id", "0");
-        String currentId = data.getString("lma_flow_task_id");
+        String currentId = data.getString(TaskKeys.FLOW_TASK_ID);
         if (!currentId.equals(expectedId)) return "false";
 
         // 检查期望状态
         String expectedState = rawParams.getOrDefault("expected_state", "in_progress");
         if (!"any".equals(expectedState)) {
-            String currentState = data.getString("lma_flow_state");
+            String currentState = data.getString(TaskKeys.FLOW_STATE);
             if (!currentState.equals(expectedState)) return "false";
         }
 
         // 检查期望步骤 (-1 = 不检查)
         int expectedStep = parseInt(rawParams.get("expected_step"), -1);
         if (expectedStep >= 0) {
-            int currentStep = data.getInt("lma_flow_step");
+            int currentStep = data.getInt(TaskKeys.FLOW_STEP);
             if (currentStep != expectedStep) return "false";
         }
 
