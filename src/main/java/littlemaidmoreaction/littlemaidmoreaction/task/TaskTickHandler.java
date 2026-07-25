@@ -8,10 +8,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
- * v53: 通用 game-tick 驱动 — 替代外置 CREATE_TICK。
- *
- * <p>仅 {@code needsGameTick()=true} 的管线（Power/Crank/Press/Mix/RunningBelt）走每 tick 路径。
- * 其余 isLongRunning 任务由 Brain ~100tick 驱动。
+ * v53: 通用 game-tick 驱动.
+ * v61: 新增被动任务 tick (与主动任务并行).
  */
 @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID)
 public final class TaskTickHandler {
@@ -37,6 +35,20 @@ public final class TaskTickHandler {
                     h.pipeline().tick(sl, maid);
                 }
             }
+            tickPassive(sl);
+        }
+    }
+
+    private static void tickPassive(ServerLevel sl) {
+        for (var e : sl.getAllEntities()) {
+            if (!(e instanceof EntityMaid maid)) continue;
+            TaskRegistry.passiveTasks().forEach(h -> {
+                String key = TaskKeys.passiveKey(h.taskType());
+                if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))
+                        && TaskToggle.isEnabledFor(maid, h.taskType())) {
+                    h.pipeline().tick(sl, maid);
+                }
+            });
         }
     }
 

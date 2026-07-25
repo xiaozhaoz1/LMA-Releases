@@ -137,11 +137,22 @@ public final class MaidAssemblyService {
     // ═══ Nearby search (委托 NearbyContainerService) ═══
 
     public static List<ItemStack> collectAvailableItems(EntityMaid maid) {
+        return collectAvailableItems(maid, false);
+    }
+
+    /** 收集可用物品: 背包 + 附近容器 + 隙间(可选). */
+    public static List<ItemStack> collectAvailableItems(EntityMaid maid, boolean includeWireless) {
         List<ItemStack> all = new ArrayList<>();
         var bp = maid.getAvailableBackpackInv();
         for (int s = 0; s < bp.getSlots(); s++) { ItemStack st = bp.getStackInSlot(s); if (!st.isEmpty()) all.add(st.copy()); }
         if (maid.level() != null) all.addAll(
             littlemaidmoreaction.littlemaidmoreaction.task.service.NearbyContainerService.scanItems(maid.level(), maid.blockPosition(), SEARCH_RADIUS));
+        if (includeWireless) {
+            var w = littlemaidmoreaction.littlemaidmoreaction.vanilla.input.container.WirelessChestSpace.getWirelessHandler(maid);
+            if (w != null) for (int s = 0; s < w.getSlots(); s++) {
+                ItemStack st = w.getStackInSlot(s); if (!st.isEmpty()) all.add(st.copy());
+            }
+        }
         return all;
     }
 

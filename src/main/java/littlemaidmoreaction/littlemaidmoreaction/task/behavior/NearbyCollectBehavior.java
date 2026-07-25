@@ -26,20 +26,28 @@ public class NearbyCollectBehavior extends MaidCheckRateTask {
     private final Set<String> containerBlocks;
     private final String dest;
     private final int radius;
+    private final boolean includeWireless;
 
-    /** 最简构造: filter=null→关闭, 默认放背包/半径3/全部容器 */
+    /** 最简构造: 默认放背包/半径3/全部容器/含隙间 */
     public NearbyCollectBehavior(Function<EntityMaid, Predicate<ItemStack>> filterProvider) {
-        this(filterProvider, Set.of(), "backpack", 3);
+        this(filterProvider, Set.of(), "backpack", 3, true);
     }
 
     public NearbyCollectBehavior(Function<EntityMaid, Predicate<ItemStack>> filterProvider,
                                   Set<String> containerBlocks, String dest, int radius) {
+        this(filterProvider, containerBlocks, dest, radius, true);
+    }
+
+    public NearbyCollectBehavior(Function<EntityMaid, Predicate<ItemStack>> filterProvider,
+                                  Set<String> containerBlocks, String dest, int radius,
+                                  boolean includeWireless) {
         super(ImmutableMap.of());
         setMaxCheckRate(100);
         this.filterProvider = filterProvider;
         this.containerBlocks = containerBlocks;
         this.dest = dest != null && !dest.isEmpty() ? dest : "backpack";
         this.radius = radius > 0 ? radius : 3;
+        this.includeWireless = includeWireless;
     }
 
     @Override
@@ -47,7 +55,6 @@ public class NearbyCollectBehavior extends MaidCheckRateTask {
         if (!super.checkExtraStartConditions(level, maid)) return false;
         Predicate<ItemStack> filter = filterProvider.apply(maid);
         if (filter == null) return false;
-        // 检查目标位置有无空间
         return hasDestSpace(maid);
     }
 
@@ -55,7 +62,8 @@ public class NearbyCollectBehavior extends MaidCheckRateTask {
     protected void start(ServerLevel level, EntityMaid maid, long gameTime) {
         Predicate<ItemStack> filter = filterProvider.apply(maid);
         if (filter == null) return;
-        ItemStack taken = NearbyContainerService.extractItem(level, maid.blockPosition(), radius, filter, containerBlocks);
+        ItemStack taken = NearbyContainerService.extractItem(
+            level, maid.blockPosition(), radius, filter, containerBlocks, includeWireless, maid);
         if (!taken.isEmpty()) putItem(maid, taken, level);
     }
 

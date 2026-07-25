@@ -84,6 +84,11 @@ public final class TaskRegistry {
     }
 
     /** v52: showInBar=true → TLM 任务栏可见; false → 仅内部注册 (被动/环境任务) */
+    /** showInBar=false 的被动任务 (v61). */
+    public static java.util.stream.Stream<TaskHandler> passiveTasks() {
+        return HANDLERS.values().stream().filter(h -> !h.showInBar());
+    }
+
     public record TaskHandler(String taskType, TaskPipeline pipeline, IExecutor executor,
                                boolean showInBar) {}
 }

@@ -19,18 +19,10 @@ import net.minecraftforge.items.ItemHandlerHelper;
 import java.util.List;
 
 /**
- * 便携装配 Pipeline — 状态机: IDLE→ADVANCE→STRIKE→EAT/RESET.
+ * 便携装配 Pipeline.
  *
- * <p>存储在 maid.getPersistentData() → "maid_assembly":
- * <pre>
- *   InProc (bool) — 装配进行中
- *   Slot   (int)  — 当前机器槽位
- *   Timer  (int)  — 剩余加工tick (>0=加工中, 0=完成, -1=前进)
- *   Pass   (int)  — 本轮已处理槽数 (0..7, 第8次=pause eat)
- * </pre>
- *
- * <p>原料来源: 中间产物槽(优先) → 原材料槽
- * <p>食物: 副手或背包中有食物才能启动
+ * <p>材料来源 (三级): 背包 → 附近容器 → 隙间 (enableWireless=true)
+ * <p>产物分发 (三级): 槽位 → 背包 → 隙间 → 地上
  */
 public final class MaidAssemblyPipeline implements TaskPipeline {
 
@@ -40,6 +32,7 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
     @Override public boolean isLongRunning() { return true; }
     @Override public boolean needsGameTick() { return true; }
     @Override public boolean enableWorkEat() { return true; }
+    @Override public boolean enableWireless() { return true; }
 
     @javax.annotation.Nullable
     @Override public java.util.function.Predicate<ItemStack> collectFilter(EntityMaid maid) {
@@ -78,10 +71,6 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         };
     }
 
-    // ═══════════════════════════════════════
-    // Main tick entry
-    // ═══════════════════════════════════════
-
     public void tick(ServerLevel world, EntityMaid maid) {
         CompoundTag root = maid.getPersistentData().getCompound(KEY);
         if (TaskKeys.STATE_CANCELLED.equals(maid.getPersistentData().getString(TaskKeys.FLOW_STATE))) {
@@ -115,30 +104,18 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
             return;
         }
 
-        // timer < 0 → advance (5 tick cooldown between recipe checks)
         int advCd = root.getInt("AdvCd");
         if (advCd > 0) { root.putInt("AdvCd", advCd - 1); maid.getPersistentData().put(KEY, root); return; }
         root.putInt("AdvCd", 5);
         advanceSlot(world, maid, root);
     }
 
-    // ═══════════════════════════════════════
-    // Start
-    // ═══════════════════════════════════════
-
     private void tryStart(EntityMaid maid, CompoundTag root) {
         MaidAssemblyInventory inv = MaidAssemblyInventory.of(maid);
-
-        // 检查有机器方块
         if (!inv.hasAnyMachine()) return;
-
-        // 检查有食物: 副手或背包
         if (!hasFood(maid)) return;
-
-        // 检查有原料: 中间产物优先, 否则材料槽
         ItemStack input = getCurrentInput(inv);
         if (input.isEmpty()) return;
-
         root.putBoolean("InProc", true);
         root.putInt("Slot", 0);
         root.putInt("Pass", 0);
@@ -146,7 +123,6 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         maid.getPersistentData().put(KEY, root);
     }
 
-    /** 检查女仆副手或背包中是否有食物 */
     private boolean hasFood(EntityMaid maid) {
         ItemStack offhand = maid.getOffhandItem();
         if (!offhand.isEmpty() && offhand.isEdible()) return true;
@@ -158,10 +134,6 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         return false;
     }
 
-    // ═══════════════════════════════════════
-    // Advance to next slot
-    // ═══════════════════════════════════════
-
     private void advanceSlot(ServerLevel world, EntityMaid maid, CompoundTag root) {
         MaidAssemblyInventory inv = MaidAssemblyInventory.of(maid);
         int pass = root.getInt("Pass");
@@ -169,7 +141,6 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         while (pass < MaidAssemblyInventory.MACHINE_SLOTS) {
             MaidAssemblyService.MachineKind kind = inv.getMachineKind(pass);
             if (kind != null) {
-                // 原料: 中间产物优先→材料槽
                 ItemStack input = getCurrentInput(inv);
                 if (!input.isEmpty()) {
                     int dur = matchRecipe(world, maid, kind, input);
@@ -185,7 +156,6 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
             pass++;
             root.putInt("Pass", pass);
         }
-        // 所有机器槽遍历完毕 → 非装配中间产物移到最终输出
         ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
         if (!inter.isEmpty() && !MaidAssemblyService.isAssemblyIntermediate(inter)) {
             ItemStack remaining = inv.tryInsertOutput(inter.copy());
@@ -196,77 +166,50 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         maid.getPersistentData().put(KEY, root);
     }
 
-    // ═══════════════════════════════════════
-    // Strike: execute recipe with work animation
-    // ═══════════════════════════════════════
-
     private void strike(ServerLevel world, EntityMaid maid, CompoundTag root) {
         MaidAssemblyInventory inv = MaidAssemblyInventory.of(maid);
         int slot = root.getInt("Slot");
         int pass = root.getInt("Pass");
         MaidAssemblyService.MachineKind kind = inv.getMachineKind(slot);
 
-        // 工作动画: 主手拿机器方块→摇摆→音效
         ItemStack machineBlock = MaidAssemblyService.getMachineBlockStack(kind);
         ItemStack oldMainHand = maid.getMainHandItem().copy();
-        if (!machineBlock.isEmpty()) {
-            maid.setItemInHand(InteractionHand.MAIN_HAND, machineBlock);
-        }
+        if (!machineBlock.isEmpty()) maid.setItemInHand(InteractionHand.MAIN_HAND, machineBlock);
 
         MaidAssemblyService.playMachineSound(world, maid.blockPosition(),
             kind != null ? kind : MaidAssemblyService.MachineKind.PRESS);
         maid.swing(InteractionHand.MAIN_HAND);
-
-        // 恢复主手
         maid.setItemInHand(InteractionHand.MAIN_HAND, oldMainHand);
 
-        if (kind == null) {
-            advanceAfterStrike(maid, root, pass);
-            return;
-        }
+        if (kind == null) { advanceAfterStrike(maid, root, pass); return; }
 
-        // 获取输入: 中间产物优先
         ItemStack input = getCurrentInput(inv);
-        if (input.isEmpty()) {
-            advanceAfterStrike(maid, root, pass);
-            return;
-        }
+        if (input.isEmpty()) { advanceAfterStrike(maid, root, pass); return; }
 
         ItemStack single = input.copyWithCount(1);
         List<ItemStack> outputs = executeRecipe(world, maid, kind, single);
+        if (outputs.isEmpty()) { advanceAfterStrike(maid, root, pass); return; }
 
-        if (outputs.isEmpty()) {
-            advanceAfterStrike(maid, root, pass);
-            return;
-        }
-
-        // 消耗原料 (从中间槽或材料槽)
         consumeInput(maid, inv, input);
 
-        // 分发产出
         boolean isLastPass = (pass + 1 >= MaidAssemblyInventory.MACHINE_SLOTS);
         for (ItemStack out : outputs) {
             if (out.isEmpty()) continue;
             if (MaidAssemblyService.isAssemblyIntermediate(out)) {
-                // 装配中间产物 → 中间槽
                 ItemStack r = insertOrStack(inv, MaidAssemblyInventory.INTERMEDIATE_SLOT, out);
                 deposit(maid, r);
             } else if (!isLastPass) {
-                // 前7轮: 第一个非中间产物→中间槽, 其余→输出
                 ItemStack r = out;
                 if (inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT).isEmpty())
                     r = insertOrStack(inv, MaidAssemblyInventory.INTERMEDIATE_SLOT, out);
                 if (!r.isEmpty()) { r = inv.tryInsertOutput(r); deposit(maid, r); }
             } else {
-                // 最后一轮 → 输出
                 ItemStack r = inv.tryInsertOutput(out);
                 deposit(maid, r);
             }
         }
 
-        // 材料用完后自动补充
         inv.autoRefillMaterial();
-
         inv.saveToNBT();
         advanceAfterStrike(maid, root, pass);
     }
@@ -277,10 +220,6 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         maid.getPersistentData().put(KEY, root);
     }
 
-    // ═══════════════════════════════════════
-    // Eat & Reset
-    // ═══════════════════════════════════════
-
     private void eatAndReset(EntityMaid maid, CompoundTag root) {
         var inv = MaidAssemblyInventory.of(maid);
         inv.saveToNBT();
@@ -288,10 +227,6 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         root.remove("Timer"); root.remove("Slot"); root.remove("Pass"); root.remove("TryCd"); root.remove("AdvCd");
         maid.getPersistentData().put(KEY, root);
     }
-
-    // ═══════════════════════════════════════
-    // Recipe matching
-    // ═══════════════════════════════════════
 
     private int matchRecipe(ServerLevel world, EntityMaid maid,
                             MaidAssemblyService.MachineKind kind, ItemStack input) {
@@ -304,16 +239,12 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
                 yield r != null ? MaidAssemblyService.getDuration(kind, maid) : 0;
             }
             case DEPLOYER -> {
-                List<ItemStack> avail = MaidAssemblyService.collectAvailableItems(maid);
+                List<ItemStack> avail = MaidAssemblyService.collectAvailableItems(maid, true);
                 ItemStack held = MaidAssemblyService.findDeployerHeldItem(world, single, avail);
                 yield held != null ? MaidAssemblyService.getDuration(kind, maid) : 0;
             }
         };
     }
-
-    // ═══════════════════════════════════════
-    // Recipe execution
-    // ═══════════════════════════════════════
 
     private List<ItemStack> executeRecipe(ServerLevel world, EntityMaid maid,
                                            MaidAssemblyService.MachineKind kind, ItemStack input) {
@@ -324,7 +255,7 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
                     yield r != null ? MaidAssemblyService.processSimple(world, r, input) : List.of();
                 }
                 case DEPLOYER -> {
-                    List<ItemStack> avail = MaidAssemblyService.collectAvailableItems(maid);
+                    List<ItemStack> avail = MaidAssemblyService.collectAvailableItems(maid, true);
                     ItemStack held = MaidAssemblyService.findDeployerHeldItem(world, input, avail);
                     if (held == null) yield List.of();
                     DeployerApplicationRecipe r = MaidAssemblyService.findDeployingRecipe(world, input, held);
@@ -339,18 +270,12 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         }
     }
 
-    // ═══════════════════════════════════════
-    // Helpers
-    // ═══════════════════════════════════════
-
-    /** 获取当前原料: 中间产物槽优先 → 原材料槽 */
     private ItemStack getCurrentInput(MaidAssemblyInventory inv) {
         ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
         if (!inter.isEmpty()) return inter;
         return inv.getStackInSlot(MaidAssemblyInventory.MATERIAL_SLOT);
     }
 
-    /** 消耗原料: 从中间槽(优先)或材料槽扣除1个 */
     private void consumeInput(EntityMaid maid, MaidAssemblyInventory inv, ItemStack input) {
         ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
         if (!inter.isEmpty() && ItemStack.isSameItemSameTags(inter, input)) {
@@ -384,31 +309,10 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
                 return;
             }
         }
-        // 2. 附近容器 — 只消耗1个
-        if (maid.level() != null) {
-            consumeFromNearby(maid, target);
-        }
-    }
-
-    /** 从附近容器消耗1个指定物品 */
-    private void consumeFromNearby(EntityMaid maid, ItemStack target) {
-        var level = maid.level();
-        int r = MaidAssemblyService.SEARCH_RADIUS;
-        for (int dx = -r; dx <= r; dx++)
-            for (int dy = -r; dy <= r; dy++)
-                for (int dz = -r; dz <= r; dz++) {
-                    var be = level.getBlockEntity(maid.blockPosition().offset(dx, dy, dz));
-                    if (be instanceof net.minecraft.world.Container container) {
-                        for (int s = 0; s < container.getContainerSize(); s++) {
-                            ItemStack st = container.getItem(s);
-                            if (ItemStack.isSameItemSameTags(st, target)) {
-                                container.removeItem(s, 1);
-                                be.setChanged();
-                                return;
-                            }
-                        }
-                    }
-                }
+        // 2. 隙间 + 附近容器 (NearbyContainerService 统一处理)
+        littlemaidmoreaction.littlemaidmoreaction.task.service.NearbyContainerService.extractItem(
+            maid.level(), maid.blockPosition(), MaidAssemblyService.SEARCH_RADIUS,
+            st -> ItemStack.isSameItemSameTags(st, target), java.util.Set.of(), true, maid);
     }
 
     /** 产物分发: 背包 → 隙间 → 扔地上 */

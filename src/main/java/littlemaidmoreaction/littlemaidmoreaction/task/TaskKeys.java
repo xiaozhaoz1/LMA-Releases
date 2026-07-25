@@ -67,6 +67,10 @@ public final class TaskKeys {
     // ── 任务开关 ──
     public static final String TASK_ENABLED_PREFIX = "lma_task_enabled_";
 
+    // ── 被动任务 (v61) ──
+    public static final String PASSIVE_PREFIX = "lma_passive_";
+    public static String passiveKey(String taskType) { return PASSIVE_PREFIX + taskType; }
+
     // ── 重试计数 (v53) ──
     public static final String RETRY_COUNT = "lma_retry_count";
 

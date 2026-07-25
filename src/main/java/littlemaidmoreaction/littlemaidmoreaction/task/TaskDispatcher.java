@@ -145,4 +145,22 @@ public final class TaskDispatcher {
     private static TaskRegistry.TaskHandler getHandler(String taskType) {
         return TaskRegistry.get(taskType);
     }
+
+    // ── 被动任务 (v61) — 与主动任务隔离, 可并行运行 ──
+
+    /** 提交被动任务 (与 lma_flow_task 不冲突) */
+    public static void submitPassive(EntityMaid maid, String taskType) {
+        if (TaskRegistry.get(taskType) == null) return;
+        if (!TaskToggle.isEnabled(taskType)) return;
+        maid.getPersistentData().putString(TaskKeys.passiveKey(taskType), TaskKeys.STATE_IN_PROGRESS);
+        LittleMaidMoreAction.LOGGER.info("[LMA/Task] submitPassive maid={} task={}", maid.getStringUUID(), taskType);
+    }
+
+    /** 取消被动任务 */
+    public static void cancelPassive(EntityMaid maid, String taskType) {
+        var h = TaskRegistry.get(taskType);
+        if (h != null) h.pipeline().onCleanup(maid);
+        maid.getPersistentData().remove(TaskKeys.passiveKey(taskType));
+        LittleMaidMoreAction.LOGGER.info("[LMA/Task] cancelPassive maid={} task={}", maid.getStringUUID(), taskType);
+    }
 }

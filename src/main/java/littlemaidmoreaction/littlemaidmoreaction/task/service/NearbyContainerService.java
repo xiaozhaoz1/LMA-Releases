@@ -72,6 +72,15 @@ public final class NearbyContainerService {
 
     public static ItemStack extractItem(Level level, BlockPos center, int radius,
                                          Predicate<ItemStack> filter, Set<String> containerBlocks) {
+        return extractItem(level, center, radius, filter, containerBlocks, false, null);
+    }
+
+    /** 提取物品 (含隙间可选). */
+    public static ItemStack extractItem(Level level, BlockPos center, int radius,
+                                         Predicate<ItemStack> filter, Set<String> containerBlocks,
+                                         boolean includeWireless,
+                                         @javax.annotation.Nullable com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid) {
+        // 1. 附近容器
         for (int dx = -radius; dx <= radius; dx++)
             for (int dy = -radius; dy <= radius; dy++)
                 for (int dz = -radius; dz <= radius; dz++) {
@@ -84,6 +93,18 @@ public final class NearbyContainerService {
                     ItemStack extracted = tryExtract(be, filter);
                     if (!extracted.isEmpty()) return extracted;
                 }
+        // 2. 隙间 (绑定箱子, 可能不在搜索半径内)
+        if (includeWireless && maid != null) {
+            var w = littlemaidmoreaction.littlemaidmoreaction.vanilla.input.container.WirelessChestSpace.getWirelessHandler(maid);
+            if (w != null) {
+                for (int s = 0; s < w.getSlots(); s++) {
+                    ItemStack st = w.getStackInSlot(s);
+                    if (!st.isEmpty() && filter.test(st)) {
+                        return w.extractItem(s, st.getMaxStackSize(), false);
+                    }
+                }
+            }
+        }
         return ItemStack.EMPTY;
     }
 

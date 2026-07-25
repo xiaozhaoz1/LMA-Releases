@@ -77,4 +77,7 @@ public interface TaskPipeline {
     default java.util.function.Predicate<net.minecraft.world.item.ItemStack> collectFilter(
             com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid) { return null; }
 
+    /** 产物自动存入隙间 (TLM无线箱子饰品). 默认关闭. */
+    default boolean enableWireless() { return false; }
+
 }
