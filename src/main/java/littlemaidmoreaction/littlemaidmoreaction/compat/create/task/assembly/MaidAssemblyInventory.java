@@ -41,7 +41,11 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
 
     /** 获取/创建此 Maid 的唯一 Inventory 实例 (服务端共享) */
     public static MaidAssemblyInventory of(EntityMaid maid) {
-        return CACHE.computeIfAbsent(maid.getUUID(), k -> new MaidAssemblyInventory(maid, true));
+        var existing = CACHE.get(maid.getUUID());
+        if (existing != null && existing.maid == maid) return existing;
+        var inv = new MaidAssemblyInventory(maid, true);
+        CACHE.put(maid.getUUID(), inv);
+        return inv;
     }
 
     /** 服务端用: 共享实例, serverSide=true */
@@ -64,6 +68,12 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
     @Override public boolean isItemValid(int slot, @Nonnull ItemStack stack) {
         if (slot < MACHINE_SLOTS) return MaidAssemblyService.MachineKind.fromStack(stack) != null;
         return true;
+    }
+
+    @Override
+    public void setStackInSlot(int slot, @Nonnull ItemStack stack) {
+        super.setStackInSlot(slot, stack);
+        if (serverSide) saveToNBT();
     }
 
     // ── Material slot lock ──
@@ -104,13 +114,13 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
     // ── NBT persistence ──
 
     private void loadFromNBT() {
+        setSize(TOTAL_SLOTS); // 先分配数组, deserializeNBT 再填充
         CompoundTag root = maid.getPersistentData().getCompound(NBT_KEY);
         if (root.contains(INV_KEY, Tag.TAG_COMPOUND)) {
             CompoundTag invTag = root.getCompound(INV_KEY);
             deserializeNBT(invTag);
             LittleMaidMoreAction.LOGGER.info("[AssemblyInv] loadFromNBT items={}", invTag.getList("Items", Tag.TAG_COMPOUND).size());
         }
-        setSize(TOTAL_SLOTS);
         ListTag lt = root.getList(LOCKS_KEY, Tag.TAG_COMPOUND);
         for (int i = 0; i < MACHINE_SLOTS; i++)
             itemLocks[i] = i < lt.size() ? ItemStack.of(lt.getCompound(i)) : ItemStack.EMPTY;

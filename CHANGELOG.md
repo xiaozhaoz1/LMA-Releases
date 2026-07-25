@@ -1,5 +1,12 @@
 # Changelog
 
+## [v61] — 2026-07-25 — 持久化修复 + 容器消耗修复
+
+- **持久化修复**: loadFromNBT setSize顺序修复(清空Bug) + setStackInSlot自动持久化 + 魂符收放事件同步
+- **容器消耗修复**: consumeFromBackpack→consumeFromNearby(1个消耗) + vanilla Container.removeItem直操作
+- **配方修复**: Deployer装配中间产物不走常规配方回退 + POWER加PumpBlock
+- **食物检查**: tryStart加hasFood，没食物不启动
+
 ## [v60] — 2026-07-25 — 装配系统修复 + 机器精简
 
 ### 崩溃修复

@@ -2,7 +2,6 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.deployer.DeployerApplicationRecipe;
-import com.simibubi.create.content.processing.basin.BasinRecipe;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
@@ -15,7 +14,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Recipe;
-import net.minecraftforge.fluids.FluidStack;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 import java.util.List;
@@ -32,7 +30,7 @@ import java.util.List;
  * </pre>
  *
  * <p>原料来源: 中间产物槽(优先) → 原材料槽
- * <p>食物: 副手, 自动从背包/附近补充
+ * <p>食物: 副手或背包中有食物才能启动
  */
 public final class MaidAssemblyPipeline implements TaskPipeline {
 
@@ -134,16 +132,30 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         // 检查有机器方块
         if (!inv.hasAnyMachine()) return;
 
+        // 检查有食物: 副手或背包
+        if (!hasFood(maid)) return;
+
         // 检查有原料: 中间产物优先, 否则材料槽
         ItemStack input = getCurrentInput(inv);
         if (input.isEmpty()) return;
 
-        // 食物: TLM Brain 自动处理 (MaidHealSelfTask/MaidWorkMealTask 每2.5~5s)
         root.putBoolean("InProc", true);
         root.putInt("Slot", 0);
         root.putInt("Pass", 0);
         root.putInt("Timer", -1);
         maid.getPersistentData().put(KEY, root);
+    }
+
+    /** 检查女仆副手或背包中是否有食物 */
+    private boolean hasFood(EntityMaid maid) {
+        ItemStack offhand = maid.getOffhandItem();
+        if (!offhand.isEmpty() && offhand.isEdible()) return true;
+        var bp = maid.getAvailableBackpackInv();
+        for (int s = 0; s < bp.getSlots(); s++) {
+            ItemStack st = bp.getStackInSlot(s);
+            if (!st.isEmpty() && st.isEdible()) return true;
+        }
+        return false;
     }
 
     // ═══════════════════════════════════════
@@ -173,12 +185,13 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
             pass++;
             root.putInt("Pass", pass);
         }
-        // 所有机器槽遍历完毕 → 中间产物移到最终输出
+        // 所有机器槽遍历完毕 → 非装配中间产物移到最终输出
         ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
-        if (!inter.isEmpty()) {
+        if (!inter.isEmpty() && !MaidAssemblyService.isAssemblyIntermediate(inter)) {
             ItemStack remaining = inv.tryInsertOutput(inter.copy());
             inv.setStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT, ItemStack.EMPTY);
             if (!remaining.isEmpty()) deposit(maid, remaining);
+            inv.saveToNBT();
         }
         maid.getPersistentData().put(KEY, root);
     }
@@ -235,17 +248,17 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         for (ItemStack out : outputs) {
             if (out.isEmpty()) continue;
             if (MaidAssemblyService.isAssemblyIntermediate(out)) {
-                // 中间产物 → 中间槽 → 背包 → 隙间 → 地上
+                // 装配中间产物 → 中间槽
                 ItemStack r = insertOrStack(inv, MaidAssemblyInventory.INTERMEDIATE_SLOT, out);
                 deposit(maid, r);
             } else if (!isLastPass) {
-                // 前7轮: 第一个非中间产物→中间槽, 其余→最终槽→背包→隙间→地上
+                // 前7轮: 第一个非中间产物→中间槽, 其余→输出
                 ItemStack r = out;
                 if (inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT).isEmpty())
                     r = insertOrStack(inv, MaidAssemblyInventory.INTERMEDIATE_SLOT, out);
                 if (!r.isEmpty()) { r = inv.tryInsertOutput(r); deposit(maid, r); }
             } else {
-                // 最后一轮 → 最终槽→背包→隙间→地上
+                // 最后一轮 → 输出
                 ItemStack r = inv.tryInsertOutput(out);
                 deposit(maid, r);
             }
@@ -254,6 +267,7 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         // 材料用完后自动补充
         inv.autoRefillMaterial();
 
+        inv.saveToNBT();
         advanceAfterStrike(maid, root, pass);
     }
 
@@ -268,7 +282,8 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
     // ═══════════════════════════════════════
 
     private void eatAndReset(EntityMaid maid, CompoundTag root) {
-        // 食物由 TLM Brain 自动处理 (MaidHealSelfTask 每50+random(50)tick)
+        var inv = MaidAssemblyInventory.of(maid);
+        inv.saveToNBT();
         root.putBoolean("InProc", false);
         root.remove("Timer"); root.remove("Slot"); root.remove("Pass"); root.remove("TryCd"); root.remove("AdvCd");
         maid.getPersistentData().put(KEY, root);
@@ -360,6 +375,7 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
     }
 
     private void consumeFromBackpack(EntityMaid maid, ItemStack target) {
+        // 1. 背包
         var bp = maid.getAvailableBackpackInv();
         for (int s = 0; s < bp.getSlots(); s++) {
             ItemStack stack = bp.getStackInSlot(s);
@@ -368,6 +384,31 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
                 return;
             }
         }
+        // 2. 附近容器 — 只消耗1个
+        if (maid.level() != null) {
+            consumeFromNearby(maid, target);
+        }
+    }
+
+    /** 从附近容器消耗1个指定物品 */
+    private void consumeFromNearby(EntityMaid maid, ItemStack target) {
+        var level = maid.level();
+        int r = MaidAssemblyService.SEARCH_RADIUS;
+        for (int dx = -r; dx <= r; dx++)
+            for (int dy = -r; dy <= r; dy++)
+                for (int dz = -r; dz <= r; dz++) {
+                    var be = level.getBlockEntity(maid.blockPosition().offset(dx, dy, dz));
+                    if (be instanceof net.minecraft.world.Container container) {
+                        for (int s = 0; s < container.getContainerSize(); s++) {
+                            ItemStack st = container.getItem(s);
+                            if (ItemStack.isSameItemSameTags(st, target)) {
+                                container.removeItem(s, 1);
+                                be.setChanged();
+                                return;
+                            }
+                        }
+                    }
+                }
     }
 
     /** 产物分发: 背包 → 隙间 → 扔地上 */

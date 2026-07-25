@@ -1,5 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.compat.create.task;
 
+import com.simibubi.create.content.fluids.pump.PumpBlock;
 import com.simibubi.create.content.kinetics.base.KineticBlockEntity;
 import com.simibubi.create.content.kinetics.millstone.MillstoneBlock;
 import com.simibubi.create.content.kinetics.mixer.MechanicalMixerBlock;
@@ -26,7 +27,8 @@ public final class PowerService {
     private static final Set<Class<? extends Block>> TARGET_BLOCKS = Set.of(
         MillstoneBlock.class,
         CogWheelBlock.class,
-        MechanicalMixerBlock.class
+        MechanicalMixerBlock.class,
+        PumpBlock.class
     );
 
     private PowerService() {}

@@ -76,8 +76,8 @@ public final class MaidAssemblyService {
         var result = SequencedAssemblyRecipe.getRecipe(level, wrapper,
             AllRecipeTypes.DEPLOYING.getType(), DeployerApplicationRecipe.class,
             r -> r.matches(wrapper, level));
-        // 2. 常规部署配方回退 (剥原木/打蜡等)
-        if (result.isEmpty())
+        // 2. 常规部署配方回退 — 仅非装配中间产物
+        if (result.isEmpty() && !isAssemblyIntermediate(input))
             result = (Optional) AllRecipeTypes.DEPLOYING.find(wrapper, level);
         return (DeployerApplicationRecipe) result.orElse(null);
     }

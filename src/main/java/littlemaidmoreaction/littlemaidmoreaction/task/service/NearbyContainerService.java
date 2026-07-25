@@ -2,6 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.task.service;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.world.Container;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -67,7 +68,7 @@ public final class NearbyContainerService {
         return result;
     }
 
-    // ── Extract (真提取, 直接操作 IItemHandler) ──
+    // ── Extract (真提取 — vanilla Container优先, IItemHandler回退) ──
 
     public static ItemStack extractItem(Level level, BlockPos center, int radius,
                                          Predicate<ItemStack> filter, Set<String> containerBlocks) {
@@ -80,17 +81,38 @@ public final class NearbyContainerService {
                         String id = BuiltInRegistries.BLOCK.getKey(be.getBlockState().getBlock()).toString();
                         if (containerBlocks.stream().noneMatch(p -> matchWildcard(id, p))) continue;
                     }
-                    var result = be.getCapability(ForgeCapabilities.ITEM_HANDLER).map(handler -> {
-                        for (int s = 0; s < handler.getSlots(); s++) {
-                            ItemStack st = handler.getStackInSlot(s);
-                            if (!st.isEmpty() && filter.test(st))
-                                return handler.extractItem(s, st.getMaxStackSize(), false);
-                        }
-                        return ItemStack.EMPTY;
-                    }).orElse(ItemStack.EMPTY);
-                    if (!result.isEmpty()) return result;
+                    ItemStack extracted = tryExtract(be, filter);
+                    if (!extracted.isEmpty()) return extracted;
                 }
         return ItemStack.EMPTY;
+    }
+
+    /** 从方块实体提取物品: vanilla Container → IItemHandler 回退 */
+    private static ItemStack tryExtract(BlockEntity be, Predicate<ItemStack> filter) {
+        // 1. 优先 vanilla Container (箱子/漏斗/熔炉等) — 直接操作真实库存
+        if (be instanceof Container container) {
+            for (int s = 0; s < container.getContainerSize(); s++) {
+                ItemStack st = container.getItem(s);
+                if (!st.isEmpty() && filter.test(st)) {
+                    ItemStack taken = container.removeItem(s, st.getMaxStackSize());
+                    be.setChanged();
+                    return taken;
+                }
+            }
+            return ItemStack.EMPTY;
+        }
+        // 2. 回退 IItemHandler (mod 容器)
+        return be.getCapability(ForgeCapabilities.ITEM_HANDLER).map(handler -> {
+            for (int s = 0; s < handler.getSlots(); s++) {
+                ItemStack st = handler.getStackInSlot(s);
+                if (!st.isEmpty() && filter.test(st)) {
+                    ItemStack taken = handler.extractItem(s, st.getMaxStackSize(), false);
+                    be.setChanged();
+                    return taken;
+                }
+            }
+            return ItemStack.EMPTY;
+        }).orElse(ItemStack.EMPTY);
     }
 
     public static ItemStack extractById(Level level, BlockPos center, int radius,
