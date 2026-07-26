@@ -1,5 +1,18 @@
 # Changelog
 
+## [v62] — 2026-07-26 — 任务系统架构重构
+
+- **文件分层**: task/ 21→2 root文件, 6子包 (api/runtime/data/pipeline/behavior/service/gui)
+- **onStop去重**: interrupt→onCleanup 统一清理, IExecutor.onStop @Deprecated, 消除3处重复
+- **Pipeline统一**: 4→2模式 (标准TaskPipeline + TaskStateMachine), TimerBased @Deprecated
+- **数据模块化**: LmaTaskDataHelper→FlowTaskData+TaskMetaData+TaskExtraData, 统一PersistentData入口
+- **pipelineData()**: 接口默认方法, 零注册零手写key, onCleanup自动清理管线私有数据
+- **pipelineConfig()**: 管线持久配置, 跨任务保留, 不被onCleanup清除
+- **死代码删除**: TaskBehaviors, TaskStateService, RuleWriter, LmaTaskDataKeys, enableWireless
+- **重复常量删除**: TaskKeys.TASK_* 10个→每个Pipeline的taskType()是正源
+- **DefaultBehaviorBrain**: 归位 task/behavior/
+- **TaskTree/TaskGroup**: 移到 task/gui/
+
 ## [v61] — 2026-07-25 — 持久化修复 + 容器消耗修复
 
 - **持久化修复**: loadFromNBT setSize顺序修复(清空Bug) + setStackInSlot自动持久化 + 魂符收放事件同步
