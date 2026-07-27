@@ -1,3 +1,22 @@
+## [v63] — 2026-07-27 — EnvSense并入任务系统 + Bug修复
+
+### 架构重构: EnvSense → 被动任务
+- **删除**: api/envsense/ (EnvSenseRegistry, EnvSenseScheduler, BuiltinEnvSensors), impl/condition/world/EnvSensorCondition, vanilla/input/sense/EnvScanner, RuleEvent.LMA_ENV_SCAN
+- **新增**: task/sense/ (EnvSignal 18信号, EnvSenseBroadcaster 全局广播, EnvSnapshot, EnvScanner)
+- **4个被动任务**: SnowShovelPipeline (雪天铲雪), LightControlPipeline (日出日落开关灯), TempAdaptPipeline (温度→篝火/水源), MonsterLogPipeline (怪物报告)
+- **TaskPipeline新增**: onSignal() 信号回调, PipelineResult.needsSignals 声明式信号需求
+- **AI上下文**: LmaEnvSenseContext — 温度/天气/时间/附近实体暴露给TLM Agent
+- **全局广播**: TaskTickHandler 200tick → EnvSenseBroadcaster → 边沿检测 → onSignal → submitPassive
+
+### Bug修复
+- **ChainHarvestExecute**: 修复砍树→挖矿模式切换时NBT残留+5静态Map污染 (LAST_MODE检测)
+- **FakePlayerManager**: start()覆盖前清理旧FakePlayer防泄漏
+- **ArmTransferPipeline**: 删除死代码 lma_arm_wait
+
+### 数据流适配
+- TempAdaptPipeline: goal从裸PersistentData移入pipelineData (clearPipelineData自动清理)
+- 全部v63新key在v62数据层体系内管理 (pipelineData/TaskKeys/TaskExtraData)
+
 # Changelog
 
 ## [v62] — 2026-07-26 — 任务系统架构重构
