@@ -4,10 +4,12 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.navigation.NavigationMemory;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.ArmTransferService;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskStateMachine;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.service.ArmTransferService;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateMachine;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
@@ -45,6 +47,7 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
     @Override protected Class<State> stateClass() { return State.class; }
     @Override protected State initialState() { return State.TO_TAKE; }
     @Override public String taskType() { return "arm_transfer"; }
+    @Override public boolean needsGameTick() { return true; }
 
     @Override
     protected Map<State, Set<State>> transitions() {
@@ -84,7 +87,6 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
         var d = maid.getPersistentData();
         // v52: KEY_TAKE/KEY_DEPOSIT 持久保留 — 玩家只设一次，重启/TLM重置后仍在
         d.remove(KEY_ITEM);
-        d.remove("lma_arm_wait");
         NavigationMemory.clearAllNav(maid);
     }
 
@@ -100,11 +102,6 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
                     return TaskResult.CONTINUE;
                 tick(world, maid);
                 return TaskResult.CONTINUE;
-            }
-
-            @Override
-            public void onStop(EntityMaid maid) {
-                cleanup(maid);
             }
         };
     }

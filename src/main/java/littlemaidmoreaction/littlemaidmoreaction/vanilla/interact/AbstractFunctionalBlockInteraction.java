@@ -362,7 +362,7 @@ public abstract class AbstractFunctionalBlockInteraction extends AbstractBlockIn
      */
     /** v43: 委托到 TaskDispatcher (统一入口) */
     protected void completeFlowTask(EntityMaid maid) {
-        littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher.complete(maid);
+        littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher.complete(maid);
         RuleEngine.handleEvent("task_changed",
             new littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext(maid, null, null));
     }

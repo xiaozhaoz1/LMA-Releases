@@ -5,10 +5,12 @@ import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaTasks;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskMetaData;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -50,10 +52,9 @@ public final class JukeboxPipeline implements TaskPipeline {
     public static IExecutor executor() {
         return new IExecutor() {
             @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
-                VanillaTasks.jukebox(w, m, p, d.getString(TaskKeys.TASK_TARGET));
+                VanillaTasks.jukebox(w, m, p, TaskMetaData.getTarget(m));
                 return TaskResult.CONTINUE;
             }
-            @Override public void onStop(EntityMaid maid) {}
         };
     }
 

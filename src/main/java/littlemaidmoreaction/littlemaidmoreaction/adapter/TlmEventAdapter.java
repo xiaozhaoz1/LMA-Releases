@@ -4,9 +4,8 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.*;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskEngine;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
 import littlemaidmoreaction.littlemaidmoreaction.core.engine.RuleEngine;
 import net.minecraft.world.damagesource.DamageSource;
 import net.minecraft.world.entity.Entity;
@@ -123,7 +122,8 @@ public final class TlmEventAdapter {
 
     // ═══ TLM 转换 (2+1) ═══
 
-    // ★ v35.4: 100tick(5s) 节流 — 被动规则(lma_tick) + TaskEngine, maid_tick 保持原样给战斗规则
+    // ★ v35.4: 100tick(5s) 节流 — 被动规则(lma_tick)
+    // ★ v64: TLM_SWITCH/GUI_INIT/超时已迁移至 TaskTickHandler (每tick)
     private static final int LMA_TICK_INTERVAL = 100;
     private static final String KEY_LMA_TICK = "lma_tick_last";
 
@@ -133,15 +133,11 @@ public final class TlmEventAdapter {
         long now = e.getMaid().level().getGameTime();
         long last = data.getLong(KEY_LMA_TICK);
 
-        // 每 LMA_TICK_INTERVAL tick 触发一次慢事件
+        // 每 LMA_TICK_INTERVAL tick 触发一次慢事件 (规则)
         if (now - last >= LMA_TICK_INTERVAL || last == 0) {
             data.putLong(KEY_LMA_TICK, now);
-            TaskEngine.tick(ctx);
             RuleEngine.handleEvent("lma_tick", ctx);
         }
-        // v37: 环境感知调度（内部自节流 200tick，无感知器时零开销）
-        littlemaidmoreaction.littlemaidmoreaction.api.envsense
-            .EnvSenseScheduler.tick(e.getMaid());
         // maid_tick 保持每 tick 触发 (战斗/快速响应规则)
         RuleEngine.handleEvent("maid_tick", ctx);
     }
@@ -211,7 +207,7 @@ public final class TlmEventAdapter {
         }
     }
 
-    // ===== Entity Join — 清理跨session残留任务 =====
+    // ===== Entity Join — 恢复任务状态 =====
     @SubscribeEvent
     public static void onEntityJoin(EntityJoinLevelEvent e) {
         if (!(e.getEntity() instanceof EntityMaid maid)) return;
@@ -221,20 +217,26 @@ public final class TlmEventAdapter {
         String task = data.getString(TaskKeys.FLOW_TASK);
         if (task.isEmpty()) return;
 
-        // v52: 保存任务类型, 清理瞬态数据, 自动恢复任务
-        LittleMaidMoreAction.LOGGER.info("[LMA/Restore] restoring task '{}' after restart", task);
+        long now = maid.level().getGameTime();
+        long savedTick = data.getLong(TaskKeys.FLOW_TICK);
 
-        // 清理跨 session 残留的瞬态数据
-        data.remove(TaskKeys.FLOW_STATE);
-        data.remove(TaskKeys.FLOW_TICK);
-        data.remove(TaskKeys.FLOW_STEP);
-        data.remove(TaskKeys.FLOW_TIMEOUT);
-        data.remove(TaskKeys.TLM_SWITCH);   // v56: 防残留cancel
-        data.remove(TaskKeys.GUI_INIT);     // v56: 直接submit不用GUI_INIT
-        // 保留: FLOW_TASK (任务类型), TASK_TARGET (目标物品), lma_arm_* (配置)
-        // 保留: SAVED_HOME/SAVED_PICKUP (女仆状态)
+        // v64: 区分场景
+        if (savedTick > 0 && savedTick <= now) {
+            // 魂符重放置 / 区块加载 — 状态完整, 仅恢复TLM任务, 让Brain自然激活
+            LittleMaidMoreAction.LOGGER.info("[LMA/Restore] 魂符恢复任务 '{}' (state={})", task,
+                data.getString(TaskKeys.FLOW_STATE));
+        } else {
+            // 跨 session 重启 — tick 值失效, 需清理重提交
+            LittleMaidMoreAction.LOGGER.info("[LMA/Restore] 跨session恢复任务 '{}'", task);
+            data.remove(TaskKeys.FLOW_STATE);
+            data.remove(TaskKeys.FLOW_TICK);
+            data.remove(TaskKeys.FLOW_STEP);
+            data.remove(TaskKeys.FLOW_TIMEOUT);
+            data.remove(TaskKeys.TLM_SWITCH);
+            data.remove(TaskKeys.GUI_INIT);
+        }
 
-        // 恢复 TLM 任务 — 直接设LMA任务 (v56: 跳过idle→GUI_INIT→cancel循环)
+        // 恢复 TLM 任务 + 清理链采瞬态
         LmaFlowTask.restorePreviousTask(maid);
         var tlmTask = com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager
             .findTask(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, "task/" + task))
@@ -246,12 +248,14 @@ public final class TlmEventAdapter {
             maid.setTask(com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager.getIdleTask());
         }
 
-        // v36
+        // v36: 清理链采 BFS/缓存 (跨session和魂符都需要)
         littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
             .ChainHarvestExecute.clearChainData(data);
 
-        // 直接提交, 不等GUI_INIT
-        TaskDispatcher.submit(maid, task, null, 0);
+        // 仅跨session重提交, 魂符由Brain自然激活
+        if (savedTick <= 0 || savedTick > now) {
+            TaskDispatcher.submit(maid, task, null, 0);
+        }
     }
 
     private TlmEventAdapter() {}

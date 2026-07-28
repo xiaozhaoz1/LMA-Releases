@@ -32,6 +32,8 @@ public final class MoreActionConfig {
     public static final ForgeConfigSpec.BooleanValue ENV_STRUCTURE_ENABLED;
     public static final ForgeConfigSpec.IntValue ENV_STRUCTURE_INTERVAL;
     public static final ForgeConfigSpec.IntValue ENV_STRUCTURE_RADIUS;
+    // ── v63: 全局总开关 ──
+    public static final ForgeConfigSpec.BooleanValue ENVSENSE_ENABLED;
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -88,6 +90,9 @@ public final class MoreActionConfig {
         ENV_STRUCTURE_RADIUS = b
                 .comment("结构探测半径 (区块), 越大越慢")
                 .defineInRange("structure_radius_chunks", 8, 1, 32);
+        ENVSENSE_ENABLED = b
+                .comment("环境感知总开关: false=女仆不接收任何环境信号 (v63)")
+                .define("enabled", false);
         b.pop();
 
         SPEC = b.build();

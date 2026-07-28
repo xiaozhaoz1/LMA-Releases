@@ -60,7 +60,7 @@ public final class JukeboxExecute {
             phase = Phase.INSERTING;
             phaseTick = now;
         }
-        littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager.heartbeat(maid, now);
+        littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateManager.heartbeat(maid, now);
 
         switch (phase) {
             case INSERTING -> {

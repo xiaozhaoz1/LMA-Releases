@@ -3,7 +3,7 @@ package littlemaidmoreaction.littlemaidmoreaction.vanilla.interact;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;

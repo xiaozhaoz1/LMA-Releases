@@ -5,10 +5,13 @@ import com.simibubi.create.content.kinetics.deployer.DeployerApplicationRecipe;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.FlowTaskData;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateMachine;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
@@ -17,25 +20,39 @@ import net.minecraft.world.item.crafting.Recipe;
 import net.minecraftforge.items.ItemHandlerHelper;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 /**
- * 便携装配 Pipeline.
+ * 便携装配 Pipeline (v62: pipelineData 管理临时进度, Inventory 用独立 key).
  *
- * <p>材料来源 (三级): 背包 → 附近容器 → 隙间 (enableWireless=true)
+ * <p>材料来源 (三级): 背包 → 附近容器 → 隙间
  * <p>产物分发 (三级): 槽位 → 背包 → 隙间 → 地上
  */
-public final class MaidAssemblyPipeline implements TaskPipeline {
+public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPipeline.State> {
 
-    private static final String KEY = "maid_assembly";
+    enum State { IDLE, TRY_START, ADVANCE, STRIKE, EAT_RESET }
 
+    @Override protected Class<State> stateClass() { return State.class; }
+    @Override protected State initialState() { return State.IDLE; }
     @Override public String taskType() { return "maid_assembly"; }
-    @Override public boolean isLongRunning() { return true; }
     @Override public boolean needsGameTick() { return true; }
     @Override public boolean enableWorkEat() { return true; }
-    @Override public boolean enableWireless() { return true; }
+
+    @Override
+    protected Map<State, Set<State>> transitions() {
+        return Map.of(
+            State.IDLE,       Set.of(State.TRY_START),
+            State.TRY_START,  Set.of(State.ADVANCE, State.IDLE),
+            State.ADVANCE,    Set.of(State.STRIKE, State.EAT_RESET, State.IDLE),
+            State.STRIKE,     Set.of(State.ADVANCE),
+            State.EAT_RESET,  Set.of(State.IDLE)
+        );
+    }
 
     @javax.annotation.Nullable
-    @Override public java.util.function.Predicate<ItemStack> collectFilter(EntityMaid maid) {
+    @Override
+    public java.util.function.Predicate<ItemStack> collectFilter(EntityMaid maid) {
         var inv = MaidAssemblyInventory.of(maid);
         ItemStack lock = inv.getMaterialLock();
         ItemStack mat = inv.getStackInSlot(8);
@@ -54,89 +71,69 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         return PipelineResult.ok("");
     }
 
-    @Override public void onCleanup(EntityMaid maid) {
-        CompoundTag r = maid.getPersistentData().getCompound(KEY);
-        r.remove("InProc"); r.remove("Timer"); r.remove("Slot"); r.remove("Pass"); r.remove("TryCd"); r.remove("AdvCd");
-        maid.getPersistentData().put(KEY, r);
-    }
-
-    @Override public void interrupt(EntityMaid maid) { onCleanup(maid); }
-
+    @Override
     public IExecutor executor() {
         return new IExecutor() {
-            @Override public TaskResult execute(ServerLevel w, EntityMaid m, net.minecraft.core.BlockPos p, CompoundTag d) {
+            @Override public TaskResult execute(ServerLevel w, EntityMaid m,
+                                                 net.minecraft.core.BlockPos p, CompoundTag d) {
                 tick(w, m); return TaskResult.CONTINUE;
             }
-            @Override public void onStop(EntityMaid m) { onCleanup(m); }
         };
     }
 
-    public void tick(ServerLevel world, EntityMaid maid) {
-        CompoundTag root = maid.getPersistentData().getCompound(KEY);
-        if (TaskKeys.STATE_CANCELLED.equals(maid.getPersistentData().getString(TaskKeys.FLOW_STATE))) {
-            onCleanup(maid); return;
+    // ── 状态业务逻辑 ──
+
+    @Override
+    protected State tick(State s, ServerLevel world, EntityMaid maid) {
+        if (TaskKeys.STATE_CANCELLED.equals(FlowTaskData.getState(maid))) {
+            return null;
         }
-
-        if (!root.getBoolean("InProc")) {
-            int cd = root.getInt("TryCd");
-            if (cd > 0) { root.putInt("TryCd", cd - 1); maid.getPersistentData().put(KEY, root); return; }
-            root.putInt("TryCd", 20);
-            tryStart(maid, root);
-            return;
-        }
-
-        int pass = root.getInt("Pass");
-        int timer = root.getInt("Timer");
-
-        if (pass >= MaidAssemblyInventory.MACHINE_SLOTS) {
-            eatAndReset(maid, root);
-            return;
-        }
-
-        if (timer > 0) {
-            root.putInt("Timer", timer - 1);
-            maid.getPersistentData().put(KEY, root);
-            return;
-        }
-
-        if (timer == 0) {
-            strike(world, maid, root);
-            return;
-        }
-
-        int advCd = root.getInt("AdvCd");
-        if (advCd > 0) { root.putInt("AdvCd", advCd - 1); maid.getPersistentData().put(KEY, root); return; }
-        root.putInt("AdvCd", 5);
-        advanceSlot(world, maid, root);
+        return switch (s) {
+            case IDLE      -> tickIdle(maid);
+            case TRY_START -> tickTryStart(maid);
+            case ADVANCE   -> tickAdvance(world, maid);
+            case STRIKE    -> tickStrike(world, maid);
+            case EAT_RESET -> tickEatReset(maid);
+        };
     }
 
-    private void tryStart(EntityMaid maid, CompoundTag root) {
+    // ── IDLE: 冷却 → TRY_START ──
+
+    private State tickIdle(EntityMaid maid) {
+        CompoundTag pd = pipelineData(maid);
+        int cd = pd.getInt("TryCd");
+        if (cd > 0) { pd.putInt("TryCd", cd - 1); return State.IDLE; }
+        pd.putInt("TryCd", 20);
+        return State.TRY_START;
+    }
+
+    // ── TRY_START: 检查机器+食物+输入 ──
+
+    private State tickTryStart(EntityMaid maid) {
         MaidAssemblyInventory inv = MaidAssemblyInventory.of(maid);
-        if (!inv.hasAnyMachine()) return;
-        if (!hasFood(maid)) return;
+        if (!inv.hasAnyMachine()) return State.IDLE;
+        if (!hasFood(maid)) return State.IDLE;
         ItemStack input = getCurrentInput(inv);
-        if (input.isEmpty()) return;
-        root.putBoolean("InProc", true);
-        root.putInt("Slot", 0);
-        root.putInt("Pass", 0);
-        root.putInt("Timer", -1);
-        maid.getPersistentData().put(KEY, root);
+        if (input.isEmpty()) return State.IDLE;
+
+        CompoundTag pd = pipelineData(maid);
+        pd.putBoolean("InProc", true);
+        pd.putInt("Slot", 0);
+        pd.putInt("Pass", 0);
+        pd.putInt("Timer", -1);
+        return State.ADVANCE;
     }
 
-    private boolean hasFood(EntityMaid maid) {
-        ItemStack offhand = maid.getOffhandItem();
-        if (!offhand.isEmpty() && offhand.isEdible()) return true;
-        var bp = maid.getAvailableBackpackInv();
-        for (int s = 0; s < bp.getSlots(); s++) {
-            ItemStack st = bp.getStackInSlot(s);
-            if (!st.isEmpty() && st.isEdible()) return true;
-        }
-        return false;
-    }
+    // ── ADVANCE: 推进槽位+匹配配方 ──
 
-    private void advanceSlot(ServerLevel world, EntityMaid maid, CompoundTag root) {
+    private State tickAdvance(ServerLevel world, EntityMaid maid) {
+        CompoundTag pd = pipelineData(maid);
+        int advCd = pd.getInt("AdvCd");
+        if (advCd > 0) { pd.putInt("AdvCd", advCd - 1); return State.ADVANCE; }
+        pd.putInt("AdvCd", 5);
+
         MaidAssemblyInventory inv = MaidAssemblyInventory.of(maid);
-        int pass = root.getInt("Pass");
+        int pass = pd.getInt("Pass");
 
         while (pass < MaidAssemblyInventory.MACHINE_SLOTS) {
             MaidAssemblyService.MachineKind kind = inv.getMachineKind(pass);
@@ -145,17 +142,16 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
                 if (!input.isEmpty()) {
                     int dur = matchRecipe(world, maid, kind, input);
                     if (dur > 0) {
-                        root.putInt("Slot", pass);
-                        root.putInt("Pass", pass);
-                        root.putInt("Timer", dur);
-                        maid.getPersistentData().put(KEY, root);
-                        return;
+                        pd.putInt("Slot", pass);
+                        pd.putInt("Pass", pass);
+                        pd.putInt("Timer", dur);
+                        return State.STRIKE;
                     }
                 }
             }
             pass++;
-            root.putInt("Pass", pass);
         }
+
         ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
         if (!inter.isEmpty() && !MaidAssemblyService.isAssemblyIntermediate(inter)) {
             ItemStack remaining = inv.tryInsertOutput(inter.copy());
@@ -163,13 +159,20 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
             if (!remaining.isEmpty()) deposit(maid, remaining);
             inv.saveToNBT();
         }
-        maid.getPersistentData().put(KEY, root);
+        pd.putInt("Pass", pass);
+        return (pass >= MaidAssemblyInventory.MACHINE_SLOTS) ? State.EAT_RESET : State.ADVANCE;
     }
 
-    private void strike(ServerLevel world, EntityMaid maid, CompoundTag root) {
+    // ── STRIKE: 计时器倒计时→执行配方 ──
+
+    private State tickStrike(ServerLevel world, EntityMaid maid) {
+        CompoundTag pd = pipelineData(maid);
+        int timer = pd.getInt("Timer");
+        if (timer > 0) { pd.putInt("Timer", timer - 1); return State.STRIKE; }
+
         MaidAssemblyInventory inv = MaidAssemblyInventory.of(maid);
-        int slot = root.getInt("Slot");
-        int pass = root.getInt("Pass");
+        int slot = pd.getInt("Slot");
+        int pass = pd.getInt("Pass");
         MaidAssemblyService.MachineKind kind = inv.getMachineKind(slot);
 
         ItemStack machineBlock = MaidAssemblyService.getMachineBlockStack(kind);
@@ -181,66 +184,79 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         maid.swing(InteractionHand.MAIN_HAND);
         maid.setItemInHand(InteractionHand.MAIN_HAND, oldMainHand);
 
-        if (kind == null) { advanceAfterStrike(maid, root, pass); return; }
-
-        ItemStack input = getCurrentInput(inv);
-        if (input.isEmpty()) { advanceAfterStrike(maid, root, pass); return; }
-
-        ItemStack single = input.copyWithCount(1);
-        List<ItemStack> outputs = executeRecipe(world, maid, kind, single);
-        if (outputs.isEmpty()) { advanceAfterStrike(maid, root, pass); return; }
-
-        consumeInput(maid, inv, input);
-
-        boolean isLastPass = (pass + 1 >= MaidAssemblyInventory.MACHINE_SLOTS);
-        for (ItemStack out : outputs) {
-            if (out.isEmpty()) continue;
-            if (MaidAssemblyService.isAssemblyIntermediate(out)) {
-                ItemStack r = insertOrStack(inv, MaidAssemblyInventory.INTERMEDIATE_SLOT, out);
-                deposit(maid, r);
-            } else if (!isLastPass) {
-                ItemStack r = out;
-                if (inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT).isEmpty())
-                    r = insertOrStack(inv, MaidAssemblyInventory.INTERMEDIATE_SLOT, out);
-                if (!r.isEmpty()) { r = inv.tryInsertOutput(r); deposit(maid, r); }
-            } else {
-                ItemStack r = inv.tryInsertOutput(out);
-                deposit(maid, r);
+        if (kind != null) {
+            ItemStack input = getCurrentInput(inv);
+            if (!input.isEmpty()) {
+                List<ItemStack> outputs = executeRecipe(world, maid, kind, input.copyWithCount(1));
+                if (!outputs.isEmpty()) {
+                    consumeInput(maid, inv, input);
+                    boolean isLastPass = (pass + 1 >= MaidAssemblyInventory.MACHINE_SLOTS);
+                    for (ItemStack out : outputs) {
+                        if (out.isEmpty()) continue;
+                        if (MaidAssemblyService.isAssemblyIntermediate(out)) {
+                            ItemStack r = insertOrStack(inv, MaidAssemblyInventory.INTERMEDIATE_SLOT, out);
+                            deposit(maid, r);
+                        } else if (!isLastPass) {
+                            ItemStack r = out;
+                            if (inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT).isEmpty())
+                                r = insertOrStack(inv, MaidAssemblyInventory.INTERMEDIATE_SLOT, out);
+                            if (!r.isEmpty()) { r = inv.tryInsertOutput(r); deposit(maid, r); }
+                        } else {
+                            ItemStack r = inv.tryInsertOutput(out);
+                            deposit(maid, r);
+                        }
+                    }
+                }
             }
         }
 
         inv.autoRefillMaterial();
         inv.saveToNBT();
-        advanceAfterStrike(maid, root, pass);
+        pd.putInt("Timer", -1);
+        pd.putInt("Pass", pass + 1);
+        return State.ADVANCE;
     }
 
-    private void advanceAfterStrike(EntityMaid maid, CompoundTag root, int pass) {
-        root.putInt("Timer", -1);
-        root.putInt("Pass", pass + 1);
-        maid.getPersistentData().put(KEY, root);
+    // ── EAT_RESET: 保存库存 → 重置 → IDLE ──
+
+    private State tickEatReset(EntityMaid maid) {
+        MaidAssemblyInventory.of(maid).saveToNBT();
+        CompoundTag pd = pipelineData(maid);
+        pd.putBoolean("InProc", false);
+        pd.remove("Timer"); pd.remove("Slot"); pd.remove("Pass");
+        pd.remove("TryCd"); pd.remove("AdvCd");
+        return State.IDLE;
     }
 
-    private void eatAndReset(EntityMaid maid, CompoundTag root) {
-        var inv = MaidAssemblyInventory.of(maid);
-        inv.saveToNBT();
-        root.putBoolean("InProc", false);
-        root.remove("Timer"); root.remove("Slot"); root.remove("Pass"); root.remove("TryCd"); root.remove("AdvCd");
-        maid.getPersistentData().put(KEY, root);
+    // ── 工具方法 ──
+
+    private boolean hasFood(EntityMaid maid) {
+        ItemStack offhand = maid.getOffhandItem();
+        if (!offhand.isEmpty() && offhand.isEdible()) return true;
+        var bp = maid.getAvailableBackpackInv();
+        for (int s = 0; s < bp.getSlots(); s++) {
+            if (!bp.getStackInSlot(s).isEmpty() && bp.getStackInSlot(s).isEdible()) return true;
+        }
+        return false;
+    }
+
+    private ItemStack getCurrentInput(MaidAssemblyInventory inv) {
+        ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
+        if (!inter.isEmpty()) return inter;
+        return inv.getStackInSlot(MaidAssemblyInventory.MATERIAL_SLOT);
     }
 
     private int matchRecipe(ServerLevel world, EntityMaid maid,
                             MaidAssemblyService.MachineKind kind, ItemStack input) {
         if (input.isEmpty()) return 0;
-        ItemStack single = input.copyWithCount(1);
-
         return switch (kind) {
             case PRESS, SAW, MILLSTONE -> {
-                Recipe<?> r = MaidAssemblyService.findSimpleRecipe(world, kind, single);
+                Recipe<?> r = MaidAssemblyService.findSimpleRecipe(world, kind, input);
                 yield r != null ? MaidAssemblyService.getDuration(kind, maid) : 0;
             }
             case DEPLOYER -> {
                 List<ItemStack> avail = MaidAssemblyService.collectAvailableItems(maid, true);
-                ItemStack held = MaidAssemblyService.findDeployerHeldItem(world, single, avail);
+                ItemStack held = MaidAssemblyService.findDeployerHeldItem(world, input, avail);
                 yield held != null ? MaidAssemblyService.getDuration(kind, maid) : 0;
             }
         };
@@ -270,12 +286,6 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
         }
     }
 
-    private ItemStack getCurrentInput(MaidAssemblyInventory inv) {
-        ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
-        if (!inter.isEmpty()) return inter;
-        return inv.getStackInSlot(MaidAssemblyInventory.MATERIAL_SLOT);
-    }
-
     private void consumeInput(EntityMaid maid, MaidAssemblyInventory inv, ItemStack input) {
         ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
         if (!inter.isEmpty() && ItemStack.isSameItemSameTags(inter, input)) {
@@ -283,10 +293,7 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
             inv.setStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT, inter);
         } else {
             ItemStack mat = inv.getStackInSlot(MaidAssemblyInventory.MATERIAL_SLOT);
-            if (!mat.isEmpty()) {
-                mat.shrink(1);
-                inv.setStackInSlot(MaidAssemblyInventory.MATERIAL_SLOT, mat);
-            }
+            if (!mat.isEmpty()) { mat.shrink(1); inv.setStackInSlot(MaidAssemblyInventory.MATERIAL_SLOT, mat); }
         }
     }
 
@@ -300,22 +307,17 @@ public final class MaidAssemblyPipeline implements TaskPipeline {
     }
 
     private void consumeFromBackpack(EntityMaid maid, ItemStack target) {
-        // 1. 背包
         var bp = maid.getAvailableBackpackInv();
         for (int s = 0; s < bp.getSlots(); s++) {
-            ItemStack stack = bp.getStackInSlot(s);
-            if (ItemStack.isSameItemSameTags(stack, target)) {
-                bp.extractItem(s, 1, false);
-                return;
+            if (ItemStack.isSameItemSameTags(bp.getStackInSlot(s), target)) {
+                bp.extractItem(s, 1, false); return;
             }
         }
-        // 2. 隙间 + 附近容器 (NearbyContainerService 统一处理)
         littlemaidmoreaction.littlemaidmoreaction.task.service.NearbyContainerService.extractItem(
             maid.level(), maid.blockPosition(), MaidAssemblyService.SEARCH_RADIUS,
             st -> ItemStack.isSameItemSameTags(st, target), java.util.Set.of(), true, maid);
     }
 
-    /** 产物分发: 背包 → 隙间 → 扔地上 */
     private void deposit(EntityMaid maid, ItemStack stack) {
         if (stack.isEmpty()) return;
         stack = ItemHandlerHelper.insertItemStacked(maid.getAvailableBackpackInv(), stack, false);

@@ -7,10 +7,13 @@ import littlemaidmoreaction.littlemaidmoreaction.api.VanillaInputRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaTasks;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.recipe.RecipeChain;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskMetaData;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -30,6 +33,7 @@ public final class CraftChainPipeline implements TaskPipeline {
 
     @Override
     public String taskType() { return "craft_chain"; }
+    @Override public boolean isLongRunning() { return true; }
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.is(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE); }
 
     @Override
@@ -45,7 +49,13 @@ public final class CraftChainPipeline implements TaskPipeline {
     /** v44: 纯验证 — 仅检查配方+材料(读操作)，不写日志 */
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
+        // v64: 空target时检查NBT中保存的目标 (魂符恢复/TLM栏启动)
         String target = ctx.target();
+        if (target.isEmpty()) {
+            target = maid.getPersistentData().getString(TaskKeys.TASK_TARGET);
+        }
+        if (target.isEmpty()) return PipelineResult.failed("需要指定合成目标 (通过AI或物品名称)");
+
         Map<Item, Integer> available = VanillaInputRegistry.readAllItems(maid);
         if (available.isEmpty()) return PipelineResult.failed("empty inventory");
         var chain = RecipeResolver.resolve(level, target, available);
@@ -66,10 +76,9 @@ public final class CraftChainPipeline implements TaskPipeline {
     public static IExecutor executor() {
         return new IExecutor() {
             @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
-                return VanillaTasks.craft(w, m, p, d.getString(TaskKeys.TASK_TARGET))
+                return VanillaTasks.craft(w, m, p, TaskMetaData.getTarget(m))
                     ? TaskResult.SUCCESS : TaskResult.FAILED;
             }
-            @Override public void onStop(EntityMaid maid) {}
         };
     }
 

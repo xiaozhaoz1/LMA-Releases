@@ -2,9 +2,11 @@ package littlemaidmoreaction.littlemaidmoreaction.compat.create.task;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.navigation.NavigationMemory;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskStateMachine;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateMachine;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;

@@ -24,7 +24,7 @@ import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.AutoCropHandler;
 import littlemaidmoreaction.littlemaidmoreaction.resource.DynamicAnimationResources;
 import littlemaidmoreaction.littlemaidmoreaction.storage.StartupLoader;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskRegistry;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.packs.PackType;
 import net.minecraft.server.packs.repository.Pack;
@@ -85,22 +85,27 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
 
     @Override
     public void registerAITool(ToolRegister register) {
-        register.register(new littlemaidmoreaction.littlemaidmoreaction.compat.ai.tool.StartTaskTool());
-        register.register(new littlemaidmoreaction.littlemaidmoreaction.compat.ai.tool.ListRulesTool());
-        register.register(new littlemaidmoreaction.littlemaidmoreaction.compat.ai.tool.DeleteRuleTool());
-        register.register(new littlemaidmoreaction.littlemaidmoreaction.compat.ai.tool.ToggleRuleTool());
-        register.register(new littlemaidmoreaction.littlemaidmoreaction.compat.ai.tool.LmaSearchTool());
-        register.register(new littlemaidmoreaction.littlemaidmoreaction.compat.ai.tool.LmaDocsTool());
-        LittleMaidMoreAction.LOGGER.info("[LMA] AI Tools 已注册 (6 tools)");
+        register.register(new littlemaidmoreaction.littlemaidmoreaction.ai.tool.StartTaskTool());
+        register.register(new littlemaidmoreaction.littlemaidmoreaction.ai.tool.ListRulesTool());
+        register.register(new littlemaidmoreaction.littlemaidmoreaction.ai.tool.DeleteRuleTool());
+        register.register(new littlemaidmoreaction.littlemaidmoreaction.ai.tool.ToggleRuleTool());
+        register.register(new littlemaidmoreaction.littlemaidmoreaction.ai.tool.LmaSearchTool());
+        register.register(new littlemaidmoreaction.littlemaidmoreaction.ai.tool.LmaDocsTool());
+        register.register(new littlemaidmoreaction.littlemaidmoreaction.ai.tool.QueryTaskTool());
+        LittleMaidMoreAction.LOGGER.info("[LMA] AI Tools 已注册 (7 tools)");
     }
 
     @Override
     public void registerAIMaidContext(GameContextRegister register) {
         // v10: 周围方块感知 + LMA 状态摘要
-        littlemaidmoreaction.littlemaidmoreaction.compat.ai.context.LmaBlocksContext.registerAll(register);
-        littlemaidmoreaction.littlemaidmoreaction.compat.ai.context.LmaStatusContext.registerAll(register);
-        littlemaidmoreaction.littlemaidmoreaction.compat.ai.context.LmaDetailContext.registerAll(register);
-        LittleMaidMoreAction.LOGGER.info("[LMA] AI Context 已注册 (nearby_blocks + lma_status + lma_details)");
+        littlemaidmoreaction.littlemaidmoreaction.ai.context.LmaBlocksContext.registerAll(register);
+        littlemaidmoreaction.littlemaidmoreaction.ai.context.LmaStatusContext.registerAll(register);
+        littlemaidmoreaction.littlemaidmoreaction.ai.context.LmaDetailContext.registerAll(register);
+        // v63: 环境感知上下文
+        littlemaidmoreaction.littlemaidmoreaction.ai.context.LmaEnvSenseContext.registerAll(register);
+        // v64: 任务状态上下文
+        littlemaidmoreaction.littlemaidmoreaction.ai.context.MaidTaskContext.registerAll(register);
+        LittleMaidMoreAction.LOGGER.info("[LMA] AI Context 已注册 (nearby_blocks + lma_status + lma_details + envsense + lma_task)");
     }
 
     // ── v12.5: 预留扩展钩子 (待实现) ──
@@ -138,7 +143,7 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
                 );
             }
         });
-        manager.addExtraMaidBrain(littlemaidmoreaction.littlemaidmoreaction.task.DefaultBehaviorBrain.INSTANCE);
+        manager.addExtraMaidBrain(littlemaidmoreaction.littlemaidmoreaction.task.behavior.DefaultBehaviorBrain.INSTANCE);
         LittleMaidMoreAction.LOGGER.info("[LMA] ExtraMaidBrain 已注册 (NAV_TARGET, NAV_START_TICK + default behaviors)");
     }
 
@@ -148,12 +153,11 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
     public void registerTaskData(TaskDataRegister register) {
         register.register(
             net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, "flow_tasks"),
-            littlemaidmoreaction.littlemaidmoreaction.compat.ai.model.FlowTask.CODEC.listOf(),
-            littlemaidmoreaction.littlemaidmoreaction.compat.ai.model.FlowTask.CODEC.listOf()
+            littlemaidmoreaction.littlemaidmoreaction.ai.model.FlowTask.CODEC.listOf(),
+            littlemaidmoreaction.littlemaidmoreaction.ai.model.FlowTask.CODEC.listOf()
         );
-        // v43: 注册 LmaTaskDataKeys (备用, v44切换)
-        littlemaidmoreaction.littlemaidmoreaction.task.LmaTaskDataKeys.registerAll(register);
-        LittleMaidMoreAction.LOGGER.info("[LMA] TaskData 已注册 (flow_tasks + lma_flow_*)");
+        // v62: LmaTaskDataKeys 已删除 — PersistentData 够用, TaskDataKey 迁移不再需要
+        LittleMaidMoreAction.LOGGER.info("[LMA] TaskData 已注册 (flow_tasks)");
     }
 
     /**
@@ -210,12 +214,12 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
             if (event.getEntity() instanceof EntityMaid maid) {
                 AutoCropHandler.onMaidUnload(maid.getUUID());
-                // v37: 环境感知缓存清理（key 闭环）
-                littlemaidmoreaction.littlemaidmoreaction.api.envsense
-                    .EnvSenseScheduler.onMaidUnload(maid.getId());
-                // v36.1: 连锁采集跳过集清理
-                littlemaidmoreaction.littlemaidmoreaction.vanilla.execute
-                    .ChainHarvestExecute.onMaidUnload(maid.getId());
+                // v63: 环境感知缓存清理（key 闭环）
+                littlemaidmoreaction.littlemaidmoreaction.task.sense
+                    .EnvSenseBroadcaster.onMaidUnload(maid.getId());
+                // v64: TlmTaskMonitor HashMap key 闭环
+                littlemaidmoreaction.littlemaidmoreaction.adapter
+                    .TlmTaskMonitor.onMaidLeave(maid.getId());
                 // v38: FakePlayer 持续挖掘清理
                 littlemaidmoreaction.littlemaidmoreaction.vanilla.fakeplayer
                     .FakePlayerManager.onMaidUnload(maid.getId());

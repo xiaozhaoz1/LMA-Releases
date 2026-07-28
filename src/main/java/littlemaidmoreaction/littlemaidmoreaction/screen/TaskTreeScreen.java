@@ -1,6 +1,7 @@
 package littlemaidmoreaction.littlemaidmoreaction.screen;
 
-import littlemaidmoreaction.littlemaidmoreaction.task.*;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskToggle;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.TaskTree;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

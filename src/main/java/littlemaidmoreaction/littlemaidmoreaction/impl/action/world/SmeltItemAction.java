@@ -2,8 +2,8 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.world;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
 import littlemaidmoreaction.littlemaidmoreaction.api.ParamExtractor;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
@@ -31,6 +31,6 @@ public final class SmeltItemAction implements IAction {
         EntityMaid maid = ctx.maid();
         if (maid.level().isClientSide()) return;
         var p = ParamExtractor.from(raw, PARAMS);
-        TaskDispatcher.submit(maid, TaskKeys.TASK_FURNACE, p.getString("item_id"), 0);
+        TaskDispatcher.submit(maid, "furnace", p.getString("item_id"), 0);
     }
 }

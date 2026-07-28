@@ -4,7 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.MaidTaskEnableEvent;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
 import net.minecraft.nbt.CompoundTag;
 
 /**

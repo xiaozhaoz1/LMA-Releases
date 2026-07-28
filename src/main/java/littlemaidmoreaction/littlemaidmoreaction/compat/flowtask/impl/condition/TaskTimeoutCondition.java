@@ -6,7 +6,7 @@ import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionCat
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ConditionValueType;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
 
 import java.util.List;
 import java.util.Map;

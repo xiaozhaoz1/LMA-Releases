@@ -4,7 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.InteractMaidEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher;
 import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.ArmTransferPipeline;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;

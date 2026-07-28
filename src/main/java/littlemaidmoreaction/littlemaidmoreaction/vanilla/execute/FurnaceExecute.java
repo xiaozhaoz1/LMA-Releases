@@ -6,6 +6,7 @@ import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.block.FurnaceOut
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
+import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
@@ -25,7 +26,10 @@ public final class FurnaceExecute {
     public static boolean execute(ServerLevel world, EntityMaid maid, BlockPos pos,
                                    String inputItemId, SlotLayout slots) {
         BlockEntity be = world.getBlockEntity(pos);
-        if (!(be instanceof AbstractFurnaceBlockEntity furnace)) return false;
+        if (!(be instanceof AbstractFurnaceBlockEntity furnace)) {
+            LittleMaidMoreAction.LOGGER.warn("[LMA/Furnace] no furnace at {}", pos.toShortString());
+            return false;
+        }
 
         var data = maid.getPersistentData();
         Phase phase = Phase.fromOrdinal(data.getInt("lma_furnace_phase"));
@@ -46,7 +50,8 @@ public final class FurnaceExecute {
             }
         }
 
-        littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager.heartbeat(maid, world.getGameTime());
+        LittleMaidMoreAction.LOGGER.info("[LMA/Furnace] phase={} meaningful={} input={}", phase, meaningful, inputItemId);
+        littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateManager.heartbeat(maid, world.getGameTime());
         return meaningful;
     }
 

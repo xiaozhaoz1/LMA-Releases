@@ -4,10 +4,12 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.navigation.NavigationMemory;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.FlowTaskData;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -16,6 +18,9 @@ import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 import java.util.List;
 
 /**
+ * @deprecated v62: 迁移至 {@link TaskStateMachine}. Press/Mix 已迁移。
+ *   保留供外部Mod可能引用, 不再用于新Pipeline。
+ *
  * Create 计时器驱动 Pipeline 抽象基类 (v42)。
  *
  * <p>提取 PressPipeline/MixPipeline 共享的 tick 状态机骨架:
@@ -32,12 +37,16 @@ import java.util.List;
  * <p>子类可直接使用继承的方法: {@link #navigateTo}, {@link #arrived}, {@link #readPos},
  * {@link #cleanup}, {@link #workTicks}, {@link #tickIdling}, {@link #executor}.
  */
+@Deprecated
 public abstract class TimerBasedCreatePipeline implements TaskPipeline {
 
     @Override public boolean isLongRunning() { return true; }
     @Override public boolean needsGameTick() { return true; } // 倒计时 tick— 需要每帧递减
-    @Override public void onCleanup(EntityMaid maid) { cleanup(maid); }
-    @Override public void interrupt(EntityMaid maid) { NavigationMemory.clearAllNav(maid); }
+    @Override public void onCleanup(EntityMaid maid) { cleanup(maid); TaskPipeline.super.onCleanup(maid); }
+    @Override public void interrupt(EntityMaid maid) {
+        NavigationMemory.clearAllNav(maid);
+        onCleanup(maid);  // v62: interrupt 统一走 onCleanup
+    }
 
     protected final String keyTimer;
     protected final String keyTarget;
@@ -80,7 +89,6 @@ public abstract class TimerBasedCreatePipeline implements TaskPipeline {
     public IExecutor executor() {
         return new IExecutor() {
             @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) { tick(w, m); return TaskResult.CONTINUE; }
-            @Override public void onStop(EntityMaid maid) { cleanup(maid); }
         };
     }
 
@@ -88,7 +96,7 @@ public abstract class TimerBasedCreatePipeline implements TaskPipeline {
     public void tick(ServerLevel world, EntityMaid maid) {
         var d = maid.getPersistentData();
         // v44: 取消检测
-        if (TaskKeys.STATE_CANCELLED.equals(d.getString(TaskKeys.FLOW_STATE))) { cleanup(maid); return; }
+        if (TaskKeys.STATE_CANCELLED.equals(FlowTaskData.getState(maid))) { cleanup(maid); return; }
         int timer = d.getInt(keyTimer);
 
         if (timer > 0) { tickWorking(world, maid, d, timer); return; }

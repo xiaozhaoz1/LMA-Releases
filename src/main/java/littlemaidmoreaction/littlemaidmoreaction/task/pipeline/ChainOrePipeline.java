@@ -5,9 +5,11 @@ import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.item.ToolStateReader;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -26,6 +28,12 @@ public final class ChainOrePipeline implements TaskPipeline {
 
     @Override public String taskType() { return "collect_ore"; }
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.is(net.minecraftforge.common.Tags.Blocks.ORES); }
+    @Override public boolean needsGameTick() { return true; }
+    @Override public void tick(ServerLevel world, EntityMaid maid) {
+        if (littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys.STATE_CANCELLED.equals(
+            littlemaidmoreaction.littlemaidmoreaction.task.data.FlowTaskData.getState(maid))) return;
+        ChainHarvestExecute.execute(world, maid, maid.blockPosition(), maid.getPersistentData(), ChainHarvestExecute.Mode.ORE);
+    }
     @Override public boolean isLongRunning() { return true; }
 
     @Override
@@ -44,9 +52,6 @@ public final class ChainOrePipeline implements TaskPipeline {
         return new IExecutor() {
             @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
                 return ChainHarvestExecute.execute(w, m, p, d, ChainHarvestExecute.Mode.ORE);
-            }
-            @Override public void onStop(EntityMaid maid) {
-                ChainHarvestExecute.onMaidUnload(maid.getId());
             }
         };
     }

@@ -84,7 +84,7 @@ public final class LmaTypedFlowTask implements IMaidTask {
 
     @Override
     public boolean enableLookAndRandomWalk(EntityMaid maid) {
-        return false;
+        return true; // true=禁用随机闲逛
     }
 
     @Override

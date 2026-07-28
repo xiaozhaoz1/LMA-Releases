@@ -9,8 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 /**
  * 统一任务执行器接口 — 替代 TaskRegistry.TaskExecutor 函数式接口。
  *
- * <p>每个 Executor 执行一个 tick 的工作，支持多 tick 持续执行 (返回 CONTINUE)。
- * 增加生命周期钩子 onStop/onComplete，替代静态 HashMap 手动清理。</p>
+ * <p>每个 Executor 执行一个 tick 的工作，支持多 tick 持续执行 (返回 CONTINUE)。</p>
  *
  * <p>标准调用签名: {@code execute(world, maid, pos, data)}</p>
  */
@@ -36,9 +35,4 @@ public interface IExecutor {
         return execute(world, maid, pos, data);
     }
 
-    /** 任务被抢占/停止时清理 */
-    default void onStop(EntityMaid maid) {}
-
-    /** 任务成功完成回调 */
-    default void onComplete(ServerLevel world, EntityMaid maid, BlockPos pos) {}
 }

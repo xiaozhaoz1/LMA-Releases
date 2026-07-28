@@ -9,7 +9,7 @@ import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.param.TypedParam;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher;
 
 import java.util.List;
 import java.util.Map;

@@ -6,10 +6,12 @@ import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.VanillaInputRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaTasks;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskMetaData;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -25,22 +27,38 @@ import net.minecraftforge.registries.ForgeRegistries;
 import java.util.*;
 
 /**
- * 熔炉管道 (Phase 2) — 查烧炼配方 → 检查原材料 → 写规则 → FurnaceInteractAction 执行。
+ * 熔炉管道 — 查烧炼配方 → 检查原材料 → 执行。
  */
 public final class FurnacePipeline implements TaskPipeline {
 
     @Override public String taskType() { return "furnace"; }
+    @Override public boolean isLongRunning() { return true; }
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return w.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity; }
     @Override public List<TaskStep> steps() { return List.of(new TaskStep("smelt", "熔炉烧炼", StepType.CRAFT, List.of())); }
 
-    /** v44: 纯验证 — 仅检查是否有可烧炼材料，不写NBT/日志/通知 */
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
         String target = ctx.target();
+        Map<Item, Integer> allItems = VanillaInputRegistry.readAllItems(maid);
+
+        // v64: 空 target — 检查是否有任何可烧炼材料
+        if (target.isEmpty()) {
+            for (SmeltingRecipe recipe : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
+                for (ItemStack ing : recipe.getIngredients().get(0).getItems()) {
+                    if (allItems.getOrDefault(ing.getItem(), 0) > 0) return PipelineResult.ok("");
+                }
+            }
+            // 将可作燃料的物品也视为有效 (如原木→木炭)
+            for (SmeltingRecipe recipe : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
+                ItemStack result = recipe.getResultItem(level.registryAccess());
+                if (allItems.getOrDefault(result.getItem(), 0) > 0) return PipelineResult.ok("");
+            }
+            return PipelineResult.failed("无可烧炼材料");
+        }
+
         Item targetItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(target));
         if (targetItem == null) return PipelineResult.failed("无效的目标物品: " + target);
 
-        Map<Item, Integer> allItems = VanillaInputRegistry.readAllItems(maid);
         for (SmeltingRecipe recipe : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
             ItemStack result = recipe.getResultItem(level.registryAccess());
             if (!result.is(targetItem)) continue;
@@ -48,7 +66,6 @@ public final class FurnacePipeline implements TaskPipeline {
                 if (allItems.getOrDefault(ing.getItem(), 0) > 0) return PipelineResult.ok("");
             }
         }
-        // Fallback: target本身在背包中
         if (allItems.getOrDefault(targetItem, 0) > 0) return PipelineResult.ok("");
         return PipelineResult.failed("no smeltable material for " + target);
     }
@@ -56,18 +73,17 @@ public final class FurnacePipeline implements TaskPipeline {
     public static IExecutor executor() {
         return new IExecutor() {
             @Override public TaskResult execute(ServerLevel w, EntityMaid m, BlockPos p, CompoundTag d) {
-                String ingredientKey = resolveSmeltIngredient(w, m, d);
+                String ingredientKey = resolveSmeltIngredient(w, m);
                 if (ingredientKey.isEmpty()) return TaskResult.FAILED;
-                d.putString(TaskKeys.TASK_INPUT, ingredientKey);
+                TaskMetaData.setInput(m, ingredientKey);
                 VanillaTasks.furnace(w, m, p, ingredientKey, SlotLayout.FURNACE);
                 return TaskResult.SUCCESS;
             }
-            @Override public void onStop(EntityMaid maid) {}
         };
     }
 
-    private static String resolveSmeltIngredient(ServerLevel level, EntityMaid maid, CompoundTag d) {
-        String target = d.getString(TaskKeys.TASK_TARGET);
+    private static String resolveSmeltIngredient(ServerLevel level, EntityMaid maid) {
+        String target = TaskMetaData.getTarget(maid);
         if (target.isEmpty()) return "";
         Item targetItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(target));
         if (targetItem == null) return "";

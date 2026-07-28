@@ -30,7 +30,7 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
     public static final int OUTPUT2_SLOT = 11;
     public static final int TOTAL_SLOTS = 12;
 
-    private static final String NBT_KEY = "maid_assembly", INV_KEY = "Inventory",
+    private static final String NBT_KEY = "lma_assembly_inv", INV_KEY = "Inventory",
         LOCKS_KEY = "Locks", BLOCKED_KEY = "Blocked", MAT_LOCK_KEY = "MatLock";
 
     private final EntityMaid maid;

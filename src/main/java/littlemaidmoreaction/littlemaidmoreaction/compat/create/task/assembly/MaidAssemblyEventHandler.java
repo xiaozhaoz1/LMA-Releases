@@ -48,9 +48,9 @@ public final class MaidAssemblyEventHandler {
         var inv = MaidAssemblyInventory.of(maid);
         inv.saveToNBT(); // 确保最新状态写入 PersistentData
         CompoundTag data = event.getData();
-        CompoundTag tag = maid.getPersistentData().getCompound("maid_assembly");
+        CompoundTag tag = maid.getPersistentData().getCompound("lma_assembly_inv");
         if (!tag.isEmpty()) {
-            data.put("lma_assembly", tag);
+            data.put("lma_assembly_inv", tag);
         }
     }
 
@@ -58,10 +58,9 @@ public final class MaidAssemblyEventHandler {
     @SubscribeEvent
     public static void onMaidFromItem(MaidAndItemTransformEvent.ToMaid event) {
         CompoundTag data = event.getData();
-        if (!data.contains("lma_assembly")) return;
-        // 写入 ForgeData, 让 maid.load() 的 readAdditionalSaveData 自动恢复
+        if (!data.contains("lma_assembly_inv")) return;
         CompoundTag forge = data.getCompound("ForgeData");
-        forge.put("maid_assembly", data.getCompound("lma_assembly"));
+        forge.put("lma_assembly_inv", data.getCompound("lma_assembly_inv"));
         data.put("ForgeData", forge);
     }
 }

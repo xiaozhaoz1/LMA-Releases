@@ -2,7 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.world;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskDispatcher;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher;
 import littlemaidmoreaction.littlemaidmoreaction.api.ParamExtractor;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;

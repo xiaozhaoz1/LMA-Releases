@@ -5,7 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.mojang.datafixers.util.Pair;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskKeys;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
@@ -25,7 +25,7 @@ import java.util.List;
  *
  * <h3>关键设计决策</h3>
  * <ul>
- *   <li>enableLookAndRandomWalk() = false — 防止脑内随机走动覆盖 WALK_TARGET</li>
+ *   <li>enableLookAndRandomWalk() = true — 禁用随机闲逛, 防止覆盖 WALK_TARGET</li>
  *   <li>enablePanic() = false — 任务期间不慌乱</li>
  *   <li>createBrainTasks() = 空列表 — 仅保留 MaidBrain 自动追加的基础行为
  *       (BegTask/WorkMealTask/StealEdible/UpdateActivity)</li>
@@ -80,8 +80,8 @@ public final class LmaFlowTask implements IMaidTask {
 
     @Override
     public boolean enableLookAndRandomWalk(EntityMaid maid) {
-        // ★ 关键：禁用随机走动，防止 brain 覆盖 LMA 动作设置的 WALK_TARGET
-        return false;
+        // ★ 关键：禁用随机闲逛(true=禁用)，防止覆盖 LMA 设置的 WALK_TARGET
+        return true;
     }
 
     @Override

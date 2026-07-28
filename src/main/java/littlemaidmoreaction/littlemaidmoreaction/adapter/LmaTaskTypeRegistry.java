@@ -71,7 +71,7 @@ public final class LmaTaskTypeRegistry {
 
     /** ★ v35: 从 TaskRegistry 读取已知任务类型 */
     private static Set<String> getKnownTaskTypes() {
-        return littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry.taskTypes();
+        return littlemaidmoreaction.littlemaidmoreaction.task.api.TaskRegistry.taskTypes();
     }
 
     /** 使用自定义 IMaidTask 的任务类型 — scanAndRegister 跳过 */
@@ -96,7 +96,7 @@ public final class LmaTaskTypeRegistry {
             if ("brewing".equals(known)) continue;
             if (CUSTOM_TASK_TYPES.contains(known)) continue; // 使用自定义 IMaidTask
             // v52: TaskRegistry.showInBar 控制 TLM 任务栏可见性
-            if (!littlemaidmoreaction.littlemaidmoreaction.task.TaskRegistry.isShowInBar(known)) continue;
+            if (!littlemaidmoreaction.littlemaidmoreaction.task.api.TaskRegistry.isShowInBar(known)) continue;
             registerIfNew(known);
         }
 

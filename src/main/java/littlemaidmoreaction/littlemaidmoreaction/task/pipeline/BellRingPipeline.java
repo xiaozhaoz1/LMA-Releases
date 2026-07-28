@@ -5,9 +5,11 @@ import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.VanillaTasks;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineContext;
-import littlemaidmoreaction.littlemaidmoreaction.task.PipelineResult;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -26,6 +28,7 @@ import java.util.List;
 public final class BellRingPipeline implements TaskPipeline {
 
     @Override public String taskType() { return "bell_ring"; }
+    @Override public boolean isLongRunning() { return true; }
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.getBlock() instanceof net.minecraft.world.level.block.BellBlock; }
     @Override public List<TaskStep> steps() { return List.of(new TaskStep("ring", "敲响钟", StepType.INTERACT, List.of())); }
 
@@ -41,7 +44,6 @@ public final class BellRingPipeline implements TaskPipeline {
                 VanillaTasks.bell(w, m, p);
                 return TaskResult.SUCCESS;
             }
-            @Override public void onStop(EntityMaid maid) {}
         };
     }
 

@@ -10,7 +10,7 @@ import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.BlockSearc
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.ConnectedBlockSearch;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.world.WorldOutput;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.HarvestTarget;
-import littlemaidmoreaction.littlemaidmoreaction.task.TaskStateManager;
+import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateManager;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.ToolJudge;
 import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import net.minecraft.core.BlockPos;
@@ -70,6 +70,8 @@ public final class ChainHarvestExecute {
     private static final Map<Integer, Long> BUBBLE_TICK = new ConcurrentHashMap<>();
     /** v36.6: 无目标待机提示去重（状态翻转才再发） */
     private static final Map<Integer, Boolean> IDLE_NOTIFIED = new ConcurrentHashMap<>();
+    /** v63: 上次执行模式 — 模式切换(Wood↔Ore)时全量清理避免跨任务污染 */
+    private static final Map<Integer, Mode> LAST_MODE = new ConcurrentHashMap<>();
 
     private static final class SkipState {
         int tierLevel = Integer.MIN_VALUE;
@@ -82,11 +84,24 @@ public final class ChainHarvestExecute {
     public static TaskResult execute(ServerLevel world, EntityMaid maid, BlockPos pos,
                                      CompoundTag data, Mode mode) {
         if (TaskStateManager.isCancelled(maid)) return TaskResult.FAILED;
+
+        // v63: 模式切换(Wood↔Ore)时全量清理残留
+        int id = maid.getId();
+        Mode prevMode = LAST_MODE.get(id);
+        if (prevMode != null && prevMode != mode) {
+            clearChainData(data);
+            SKIPPED.remove(id);
+            LAST_SCAN.remove(id);
+            IDLE_NOTIFIED.remove(id);
+            BUBBLE_ID.remove(id);
+            BUBBLE_TICK.remove(id);
+        }
+        LAST_MODE.put(id, mode);
+
         HarvestTarget target = mode.target;
         ItemStack tool = maid.getMainHandItem();
 
         if (mode == Mode.ORE && !ToolJudge.isToolUsable(tool, TOOL_RESERVE_DURABILITY)) {
-            // 无限等待 — 不 fail, 女仆会待机直到拿到新镐
             keepAlive(world, maid);
             return TaskResult.CONTINUE;
         }
@@ -101,8 +116,6 @@ public final class ChainHarvestExecute {
         }
         return idleScan(world, maid, data, target, tool, false);
     }
-
-    // ── 阶段 1: 到达开脉（不能采 → 跳过 → 立即找下一个） ──
 
     private static TaskResult tryStartVein(ServerLevel world, EntityMaid maid, BlockPos pos,
                                            CompoundTag data, HarvestTarget target, ItemStack tool) {
@@ -124,14 +137,12 @@ public final class ChainHarvestExecute {
             return idleScan(world, maid, data, target, tool, true);
         }
 
-        // 耐久保护: 需耗久时队列截断至剩余耐久-1
         if (target.consumesDurability(tool)) {
             int budget = ToolStateReader.getRemainingDurability(tool) - TOOL_RESERVE_DURABILITY;
             if (budget < vein.size()) {
                 vein = vein.subList(0, Math.max(0, budget));
             }
             if (vein.isEmpty()) {
-                // 耐久不足无法采任何块 → 回空闲扫描等待 (不 fail)
                 return idleScan(world, maid, data, target, tool, true);
             }
         }
@@ -150,8 +161,6 @@ public final class ChainHarvestExecute {
         keepAlive(world, maid);
         return TaskResult.CONTINUE;
     }
-
-    // ── 阶段 2: 蓄力 → 时间到整脉同消 ──
 
     private static TaskResult charge(ServerLevel world, EntityMaid maid,
                                      CompoundTag data, HarvestTarget target, ItemStack tool) {
@@ -183,14 +192,12 @@ public final class ChainHarvestExecute {
         }
         maid.swing(InteractionHand.MAIN_HAND);
         clearChainData(data);
-        LAST_SCAN.remove(maid.getId()); // 立即下一轮扫描
+        LAST_SCAN.remove(maid.getId());
         LittleMaidMoreAction.LOGGER.info("[ChainHarvest] {} 整脉破坏 {} 块", target.label(), broken);
         bubble(world, maid, target.label() + " 完成 " + broken + " 块", true);
         keepAlive(world, maid);
         return TaskResult.CONTINUE;
     }
-
-    // ── 阶段 0: 空闲扫描（3 秒节流，常驻不休眠） ──
 
     private static TaskResult idleScan(ServerLevel world, EntityMaid maid, CompoundTag data,
                                        HarvestTarget target, ItemStack tool, boolean immediate) {
@@ -208,7 +215,6 @@ public final class ChainHarvestExecute {
         int radius = searchRadius(maid);
         BlockPos next = findNearestValid(world, maid, target, tool, radius);
         if (next == null) {
-            // 常驻空闲 + 一次性提示（状态翻转才再发）
             if (!IDLE_NOTIFIED.getOrDefault(id, false)) {
                 IDLE_NOTIFIED.put(id, true);
                 bubble(world, maid, "附近没有可采集的" + target.label() + "目标", true);
@@ -229,14 +235,12 @@ public final class ChainHarvestExecute {
         return TaskResult.CONTINUE;
     }
 
-    /** v36.6 半径规则: 有工作范围用工作范围，否则回退 config 默认(16) — 与 EnvSense 一致 */
     private static int searchRadius(EntityMaid maid) {
         return maid.hasRestriction()
                 ? Math.max(4, (int) maid.getRestrictRadius())
                 : MoreActionConfig.ENV_DEFAULT_RADIUS.get();
     }
 
-    /** 最近的"能采的"目标（HarvestTarget 过滤 + 跳过集），BlockSearch 已按距离排序 */
     @Nullable
     private static BlockPos findNearestValid(ServerLevel world, EntityMaid maid,
                                              HarvestTarget target, ItemStack tool, int radius) {
@@ -246,8 +250,6 @@ public final class ChainHarvestExecute {
         var matches = BlockSearch.findBlocksInRange(world, maid.blockPosition(), radius, pred);
         return matches.isEmpty() ? null : matches.get(0).pos();
     }
-
-    // ── 跳过集 ──
 
     private static LinkedHashSet<Long> skipSet(EntityMaid maid, ItemStack tool) {
         SkipState state = SKIPPED.computeIfAbsent(maid.getId(), k -> new SkipState());
@@ -266,12 +268,6 @@ public final class ChainHarvestExecute {
         set.add(pos);
     }
 
-    // ── 生命周期 ──
-
-    /**
-     * 自持导航目标 + v36.6 任务心跳 —
-     * tick 循环维持 + TaskStateService.heartbeat 防 TaskEngine 超时误杀。
-     */
     private static void keepAlive(ServerLevel world, EntityMaid maid) {
         NavigationMemory.setNavTarget(maid, maid.blockPosition());
         NavigationMemory.setNavStartTick(maid, world.getGameTime());
@@ -286,16 +282,6 @@ public final class ChainHarvestExecute {
         data.remove(KEY_TICK_LEGACY);
     }
 
-    /** 女仆卸载清理（内存态闭环） */
-    public static void onMaidUnload(int entityId) {
-        SKIPPED.remove(entityId);
-        LAST_SCAN.remove(entityId);
-        BUBBLE_ID.remove(entityId);
-        BUBBLE_TICK.remove(entityId);
-        IDLE_NOTIFIED.remove(entityId);
-    }
-
-    /** 头顶气泡 — 按 id 替换（sendBubbleReplacing），非强制时 3 秒节流 */
     private static void bubble(ServerLevel world, EntityMaid maid, String text, boolean force) {
         int id = maid.getId();
         long now = world.getGameTime();
