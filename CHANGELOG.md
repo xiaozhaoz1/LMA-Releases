@@ -1,3 +1,34 @@
+## [v64] — 2026-07-28 — 架构瘦身 + Brain持续循环 + 全GameTick统一
+
+### 架构瘦身
+- **删除**: TaskEngine.java (~85行), IExecutor.onStop()/onComplete(), TaskPipeline.onTimeout(), ChainHarvestExecute.onMaidUnload()
+- **迁移**: TLM_SWITCH/GUI_INIT/超时看门狗 → TaskTickHandler (每tick, 零延迟)
+- **修复**: TlmTaskMonitor WeakHashMap→HashMap (防GC丢检测), enableLookAndRandomWalk=true (禁用随机闲逛)
+
+### Brain持续循环
+- **修复**: tick()不擦TARGET_POS → 工作站锚定, 30tick冷却, 目标失效自动重搜索
+- **修复**: canStillUse永真→tick执行一次后no-op → 永久假死
+- **furnace/bell_ring/craft_chain**: 加isLongRunning=true, 防一次性完成
+
+### AI流程修复
+- **StartTaskTool**: 删冗余maid.setTask (init已调用), 更新AI指令
+- **TaskTickHandler**: TLM_SWITCH匹配当前任务→跳过cancel+resubmit (防target丢失)
+- **TaskDispatcher.submit**: count参数实际写入FLOW_MAX_COUNT
+- **craft_chain**: isLongRunning → 无限循环, 一次做一个
+
+### 持久化修复
+- **魂符**: onEntityJoin区分同session/跨session, 保留完整任务状态
+- **TLM栏重选**: 保存TASK_TARGET再cancel, 防原料丢失
+
+### 包重构
+- **compat/ai → ai/** (root级), 新增: ai/context/MaidTaskContext, ai/tool/QueryTaskTool
+- **新包**: bauble/, chatbubble/, io/, compat/kubejs/
+
+### 验证
+- **furnace**: COLLECT_RESULT→ADD_INPUT→ADD_FUEL三阶段正常循环, meaningful=true
+- **craft_chain**: 合成→循环→持续产出, count指定则定量
+- **bell_ring**: 持续循环敲钟, 每30tick一次
+
 ## [v63] — 2026-07-27 — EnvSense并入任务系统 + Bug修复
 
 ### 架构重构: EnvSense → 被动任务

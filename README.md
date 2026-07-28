@@ -1,4 +1,4 @@
-﻿# LittleMaidMoreAction — 车万女仆「更多动作」
+# LittleMaidMoreAction — 车万女仆「更多动作」
 
 为 Touhou Little Maid 添加可视化规则编辑器与事件驱动的女仆战斗动作系统。
 
@@ -21,34 +21,32 @@
 
 ## 版本
 
-**v53** — 2026-07-22 — 执行引擎收尾 + 重启自动恢复
+**v64** — 2026-07-28 — 架构瘦身 + Brain持续循环 + AI流程完善
 
 | 指标 | 值 |
 |------|-----|
-| 任务类型 | 13 (7 Vanilla + 6 Create) |
+| 任务类型 | 14 (8 Vanilla + 6 Create) |
 | 条件/动作/事件 | 111 / 83 / 36 |
-| 源文件 | 582 |
+| 源文件 | ~580 |
 | 测试 | 144 |
 | 兼容模块 | 6 (Create · SlashBlade · TPM · YSM · AI · FlowTask) |
 | 架构层 | 6 (调度→状态→注册→引擎→执行→IO) |
-| 版本演进 | v1→v53, 八轮重构 (v45-v53) |
+| 版本演进 | v1→v64 |
 
 ## 开发
 
-v53 架构 — 六层: 调度/状态/注册/引擎/执行/IO。规则引擎六边形架构, 零 Minecraft 依赖 core 模块。
+v64 架构 — 六层: 调度/状态/注册/引擎/执行/IO。规则引擎六边形架构。
 
 | 层 | 包 | 说明 |
 |----|-----|------|
-| 调度 | `task/TaskDispatcher.java` | 所有任务唯一入口/出口 — submit/cancel/complete/fail/timeout |
-| 状态 | `task/TaskStateManager.java` + `TaskEngine.java` | NBT 25键读写 + heartbeat 防超时 + adapter 解耦轮询 |
-| 注册 | `task/TaskRegistry.java` | `register(name, pipeline, executor, showInBar)` — 统一入口 |
-| 引擎 | `task/TaskStateMachine.java` | 泛型 FSM — 显式枚举状态·转换图验证·onEnter/onExit |
-| 执行 | `adapter/` + `compat/` | Brain 驱动 (Vanilla) + Tick 驱动 (Create) · 双路径 |
-| IO | `task/TaskKeys.java` + `LmaTaskDataHelper.java` | 26 NBT 常量 · 19读取器+16写入器 |
+| 调度 | `task/runtime/TaskDispatcher.java` | 所有任务唯一入口/出口 — submit/cancel/complete/fail/timeout |
+| 状态 | `task/runtime/TaskStateManager.java` + `TaskTickHandler.java` | NBT 25键读写 + 每tick TLM_SWITCH/GUI_INIT/超时处理 |
+| 注册 | `task/api/TaskRegistry.java` | `register(name, pipeline, executor, showInBar)` — 统一入口 |
+| 引擎 | `task/runtime/TaskStateMachine.java` | 泛型 FSM — 显式枚举状态·转换图验证·onEnter/onExit |
+| 执行 | `adapter/` + `compat/` | Brain 导航 + ServerTick 驱动 · 持续循环 |
+| IO | `task/data/TaskKeys.java` + `FlowTaskData.java` | 26 NBT 常量 · 19读取器+16写入器 |
+| AI | `ai/` | ITool(7) + IMaidContext(5) + 任务状态查询 |
 | core | `core/spi/` | 类型安全参数系统 (sealed TypedParam) |
-| core | `core/registry/` | 注解扫描 + ClassGraph 自动注册 + BuiltinRegistrar 三层回退 |
-| core | `core/engine/` | 异步管道 + 主线程安全执行 |
-| core | `core/model/` | 不可变数据模型 + 树形条件 + 参数化条件 |
 
 新增条件: 实现 `ICondition` + `@RuleCondition` → 自动注册
 新增动作: 实现 `IAction` + `@RuleAction` → 自动注册
@@ -61,7 +59,7 @@ v53 架构 — 六层: 调度/状态/注册/引擎/执行/IO。规则引擎六�
 | SlashBlade | `compat/slashblade/` | 拔刀剑 Sa 槽 + 连段攻击 |
 | TPM | `compat/tpm/` | True Power of Maid 连段修改 |
 | YSM | `compat/ysm/` | Yes Steve Model — 条件/动作自动注册 |
-| AI | `compat/ai/` | 多个 AI 模型集成 |
+| AI | `ai/` | 多个 AI 模型集成 |
 | FlowTask | `compat/flowtask/` | 通用流程任务基类
 
 参考 TLM compat 架构。每个模块 `compat/<modid>/impl/condition/` + `action/`。门控加载 `CompatRegistry.checkModLoad()`。
