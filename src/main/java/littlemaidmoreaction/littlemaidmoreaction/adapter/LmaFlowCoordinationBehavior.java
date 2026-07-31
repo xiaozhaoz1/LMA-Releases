@@ -87,7 +87,7 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
     protected boolean shouldMoveTo(ServerLevel world, EntityMaid maid, BlockPos pos) {
         var handler = TaskRegistry.get(FlowTaskData.getTask(maid));
         if (handler == null) return false;
-        return handler.pipeline().isTargetBlock(world, pos, world.getBlockState(pos));
+        return handler.pipeline().isTargetBlock(world, pos, world.getBlockState(pos), maid);
     }
 
     @Override

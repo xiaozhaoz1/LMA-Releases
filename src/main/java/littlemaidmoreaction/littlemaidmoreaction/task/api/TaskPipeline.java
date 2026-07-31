@@ -48,7 +48,7 @@ public interface TaskPipeline {
     default RetryPolicy retryPolicy() { return RetryPolicy.NEVER; }
 
     /** v52: 目标方块判断 — 供 Brain 导航匹配 */
-    default boolean isTargetBlock(ServerLevel world, BlockPos pos, BlockState state) { return false; }
+    default boolean isTargetBlock(ServerLevel world, BlockPos pos, BlockState state, EntityMaid maid) { return false; }
 
     /** v53: 持续 tick — 仅 isLongRunning() 子类覆写 */
     default void tick(ServerLevel world, EntityMaid maid) {}
@@ -114,5 +114,28 @@ public interface TaskPipeline {
      */
     default void onSignal(EntityMaid maid, EnvSnapshot snap, EnvSignal signal) {
         // 子类覆写
+    }
+
+    /**
+     * v66: TLM 女仆界面「任务设置」标签 GUI。
+     * 覆写返回 {@link net.minecraft.world.MenuProvider} 以提供自定义配置界面。
+     * 返回 {@code null} 表示无配置界面（默认）。
+     * <p>
+     * 引擎通过 {@link littlemaidmoreaction.littlemaidmoreaction.task.gui.TaskConfigGui#of TaskConfigGui.of(maid)}
+     * 自动查找当前运行任务的 Pipeline 并调用此方法。
+     */
+    @javax.annotation.Nullable
+    default net.minecraft.world.MenuProvider getConfigGuiProvider(com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid) {
+        return null;
+    }
+
+    /**
+     * v67: 获取任务配置 NBT (供配置GUI数据同步)。
+     *
+     * <p>服务端调用，S→C 通过 {@code ReplyTaskConfigPacket} 发送给客户端。
+     * 默认返回空 CompoundTag，子类覆写返回 {@link #pipelineConfig(EntityMaid)}。
+     */
+    default CompoundTag getConfigNbt(EntityMaid maid) {
+        return new CompoundTag();
     }
 }

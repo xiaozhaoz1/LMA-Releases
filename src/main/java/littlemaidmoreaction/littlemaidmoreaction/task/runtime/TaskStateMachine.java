@@ -185,6 +185,11 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
 
         // 2. 读取当前状态
         S current = readState(maid);
+        boolean isFirstTick = !maid.getPersistentData().contains(stateKey());
+        if (isFirstTick) {
+            writeState(maid, current);
+            onEnter(current, world, maid);
+        }
 
         // 3. 执行业务逻辑
         S next = tick(current, world, maid);

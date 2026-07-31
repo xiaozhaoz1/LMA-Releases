@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.*;
+import littlemaidmoreaction.littlemaidmoreaction.compat.createbigcannons.task.CannonLoadPipeline;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
 import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.*;
@@ -32,6 +33,10 @@ public final class TaskRegistry {
         var armTransferPl = new ArmTransferPipeline();
         register("arm_transfer", armTransferPl, armTransferPl.executor());
 
+        // ── v66: 女仆右键交互 ──
+        var blockInteractPl = new BlockInteractPipeline();
+        register("block_interact", blockInteractPl, blockInteractPl.executor());
+
         // ── v38-40: Create 女仆专属任务 ──
         if (net.minecraftforge.fml.ModList.get().isLoaded("create")) {
             var crankPl = new CrankPipeline();
@@ -51,6 +56,12 @@ public final class TaskRegistry {
 
             var assemblyPl = new littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyPipeline();
             register("maid_assembly", assemblyPl, assemblyPl.executor(), true);
+        }
+
+        // ── Create Big Cannons 速射炮闩装填 ──
+        if (net.minecraftforge.fml.ModList.get().isLoaded("createbigcannons")) {
+            var cannonLoadPl = new CannonLoadPipeline();
+            register("cannon_load", cannonLoadPl, cannonLoadPl.executor());
         }
     }
 

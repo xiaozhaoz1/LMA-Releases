@@ -64,6 +64,8 @@ public final class LmaTaskTypeRegistry {
         Map.entry("bed",       Items.RED_BED),
         Map.entry("sleep",     Items.RED_BED),
         Map.entry("rest",      Items.RED_BED),
+        Map.entry("interact",  Items.STICK),
+        Map.entry("block",     Items.STICK),
         Map.entry("assembly",  Items.CRAFTING_TABLE)
     );
 
@@ -81,6 +83,7 @@ public final class LmaTaskTypeRegistry {
     static {
         SIMPLE_TASKS.add("bell_ring");
         SIMPLE_TASKS.add("jukebox");
+        SIMPLE_TASKS.add("block_interact");
     }
 
     private LmaTaskTypeRegistry() {}

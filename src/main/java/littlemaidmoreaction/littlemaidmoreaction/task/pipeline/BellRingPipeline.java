@@ -29,7 +29,7 @@ public final class BellRingPipeline implements TaskPipeline {
 
     @Override public String taskType() { return "bell_ring"; }
     @Override public boolean isLongRunning() { return true; }
-    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.getBlock() instanceof net.minecraft.world.level.block.BellBlock; }
+    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return s.getBlock() instanceof net.minecraft.world.level.block.BellBlock; }
     @Override public List<TaskStep> steps() { return List.of(new TaskStep("ring", "敲响钟", StepType.INTERACT, List.of())); }
 
     /** v44: 纯验证 — 敲钟无前置条件，始终可用 */

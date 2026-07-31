@@ -33,7 +33,7 @@ public final class FurnacePipeline implements TaskPipeline {
 
     @Override public String taskType() { return "furnace"; }
     @Override public boolean isLongRunning() { return true; }
-    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return w.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity; }
+    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return w.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity; }
     @Override public List<TaskStep> steps() { return List.of(new TaskStep("smelt", "熔炉烧炼", StepType.CRAFT, List.of())); }
 
     @Override

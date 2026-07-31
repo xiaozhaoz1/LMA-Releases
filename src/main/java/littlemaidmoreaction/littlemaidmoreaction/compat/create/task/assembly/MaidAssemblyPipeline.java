@@ -40,6 +40,11 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
     @Override public boolean enableWorkEat() { return true; }
 
     @Override
+    public net.minecraft.world.MenuProvider getConfigGuiProvider(EntityMaid maid) {
+        return new MaidAssemblyNetwork.MaidAssemblyMenuProvider(maid);
+    }
+
+    @Override
     protected Map<State, Set<State>> transitions() {
         return Map.of(
             State.IDLE,       Set.of(State.TRY_START),

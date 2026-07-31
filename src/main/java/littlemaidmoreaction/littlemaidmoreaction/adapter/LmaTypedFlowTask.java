@@ -5,10 +5,12 @@ import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.mojang.datafixers.util.Pair;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.TaskConfigGui;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.item.ItemStack;
 
@@ -106,6 +108,11 @@ public final class LmaTypedFlowTask implements IMaidTask {
     @Override
     public FunctionCallSwitchResult onFunctionCallSwitch(EntityMaid maid) {
         return FunctionCallSwitchResult.OK;
+    }
+
+    @Override @Nullable
+    public MenuProvider getTaskConfigGuiProvider(EntityMaid maid) {
+        return TaskConfigGui.of(maid);
     }
 
     @Override

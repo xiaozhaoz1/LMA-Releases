@@ -5,9 +5,15 @@ import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyMenu;
 import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyScreen;
 import littlemaidmoreaction.littlemaidmoreaction.init.LmaRegistrar;
+import littlemaidmoreaction.littlemaidmoreaction.network.BlockInteractConfigPacket;
+import littlemaidmoreaction.littlemaidmoreaction.network.InteractTriggerPacket;
 import littlemaidmoreaction.littlemaidmoreaction.network.LmaAnimSyncMessage;
 import littlemaidmoreaction.littlemaidmoreaction.network.OpenMaidEditorMessage;
+import littlemaidmoreaction.littlemaidmoreaction.network.ReplyTaskConfigPacket;
+import littlemaidmoreaction.littlemaidmoreaction.network.RequestTaskConfigPacket;
 import littlemaidmoreaction.littlemaidmoreaction.screen.LMAConfigScreen;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.BlockInteractConfigMenu;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.BlockInteractConfigScreen;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraftforge.client.ConfigScreenHandler;
@@ -64,6 +70,10 @@ public final class LittleMaidMoreAction {
         DeferredRegister.create(ForgeRegistries.MENU_TYPES, MOD_ID);
     public static final RegistryObject<MenuType<MaidAssemblyMenu>> MAID_ASSEMBLY_MENU =
         MENU_TYPES.register("maid_assembly", () -> IForgeMenuType.create(MaidAssemblyMenu::new));
+    /** v66: BlockInteract 配置菜单 */
+    public static final RegistryObject<MenuType<BlockInteractConfigMenu>> BLOCK_INTERACT_CONFIG_MENU =
+        MENU_TYPES.register("block_interact_config",
+            () -> IForgeMenuType.create((id, inv, buf) -> new BlockInteractConfigMenu(id, inv, buf.readInt())));
 
     public LittleMaidMoreAction() {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -101,7 +111,31 @@ public final class LittleMaidMoreAction {
                     OpenMaidEditorMessage::decode,
                     OpenMaidEditorMessage::handle,
                     Optional.of(NetworkDirection.PLAY_TO_CLIENT));
-            LOGGER.info("[LMA] 网络通道初始化完成 (2 packets)");
+            NETWORK.registerMessage(2, InteractTriggerPacket.class,
+                    InteractTriggerPacket::encode,
+                    InteractTriggerPacket::decode,
+                    InteractTriggerPacket::handle,
+                    Optional.of(NetworkDirection.PLAY_TO_SERVER));
+            NETWORK.registerMessage(3, BlockInteractConfigPacket.class,
+                    BlockInteractConfigPacket::encode,
+                    BlockInteractConfigPacket::decode,
+                    BlockInteractConfigPacket::handle,
+                    Optional.of(NetworkDirection.PLAY_TO_SERVER));
+            NETWORK.registerMessage(5, RequestTaskConfigPacket.class,
+                    RequestTaskConfigPacket::encode,
+                    RequestTaskConfigPacket::decode,
+                    RequestTaskConfigPacket::handle,
+                    Optional.of(NetworkDirection.PLAY_TO_SERVER));
+            NETWORK.registerMessage(6, ReplyTaskConfigPacket.class,
+                    ReplyTaskConfigPacket::encode,
+                    ReplyTaskConfigPacket::decode,
+                    ReplyTaskConfigPacket::handle,
+                    Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+            LOGGER.info("[LMA] 网络通道初始化完成 (6 packets)");
+
+            // v66: 配置屏幕注册
+            net.minecraft.client.gui.screens.MenuScreens.register(
+                BLOCK_INTERACT_CONFIG_MENU.get(), BlockInteractConfigScreen::new);
         });
     }
 

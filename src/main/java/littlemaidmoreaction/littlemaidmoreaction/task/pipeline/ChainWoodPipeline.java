@@ -27,7 +27,7 @@ import java.util.List;
 public final class ChainWoodPipeline implements TaskPipeline {
 
     @Override public String taskType() { return "collect_wood"; }
-    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.is(net.minecraft.tags.BlockTags.LOGS); }
+    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return s.is(net.minecraft.tags.BlockTags.LOGS); }
     @Override public boolean needsGameTick() { return true; }
     @Override public void tick(ServerLevel world, EntityMaid maid) {
         if (littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys.STATE_CANCELLED.equals(

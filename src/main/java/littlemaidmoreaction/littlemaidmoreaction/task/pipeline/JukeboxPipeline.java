@@ -30,7 +30,7 @@ import java.util.*;
 public final class JukeboxPipeline implements TaskPipeline {
 
     @Override public String taskType() { return "jukebox"; }
-    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.is(net.minecraft.world.level.block.Blocks.JUKEBOX); }
+    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return s.is(net.minecraft.world.level.block.Blocks.JUKEBOX); }
     @Override public List<TaskStep> steps() { return List.of(new TaskStep("play", "播放唱片", StepType.INTERACT, List.of())); }
 
     /** v44: 纯验证 — 仅扫描背包是否有唱片(读操作)，不写日志/通知 */

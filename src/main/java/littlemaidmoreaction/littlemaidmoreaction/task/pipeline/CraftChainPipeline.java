@@ -34,7 +34,7 @@ public final class CraftChainPipeline implements TaskPipeline {
     @Override
     public String taskType() { return "craft_chain"; }
     @Override public boolean isLongRunning() { return true; }
-    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s) { return s.is(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE); }
+    @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return s.is(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE); }
 
     @Override
     public List<TaskStep> steps() {

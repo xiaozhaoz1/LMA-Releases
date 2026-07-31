@@ -6,7 +6,6 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.mojang.datafixers.util.Pair;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaFlowCoordinationBehavior;
-import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyNetwork.MaidAssemblyMenuProvider;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.MenuProvider;
@@ -55,6 +54,6 @@ public final class MaidAssemblyTask implements IMaidTask {
 
     @Override
     public MenuProvider getTaskConfigGuiProvider(EntityMaid maid) {
-        return new MaidAssemblyMenuProvider(maid);
+        return littlemaidmoreaction.littlemaidmoreaction.task.gui.TaskConfigGui.of(maid);
     }
 }
