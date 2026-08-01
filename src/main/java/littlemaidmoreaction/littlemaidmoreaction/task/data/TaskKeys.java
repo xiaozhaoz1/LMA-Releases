@@ -9,7 +9,7 @@ package littlemaidmoreaction.littlemaidmoreaction.task.data;
  * <h3>使用方式</h3>
  * <pre>{@code
  * CompoundTag data = maid.getPersistentData();
- * data.putString(TaskKeys.FLOW_TASK, "altar_craft");
+ * data.putString(TaskKeys.FLOW_TASK, "craft_chain");
  * data.putString(TaskKeys.FLOW_STATE, TaskKeys.STATE_IN_PROGRESS);
  * }</pre>
  */

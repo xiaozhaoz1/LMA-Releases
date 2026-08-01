@@ -3,7 +3,6 @@ package littlemaidmoreaction.littlemaidmoreaction.engine;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ConditionRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.ITickScheduler;
 import net.minecraft.server.MinecraftServer;
@@ -16,6 +15,7 @@ import net.minecraftforge.fml.common.Mod;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 
 /**
  * Tick 调度器 — 管理 WAIT/REPEAT 挂起序列的恢复。

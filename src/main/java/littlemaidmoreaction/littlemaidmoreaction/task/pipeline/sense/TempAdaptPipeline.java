@@ -1,7 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.task.pipeline.sense;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
@@ -16,6 +15,7 @@ import net.minecraft.world.level.block.CampfireBlock;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
+import littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig;
 
 /**
  * v63: 温度自适应被动任务。
@@ -63,7 +63,7 @@ public final class TempAdaptPipeline implements TaskPipeline {
         if (cd > 0) { pd.putInt("Cd", cd); return; }
         pd.putInt("Cd", 100);
 
-        int radius = MoreActionConfig.ENV_DEFAULT_RADIUS.get();
+        int radius = PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
         BlockPos center = maid.blockPosition();
         BlockPos target = switch (goal) {
             case "warm" -> findHeatSource(world, center, radius);
@@ -78,11 +78,7 @@ public final class TempAdaptPipeline implements TaskPipeline {
             pd.putInt("Cd", 600);
         }
     }
-
-    @Override
-    public void onCleanup(EntityMaid maid) {
-        clearPipelineData(maid);
-    }
+    // onCleanup 用接口默认 (clearPipelineData) — v67.3 删除冗余覆写
 
     private static BlockPos findHeatSource(ServerLevel world, BlockPos center, int radius) {
         int vert = 4;

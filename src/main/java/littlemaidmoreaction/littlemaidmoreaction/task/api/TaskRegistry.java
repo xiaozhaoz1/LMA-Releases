@@ -26,10 +26,9 @@ public final class TaskRegistry {
         register("craft_chain",  new CraftChainPipeline(),  CraftChainPipeline.executor());
         register("furnace",      new FurnacePipeline(),      FurnacePipeline.executor());
         register("jukebox",      new JukeboxPipeline(),      JukeboxPipeline.executor());
-        register("bell_ring",    new BellRingPipeline(),     BellRingPipeline.executor());
+        register("bell_ring",    new BellRingPipeline(),     new BellRingPipeline().executor());
         register("collect_wood", new ChainWoodPipeline(),    ChainWoodPipeline.executor());
         register("collect_ore",  new ChainOrePipeline(),     ChainOrePipeline.executor());
-        register("altar_craft",  new AltarCraftPipeline(),   AltarCraftPipeline.executor());
         var armTransferPl = new ArmTransferPipeline();
         register("arm_transfer", armTransferPl, armTransferPl.executor());
 

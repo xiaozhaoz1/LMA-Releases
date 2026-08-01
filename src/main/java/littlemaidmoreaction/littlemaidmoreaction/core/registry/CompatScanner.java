@@ -1,7 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.core.registry;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleCondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
@@ -20,6 +19,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.CodeSource;
 import java.util.Collections;
 import java.util.function.Consumer;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 
 /**
  * 通用 Compat 扫描器 — v35.1: 零 MC 依赖, 事件注册回调通过 Consumer 注入。

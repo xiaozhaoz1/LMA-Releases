@@ -1,39 +1,36 @@
 package littlemaidmoreaction.littlemaidmoreaction.config;
 
+import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+
 import net.minecraftforge.common.ForgeConfigSpec;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
 /**
- * 模组 Forge 配置文件。
+ * 模组 Forge 配置 — 通用段入口 (v67.7 拆 3 类)。
  *
- * 战斗参数已迁移至规则引擎 JSON 预设（RuleActionStorage.createDefaultRules），
- * 此处仅保留规则引擎总开关和调试模式。
+ * <p>战斗参数已迁移至规则引擎 JSON 预设（RuleActionStorage.createDefaultRules）。
+ * 本类保留规则引擎总开关/调试模式 (common.toml) + 三段 Spec 统一保存入口。
+ *
+ * <p>三段配置 (v67.6 拆文件, v67.7 拆类):
+ * <ul>
+ *   <li>{@link MoreActionConfig} — 通用: 规则引擎/调试 → {@code littlemaidmoreaction-common.toml}</li>
+ *   <li>{@link ActiveTaskConfig} — 主动任务 23 项 → {@code littlemaidmoreaction/active.toml}</li>
+ *   <li>{@link PassiveTaskConfig} — 环境感知 11 项 → {@code littlemaidmoreaction/passive.toml}</li>
+ * </ul>
  */
 public final class MoreActionConfig {
+    /** 通用段 Spec (config/littlemaidmoreaction-common.toml) */
     public static final ForgeConfigSpec SPEC;
 
     public static final ForgeConfigSpec.BooleanValue CUSTOM_RULES_ENABLED;
     public static final ForgeConfigSpec.BooleanValue DEBUG_MODE;
 
-    // ── 连锁采集 (v36) ──
-    // v36.2: 破坏间隔改为按挖掘等级查表 (ToolJudge.harvestIntervalTicks)，不再配置
-    public static final ForgeConfigSpec.IntValue CHAIN_MAX_BLOCKS;
-    public static final ForgeConfigSpec.BooleanValue CHAIN_WOOD_NATURE_CHECK;
-
-    // ── 环境感知 (v37) ──
-    public static final ForgeConfigSpec.IntValue ENV_SCAN_INTERVAL;
-    public static final ForgeConfigSpec.IntValue ENV_DEFAULT_RADIUS;
-    public static final ForgeConfigSpec.IntValue ENV_MAX_HITS;
-    // ── 环境感知阈值 (v37.1, 默认对齐 TLM) ──
-    public static final ForgeConfigSpec.DoubleValue ENV_COLD_THRESHOLD;
-    public static final ForgeConfigSpec.DoubleValue ENV_HOT_THRESHOLD;
-    // ── 环境感知扩展 (v37.2) ──
-    public static final ForgeConfigSpec.IntValue ENV_PLAYER_GATE_RADIUS;
-    public static final ForgeConfigSpec.IntValue ENV_DARKNESS_THRESHOLD;
-    public static final ForgeConfigSpec.BooleanValue ENV_STRUCTURE_ENABLED;
-    public static final ForgeConfigSpec.IntValue ENV_STRUCTURE_INTERVAL;
-    public static final ForgeConfigSpec.IntValue ENV_STRUCTURE_RADIUS;
-    // ── v63: 全局总开关 ──
-    public static final ForgeConfigSpec.BooleanValue ENVSENSE_ENABLED;
+    /** v67.11: 通用段 ConfigValue 句柄注册表 (path → value, 前缀 "common.") — 配置同步用 */
+    public static final Map<String, ForgeConfigSpec.ConfigValue<?>> COMMON_VALUES = new HashMap<>();
 
     static {
         ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
@@ -50,51 +47,62 @@ public final class MoreActionConfig {
                 .define("debug_mode", false);
         b.pop();
 
-        b.push("chain_harvest");
-        CHAIN_MAX_BLOCKS = b
-                .comment("连锁采集(砍树/挖矿)单次最大方块数")
-                .defineInRange("max_blocks", 64, 1, 1024);
-        CHAIN_WOOD_NATURE_CHECK = b
-                .comment("砍树前校验天然树(原木需连接非手放树叶)，防止女仆拆玩家木建筑")
-                .define("wood_nature_check", true);
-        b.pop();
-
-        b.push("env_sense");
-        ENV_SCAN_INTERVAL = b
-                .comment("环境感知扫描间隔 (tick)，默认 200 = 10秒")
-                .defineInRange("scan_interval_ticks", 200, 20, 1200);
-        ENV_DEFAULT_RADIUS = b
-                .comment("无工作范围时的默认扫描半径")
-                .defineInRange("default_radius", 16, 4, 64);
-        ENV_MAX_HITS = b
-                .comment("每感知器命中结果上限")
-                .defineInRange("max_hits_per_sensor", 32, 1, 256);
-        ENV_COLD_THRESHOLD = b
-                .comment("太冷判定阈值 (女仆位置温度低于此值触发 env_too_cold, TLM COLD 档默认 0.15)")
-                .defineInRange("cold_threshold", 0.15, -1.0, 2.0);
-        ENV_HOT_THRESHOLD = b
-                .comment("太热判定阈值 (女仆位置温度高于此值触发 env_too_hot, TLM 判热默认 1.0)")
-                .defineInRange("hot_threshold", 1.0, 0.0, 2.0);
-        ENV_PLAYER_GATE_RADIUS = b
-                .comment("玩家门控半径: 仅此范围内的女仆参与环境感知, 0=不门控 (v37.2)")
-                .defineInRange("player_gate_radius", 20, 0, 256);
-        ENV_DARKNESS_THRESHOLD = b
-                .comment("黑暗判定亮度阈值 (低于此值触发 env_darkness, 怪物生成亮度默认 7)")
-                .defineInRange("darkness_threshold", 7, 0, 15);
-        ENV_STRUCTURE_ENABLED = b
-                .comment("结构探测总开关 (村庄/矿井/前哨站, findNearestMapStructure 较慢)")
-                .define("structure_enabled", true);
-        ENV_STRUCTURE_INTERVAL = b
-                .comment("结构探测间隔 (tick), 默认 24000 = 1 MC 天")
-                .defineInRange("structure_interval_ticks", 24000, 1200, 168000);
-        ENV_STRUCTURE_RADIUS = b
-                .comment("结构探测半径 (区块), 越大越慢")
-                .defineInRange("structure_radius_chunks", 8, 1, 32);
-        ENVSENSE_ENABLED = b
-                .comment("环境感知总开关: false=女仆不接收任何环境信号 (v63)")
-                .define("enabled", false);
-        b.pop();
-
         SPEC = b.build();
+        reg(COMMON_VALUES, "common", CUSTOM_RULES_ENABLED);
+        reg(COMMON_VALUES, "common", DEBUG_MODE);
+    }
+
+    private MoreActionConfig() {}
+
+    /** v67.6: 三段 Spec 统一落盘 — Cloth 屏/编辑器保存的唯一入口 */
+    public static void saveAll() {
+        SPEC.save();
+        ActiveTaskConfig.ACTIVE_SPEC.save();
+        PassiveTaskConfig.PASSIVE_SPEC.save();
+    }
+
+    // ── v67.11: 配置同步 (专用服务器) — ConfigValue 句柄注册表 ──
+
+    static <T> void reg(Map<String, ForgeConfigSpec.ConfigValue<?>> map, String prefix,
+                                ForgeConfigSpec.ConfigValue<T> value) {
+        map.put(prefix + "." + String.join(".", value.getPath()), value);
+    }
+
+    /** 全量句柄 (common + active + passive) */
+    public static Map<String, ForgeConfigSpec.ConfigValue<?>> allValues() {
+        Map<String, ForgeConfigSpec.ConfigValue<?>> all = new HashMap<>(COMMON_VALUES);
+        all.putAll(ActiveTaskConfig.ACTIVE_VALUES);
+        all.putAll(PassiveTaskConfig.PASSIVE_VALUES);
+        return all;
+    }
+
+    /** 配置值条目 (path + 原始值) — 同步快照单元 */
+    public record ConfigValueEntry(String path, Object value) {}
+
+    /** 全量快照 (35 项当前值) */
+    public static List<ConfigValueEntry> snapshot() {
+        List<ConfigValueEntry> out = new ArrayList<>();
+        allValues().forEach((path, cv) -> out.add(new ConfigValueEntry(path, cv.get())));
+        return out;
+    }
+
+    /** 应用快照 (仅值, 不落盘 — 服务端落盘由调用方 saveAll) */
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public static void applySnapshot(List<ConfigValueEntry> entries) {
+        Map<String, ForgeConfigSpec.ConfigValue<?>> all = allValues();
+        for (ConfigValueEntry e : entries) {
+            ForgeConfigSpec.ConfigValue<?> cv = all.get(e.path());
+            if (cv == null) {
+                LittleMaidMoreAction.LOGGER.warn("[LMA] 配置同步跳过未知路径: {}", e.path());
+                continue;
+            }
+            Object current = cv.get();
+            if (e.value() != null && current != null && !current.getClass().equals(e.value().getClass())) {
+                LittleMaidMoreAction.LOGGER.warn("[LMA] 配置同步类型不匹配: {} ({} vs {})",
+                        e.path(), current.getClass().getSimpleName(), e.value().getClass().getSimpleName());
+                continue;
+            }
+            ((ForgeConfigSpec.ConfigValue) cv).set(e.value());
+        }
     }
 }

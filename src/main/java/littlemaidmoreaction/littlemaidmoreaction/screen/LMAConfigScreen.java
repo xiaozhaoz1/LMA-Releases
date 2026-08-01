@@ -1,12 +1,13 @@
 package littlemaidmoreaction.littlemaidmoreaction.screen;
 
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.storage.RuleActionStorage;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
+import littlemaidmoreaction.littlemaidmoreaction.network.ConfigSyncPacket;
 
 /**
  * 独立配置屏幕 — Forge 模组列表点本模组即可打开，不依赖 TLM。
@@ -30,16 +31,20 @@ public final class LMAConfigScreen extends Screen {
                 btn -> {
                     boolean v = !MoreActionConfig.CUSTOM_RULES_ENABLED.get();
                     MoreActionConfig.CUSTOM_RULES_ENABLED.set(v);
-                    MoreActionConfig.SPEC.save();
+                    MoreActionConfig.saveAll();
+                    if (!net.minecraft.client.Minecraft.getInstance().hasSingleplayerServer()) {
+                        ConfigSyncPacket.send();
+                    }
                     btn.setMessage(Component.literal("规则引擎: " + (v ? "ON" : "OFF")));
                 }).pos(cx - 80, y).size(160, 20).build());
         y += 28;
 
         y += 32; // 占位 — 规则数量在 render() 中用灰色文字绘制
 
+        // v67.2: 规则编辑入口移至女仆编辑器 (MaidListScreen 右下角: 全局/独立规则)
         this.addRenderableWidget(Button.builder(
-                Component.literal("打开规则编辑器"),
-                btn -> Minecraft.getInstance().setScreen(new MainEditorScreen(this)))
+                Component.literal("详细设置"),
+                btn -> Minecraft.getInstance().setScreen(ClothSettingsScreen.create(this)))
                 .pos(cx - 80, y).size(160, 20).build());
         y += 28;
 
@@ -61,7 +66,10 @@ public final class LMAConfigScreen extends Screen {
                 btn -> {
                     boolean v = !MoreActionConfig.DEBUG_MODE.get();
                     MoreActionConfig.DEBUG_MODE.set(v);
-                    MoreActionConfig.SPEC.save();
+                    MoreActionConfig.saveAll();
+                    if (!net.minecraft.client.Minecraft.getInstance().hasSingleplayerServer()) {
+                        ConfigSyncPacket.send();
+                    }
                     RuleActionStorage.syncDebugPresets();
                     btn.setMessage(Component.literal("调试: " + (v ? "ON" : "OFF")));
                 }).pos(cx - 80, y).size(160, 20).build());

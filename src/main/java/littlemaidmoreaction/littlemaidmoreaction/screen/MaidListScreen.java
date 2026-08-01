@@ -37,6 +37,21 @@ public final class MaidListScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("完成"),
                 b -> onClose())
                 .pos(LIST_W + 80, 30).size(50, 20).build());
+
+        // ── v67.2: 规则编辑入口 (右下角) — 全局规则始终可用, 独立女仆规则需先选中女仆 ──
+        addRenderableWidget(Button.builder(Component.literal("全局规则"),
+                b -> minecraft.setScreen(new MainEditorScreen(this)))
+                .pos(width - 190, height - 30).size(90, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("独立女仆规则"),
+                b -> {
+                    if (selectedMaid != null) {
+                        minecraft.setScreen(new MaidRuleListScreen(selectedMaid));
+                    } else if (minecraft.player != null) {
+                        minecraft.player.sendSystemMessage(
+                            Component.literal("§c请先在列表选择女仆"));
+                    }
+                })
+                .pos(width - 95, height - 30).size(90, 20).build());
     }
 
     @Override

@@ -121,6 +121,6 @@ public final class LMAT {
      */
     @javax.annotation.Nullable
     public static net.minecraft.world.MenuProvider configGui(EntityMaid maid) {
-        return littlemaidmoreaction.littlemaidmoreaction.task.gui.TaskConfigGui.of(maid);
+        return littlemaidmoreaction.littlemaidmoreaction.task.api.TaskConfigGuiFactory.of(maid);
     }
 }

@@ -2,30 +2,26 @@ package littlemaidmoreaction.littlemaidmoreaction.network;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.FlowTaskData;
-import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.BlockInteractPipeline;
-import littlemaidmoreaction.littlemaidmoreaction.task.service.BlockInteractService;
-import net.minecraft.core.BlockPos;
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.nbt.NbtUtils;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.network.NetworkEvent;
-import net.minecraftforge.network.PacketDistributor;
 
 import java.util.function.Supplier;
+import littlemaidmoreaction.littlemaidmoreaction.config.ActiveTaskConfig;
 
 /**
- * 右键交互手动触发包 (C→S)。
+ * 任务手动触发包 (C→S) — 引擎级按键触发。
  *
- * <p>客户端按键 → 发送本包 → 服务端扫描玩家10格内女仆 → 执行交互。
+ * <p>客户端按键 → 发送本包 → 服务端扫描玩家周围女仆 (范围见
+ * {@link MoreActionConfig#BI_TRIGGER_RANGE}) → 按当前任务分发到
+ * {@link littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline#onPlayerTrigger}。
+ * 任何任务覆写 onPlayerTrigger 即可响应按键, 无需改本包。
  */
 public final class InteractTriggerPacket {
-
-    /** 10格扫描范围 */
-    private static final double TRIGGER_RANGE = 10.0;
 
     private InteractTriggerPacket() {}
 
@@ -43,14 +39,12 @@ public final class InteractTriggerPacket {
             if (player == null) return;
             ServerLevel world = player.serverLevel();
 
-            AABB aabb = player.getBoundingBox().inflate(TRIGGER_RANGE);
+            // v67.2: 扫描范围 Cloth Config 配置 (默认 10 格)
+            AABB aabb = player.getBoundingBox().inflate(ActiveTaskConfig.BI_TRIGGER_RANGE.get());
             for (EntityMaid maid : world.getEntitiesOfClass(EntityMaid.class, aabb,
                 m -> m.isAlive() && m.isOwnedBy(player))) {
-                if (!"block_interact".equals(FlowTaskData.getTask(maid))) continue;
-                CompoundTag cfg = BlockInteractPipeline.config(maid);
-                if (!cfg.contains(BlockInteractPipeline.KEY_POS)) continue;
-                BlockPos pos = NbtUtils.readBlockPos(cfg.getCompound(BlockInteractPipeline.KEY_POS));
-                BlockInteractService.interact(world, maid, pos);
+                TaskRegistry.TaskHandler handler = TaskRegistry.get(FlowTaskData.getTask(maid));
+                if (handler != null) handler.pipeline().onPlayerTrigger(maid, player);
             }
         });
         ctx.get().setPacketHandled(true);

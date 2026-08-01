@@ -2,7 +2,6 @@ package littlemaidmoreaction.littlemaidmoreaction.core.engine;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.cache.ConditionCache;
 import littlemaidmoreaction.littlemaidmoreaction.core.cache.MaidRuleIndex;
 import littlemaidmoreaction.littlemaidmoreaction.core.cache.RuleIndex;
@@ -12,6 +11,7 @@ import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 
 /**
  * 规则引擎 v5 主入口。

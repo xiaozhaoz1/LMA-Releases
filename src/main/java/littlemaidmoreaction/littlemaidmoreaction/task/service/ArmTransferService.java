@@ -18,11 +18,17 @@ public final class ArmTransferService {
     // ── Input ──
 
     public static ItemStack readSourceItem(EntityMaid maid, BlockPos sourcePos) {
+        return readSourceItem(maid, sourcePos, s -> true);
+    }
+
+    /** v67.3: 读取第一个非空且通过过滤的源物品 (搬运黑白名单用) */
+    public static ItemStack readSourceItem(EntityMaid maid, BlockPos sourcePos,
+                                           java.util.function.Predicate<ItemStack> filter) {
         IItemHandler handler = getHandler(maid, sourcePos);
         if (handler == null) return ItemStack.EMPTY;
         for (int slot = 0; slot < handler.getSlots(); slot++) {
             ItemStack stack = handler.getStackInSlot(slot);
-            if (!stack.isEmpty()) return stack.copy();
+            if (!stack.isEmpty() && filter.test(stack)) return stack.copy();
         }
         return ItemStack.EMPTY;
     }

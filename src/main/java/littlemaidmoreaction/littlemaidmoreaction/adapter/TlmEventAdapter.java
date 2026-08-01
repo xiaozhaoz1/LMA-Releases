@@ -198,9 +198,9 @@ public final class TlmEventAdapter {
         if (dead.level().isClientSide()) return;
         if (dead instanceof EntityMaid) return; // 女仆自身死亡由 maid_death 覆盖
         if (!(dead.level() instanceof net.minecraft.server.level.ServerLevel level)) return;
-        int gate = littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig.ENV_PLAYER_GATE_RADIUS.get();
+        int gate = littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig.ENV_PLAYER_GATE_RADIUS.get();
         if (gate > 0 && !level.hasNearbyAlivePlayer(dead.getX(), dead.getY(), dead.getZ(), gate)) return;
-        int radius = littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig.ENV_DEFAULT_RADIUS.get();
+        int radius = littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
         var box = dead.getBoundingBox().inflate(radius, radius, radius);
         for (EntityMaid maid : level.getEntitiesOfClass(EntityMaid.class, box)) {
             RuleEngine.handleEvent("lma_nearby_death", new RuleContext(maid, e.getEntity()));

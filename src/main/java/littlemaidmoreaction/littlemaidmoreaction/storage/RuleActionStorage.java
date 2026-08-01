@@ -193,7 +193,7 @@ public final class RuleActionStorage {
         for (RuleDef r : defaults) { if (writeIfMissing(r)) seeded++; }
         // compat 模块默认规则（always seed — compat 未加载时降级运行）
         for (RuleDef r : littlemaidmoreaction.littlemaidmoreaction.compat.ysm.YsmPresets.createDefaults()) { if (writeIfMissing(r)) seeded++; }
-        for (RuleDef r : littlemaidmoreaction.littlemaidmoreaction.impl.altar.AltarPresets.createDefaults()) { if (writeIfMissing(r)) seeded++; }
+        // v67.2: 祭坛合成任务已删除 (用户决策) — AltarPresets 不再 seed
         // ★ v18: AiDemoPresets removed — task system no longer uses rule engine
         LittleMaidMoreAction.LOGGER.info("[Storage] seeded {} new default rules", seeded);
     }
@@ -202,8 +202,7 @@ public final class RuleActionStorage {
     private static void seedDefaultsForce() throws IOException {
         for (RuleDef r : createDefaultRules()) writeRuleFile(r);
         for (RuleDef r : littlemaidmoreaction.littlemaidmoreaction.compat.ysm.YsmPresets.createDefaults()) writeRuleFile(r);
-        for (RuleDef r : littlemaidmoreaction.littlemaidmoreaction.impl.altar.AltarPresets.createDefaults()) writeRuleFile(r);
-        // ★ v18: AiDemoPresets removed
+        // ★ v18: AiDemoPresets removed; v67.2: 祭坛合成任务已删除 — AltarPresets 不再写入
     }
 
     /** 文件不存在时才写入，返回 true 表示实际写入了 */

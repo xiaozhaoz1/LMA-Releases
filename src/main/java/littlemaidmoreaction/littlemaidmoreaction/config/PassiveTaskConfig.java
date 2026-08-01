@@ -1,0 +1,91 @@
+package littlemaidmoreaction.littlemaidmoreaction.config;
+
+import net.minecraftforge.common.ForgeConfigSpec;
+
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * 被动任务配置段 (v67.7) — {@code config/littlemaidmoreaction/passive.toml}。
+ *
+ * <p>覆盖环境感知 (EnvSense) 11 项 — 感知器扫描/阈值/结构探测/总开关。
+ * 保存统一走 {@link MoreActionConfig#saveAll()} (三段 Spec 唯一落盘入口)。
+ */
+public final class PassiveTaskConfig {
+    /** 被动段 Spec (config/littlemaidmoreaction/passive.toml) */
+    public static final ForgeConfigSpec PASSIVE_SPEC;
+
+    // ── 环境感知 (v37) ──
+    public static final ForgeConfigSpec.IntValue ENV_SCAN_INTERVAL;
+    public static final ForgeConfigSpec.IntValue ENV_DEFAULT_RADIUS;
+    public static final ForgeConfigSpec.IntValue ENV_MAX_HITS;
+    // ── 环境感知阈值 (v37.1, 默认对齐 TLM) ──
+    public static final ForgeConfigSpec.DoubleValue ENV_COLD_THRESHOLD;
+    public static final ForgeConfigSpec.DoubleValue ENV_HOT_THRESHOLD;
+    // ── 环境感知扩展 (v37.2) ──
+    public static final ForgeConfigSpec.IntValue ENV_PLAYER_GATE_RADIUS;
+    public static final ForgeConfigSpec.IntValue ENV_DARKNESS_THRESHOLD;
+    public static final ForgeConfigSpec.BooleanValue ENV_STRUCTURE_ENABLED;
+    public static final ForgeConfigSpec.IntValue ENV_STRUCTURE_INTERVAL;
+    public static final ForgeConfigSpec.IntValue ENV_STRUCTURE_RADIUS;
+    // ── v63: 全局总开关 ──
+    public static final ForgeConfigSpec.BooleanValue ENVSENSE_ENABLED;
+
+    /** v67.11: 本段 ConfigValue 句柄注册表 (path → value, 前缀 "passive.") — 配置同步用 */
+    public static final Map<String, ForgeConfigSpec.ConfigValue<?>> PASSIVE_VALUES = new HashMap<>();
+
+    static {
+        ForgeConfigSpec.Builder b = new ForgeConfigSpec.Builder();
+
+        b.push("env_sense");
+        ENV_SCAN_INTERVAL = b
+                .comment("环境感知扫描间隔 (tick)，默认 200 = 10秒")
+                .defineInRange("scan_interval_ticks", 200, 20, 1200);
+        ENV_DEFAULT_RADIUS = b
+                .comment("无工作范围时的默认扫描半径")
+                .defineInRange("default_radius", 16, 4, 64);
+        ENV_MAX_HITS = b
+                .comment("每感知器命中结果上限")
+                .defineInRange("max_hits_per_sensor", 32, 1, 256);
+        ENV_COLD_THRESHOLD = b
+                .comment("太冷判定阈值 (女仆位置温度低于此值触发 env_too_cold, TLM COLD 档默认 0.15)")
+                .defineInRange("cold_threshold", 0.15, -1.0, 2.0);
+        ENV_HOT_THRESHOLD = b
+                .comment("太热判定阈值 (女仆位置温度高于此值触发 env_too_hot, TLM 判热默认 1.0)")
+                .defineInRange("hot_threshold", 1.0, 0.0, 2.0);
+        ENV_PLAYER_GATE_RADIUS = b
+                .comment("玩家门控半径: 仅此范围内的女仆参与环境感知, 0=不门控 (v37.2)")
+                .defineInRange("player_gate_radius", 20, 0, 256);
+        ENV_DARKNESS_THRESHOLD = b
+                .comment("黑暗判定亮度阈值 (低于此值触发 env_darkness, 怪物生成亮度默认 7)")
+                .defineInRange("darkness_threshold", 7, 0, 15);
+        ENV_STRUCTURE_ENABLED = b
+                .comment("结构探测总开关 (村庄/矿井/前哨站, findNearestMapStructure 较慢)")
+                .define("structure_enabled", true);
+        ENV_STRUCTURE_INTERVAL = b
+                .comment("结构探测间隔 (tick), 默认 24000 = 1 MC 天")
+                .defineInRange("structure_interval_ticks", 24000, 1200, 168000);
+        ENV_STRUCTURE_RADIUS = b
+                .comment("结构探测半径 (区块), 越大越慢")
+                .defineInRange("structure_radius_chunks", 8, 1, 32);
+        ENVSENSE_ENABLED = b
+                .comment("环境感知总开关: false=女仆不接收任何环境信号 (v63)")
+                .define("enabled", false);
+        b.pop();
+
+        PASSIVE_SPEC = b.build();
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_SCAN_INTERVAL);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_DEFAULT_RADIUS);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_MAX_HITS);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_COLD_THRESHOLD);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_HOT_THRESHOLD);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_PLAYER_GATE_RADIUS);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_DARKNESS_THRESHOLD);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_STRUCTURE_ENABLED);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_STRUCTURE_INTERVAL);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_STRUCTURE_RADIUS);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENVSENSE_ENABLED);
+    }
+
+    private PassiveTaskConfig() {}
+}

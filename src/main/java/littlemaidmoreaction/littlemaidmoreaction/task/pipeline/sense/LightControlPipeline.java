@@ -1,7 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.task.pipeline.sense;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
@@ -17,6 +16,7 @@ import net.minecraft.world.level.block.RedstoneLampBlock;
 
 import java.util.List;
 import java.util.Set;
+import littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig;
 
 /**
  * v63: 日出日落自动开关灯被动任务。
@@ -41,7 +41,7 @@ public final class LightControlPipeline implements TaskPipeline {
         if (!(maid.level() instanceof ServerLevel world)) return;
 
         boolean isDay = snap.world() != null && snap.world().day();
-        int radius = MoreActionConfig.ENV_DEFAULT_RADIUS.get();
+        int radius = PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
         List<BlockPos> lamps = EnvScanner.scanRedstoneLamps(world, maid.blockPosition(), radius);
 
         for (BlockPos pos : lamps) {

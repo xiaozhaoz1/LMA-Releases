@@ -9,10 +9,12 @@ import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.item.ToolStateRea
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.BlockSearch;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.ConnectedBlockSearch;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.world.WorldOutput;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.data.FlowTaskData;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.HarvestTarget;
 import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateManager;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.ToolJudge;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
+import littlemaidmoreaction.littlemaidmoreaction.task.service.ItemFilters;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -27,6 +29,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiPredicate;
+import littlemaidmoreaction.littlemaidmoreaction.config.ActiveTaskConfig;
+import littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig;
 
 /**
  * 连锁采集执行器 (v36.6) — 只做编排，判定全部委托 {@link HarvestTarget}。
@@ -57,9 +61,6 @@ public final class ChainHarvestExecute {
     private static final String KEY_IDX_LEGACY = "lma_chain_idx";
     private static final String KEY_TICK_LEGACY = "lma_chain_tick";
 
-    /** v36.4 用户定: 3 秒扫描一次 */
-    private static final int SCAN_INTERVAL_TICKS = 60;
-    private static final double MAX_DIST_SQR = 32 * 32;
     private static final int TOOL_RESERVE_DURABILITY = 1;
     /** 跳过集容量 (v36.3 用户定 10) */
     private static final int SKIP_MAX = 10;
@@ -111,7 +112,7 @@ public final class ChainHarvestExecute {
         }
 
         BlockState state = world.getBlockState(pos);
-        if (target.matches(state)) {
+        if (target.matches(state) && allowed(maid, state)) {
             return tryStartVein(world, maid, pos, data, target, tool);
         }
         return idleScan(world, maid, data, target, tool, false);
@@ -123,6 +124,7 @@ public final class ChainHarvestExecute {
         BlockState state = world.getBlockState(pos);
 
         if (skip.contains(pos.asLong())
+                || !allowed(maid, state)
                 || !target.canHarvest(tool, state)
                 || !target.validAt(world, pos)) {
             addSkip(skip, pos.asLong());
@@ -131,7 +133,7 @@ public final class ChainHarvestExecute {
 
         List<BlockPos> vein = ConnectedBlockSearch.findConnected(world, pos,
                 target.veinPredicate(state),
-                MoreActionConfig.CHAIN_MAX_BLOCKS.get(), maid.blockPosition(), MAX_DIST_SQR);
+                ActiveTaskConfig.CHAIN_MAX_BLOCKS.get(), maid.blockPosition(), maxDistSqr());
         if (vein.isEmpty()) {
             addSkip(skip, pos.asLong());
             return idleScan(world, maid, data, target, tool, true);
@@ -181,7 +183,7 @@ public final class ChainHarvestExecute {
             BlockPos blockPos = BlockPos.of(l);
             BlockState state = world.getBlockState(blockPos);
             if (state.isAir() || !target.matches(state)) continue;
-            if (blockPos.distSqr(maid.blockPosition()) > MAX_DIST_SQR) continue;
+            if (blockPos.distSqr(maid.blockPosition()) > maxDistSqr()) continue;
             if (!target.canHarvest(tool, state)) continue;
             if (!maid.canDestroyBlock(blockPos)) continue;
             if (maid.destroyBlock(blockPos)) broken++;
@@ -205,7 +207,7 @@ public final class ChainHarvestExecute {
         int id = maid.getId();
         if (!immediate) {
             long last = LAST_SCAN.getOrDefault(id, 0L);
-            if (last != 0 && last <= now && now - last < SCAN_INTERVAL_TICKS) {
+            if (last != 0 && last <= now && now - last < ActiveTaskConfig.CHAIN_SCAN_INTERVAL.get()) {
                 keepAlive(world, maid);
                 return TaskResult.CONTINUE;
             }
@@ -235,10 +237,26 @@ public final class ChainHarvestExecute {
         return TaskResult.CONTINUE;
     }
 
+    /** v67.3: 采集方块黑白名单 (方块id). v67.8: per-maid pipelineConfig 非空覆盖全局 */
+    private static boolean allowed(EntityMaid maid, BlockState state) {
+        CompoundTag cfg = TaskRegistry.get(FlowTaskData.getTask(maid)).pipeline().pipelineConfig(maid);
+        List<String> black = ItemFilters.effective(ItemFilters.maidList(cfg, ItemFilters.KEY_BLACKLIST),
+                ActiveTaskConfig.COLLECT_BLACKLIST.get());
+        List<String> white = ItemFilters.effective(ItemFilters.maidList(cfg, ItemFilters.KEY_WHITELIST),
+                ActiveTaskConfig.COLLECT_WHITELIST.get());
+        return ItemFilters.isAllowed(state, black, white);
+    }
+
     private static int searchRadius(EntityMaid maid) {
         return maid.hasRestriction()
                 ? Math.max(4, (int) maid.getRestrictRadius())
-                : MoreActionConfig.ENV_DEFAULT_RADIUS.get();
+                : PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
+    }
+
+    /** v67.4: 采集距离上限平方 (配置驱动, 默认 32 格) */
+    private static double maxDistSqr() {
+        int radius = ActiveTaskConfig.CHAIN_MAX_DISTANCE.get();
+        return (double) radius * radius;
     }
 
     @Nullable
@@ -246,7 +264,7 @@ public final class ChainHarvestExecute {
                                              HarvestTarget target, ItemStack tool, int radius) {
         var skip = skipSet(maid, tool);
         BiPredicate<BlockPos, BlockState> pred = (p, s) ->
-                target.matches(s) && !skip.contains(p.asLong()) && target.canHarvest(tool, s);
+                target.matches(s) && allowed(maid, s) && !skip.contains(p.asLong()) && target.canHarvest(tool, s);
         var matches = BlockSearch.findBlocksInRange(world, maid.blockPosition(), radius, pred);
         return matches.isEmpty() ? null : matches.get(0).pos();
     }
@@ -287,7 +305,7 @@ public final class ChainHarvestExecute {
         long now = world.getGameTime();
         if (!force) {
             long last = BUBBLE_TICK.getOrDefault(id, 0L);
-            if (last != 0 && last <= now && now - last < SCAN_INTERVAL_TICKS) return;
+            if (last != 0 && last <= now && now - last < ActiveTaskConfig.CHAIN_SCAN_INTERVAL.get()) return;
         }
         BUBBLE_TICK.put(id, now);
         long prev = BUBBLE_ID.getOrDefault(id, -1L);

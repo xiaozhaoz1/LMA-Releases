@@ -1,6 +1,5 @@
 package littlemaidmoreaction.littlemaidmoreaction.screen;
 
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.model.RuleDef;
 import littlemaidmoreaction.littlemaidmoreaction.storage.RuleActionStorage;
 import net.minecraft.client.Minecraft;
@@ -10,6 +9,8 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.ConfirmScreen;
 import net.minecraft.network.chat.Component;
 import java.util.*;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
+import littlemaidmoreaction.littlemaidmoreaction.network.ConfigSyncPacket;
 
 /**
  * 规则列表编辑器 — 显示所有规则，支持新增/编辑/删除。
@@ -45,7 +46,10 @@ public final class MainEditorScreen extends Screen {
         addRenderableWidget(Button.builder(Component.literal("引擎: " + (on ? "开" : "关")), b -> {
             boolean v = !MoreActionConfig.CUSTOM_RULES_ENABLED.get();
             MoreActionConfig.CUSTOM_RULES_ENABLED.set(v);
-            MoreActionConfig.SPEC.save();
+            MoreActionConfig.saveAll();
+            if (!net.minecraft.client.Minecraft.getInstance().hasSingleplayerServer()) {
+                ConfigSyncPacket.send();
+            }
             b.setMessage(Component.literal("引擎: " + (v ? "开" : "关")));
         }).pos(this.width / 2 + 10, this.height - 30).size(100, 20).build());
     }

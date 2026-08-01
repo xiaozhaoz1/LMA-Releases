@@ -2,7 +2,6 @@ package littlemaidmoreaction.littlemaidmoreaction.task.sense;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
 import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
@@ -13,6 +12,7 @@ import net.minecraft.server.level.ServerLevel;
 
 import javax.annotation.Nullable;
 import java.util.*;
+import littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig;
 
 /**
  * 环境感知广播器 (v63) — 全局扫描 + 信号分发。
@@ -43,7 +43,7 @@ public final class EnvSenseBroadcaster {
      * 对 level 中所有女仆做边沿检测 + 信号分发。
      */
     public static void broadcast(ServerLevel level) {
-        if (!MoreActionConfig.ENVSENSE_ENABLED.get()) return;
+        if (!PassiveTaskConfig.ENVSENSE_ENABLED.get()) return;
 
         long now = level.getGameTime();
 
@@ -55,7 +55,7 @@ public final class EnvSenseBroadcaster {
             if (!maid.getPersistentData().getBoolean(TaskKeys.ENVSENSE_ENABLED)) continue;
 
             // 玩家门控
-            int gateRadius = MoreActionConfig.ENV_PLAYER_GATE_RADIUS.get();
+            int gateRadius = PassiveTaskConfig.ENV_PLAYER_GATE_RADIUS.get();
             if (gateRadius > 0
                     && !level.hasNearbyAlivePlayer(maid.getX(), maid.getY(), maid.getZ(), gateRadius)) {
                 continue;
@@ -65,9 +65,9 @@ public final class EnvSenseBroadcaster {
             EnvSnapshot.WorldInfo world = EnvScanner.readWorld(level, maid.blockPosition());
             int radius = maid.hasRestriction()
                     ? Math.max(4, (int) maid.getRestrictRadius())
-                    : MoreActionConfig.ENV_DEFAULT_RADIUS.get();
+                    : PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
             Map<String, List<net.minecraft.world.entity.LivingEntity>> entities =
-                    EnvScanner.scanEntities(level, maid, radius, MoreActionConfig.ENV_MAX_HITS.get());
+                    EnvScanner.scanEntities(level, maid, radius, PassiveTaskConfig.ENV_MAX_HITS.get());
 
             EnvSnapshot snap = new EnvSnapshot(now, Map.of(), entities, world, List.of());
             EnvSnapshot prev = PREV_SNAPSHOTS.get(maid.getId());
@@ -119,10 +119,10 @@ public final class EnvSenseBroadcaster {
         if (pw != null && pw.raining() && !cw.raining()) signals.add(EnvSignal.WEATHER_CLEAR);
 
         // ── 温度 ──
-        boolean wasCold = pw != null && pw.temperature() < MoreActionConfig.ENV_COLD_THRESHOLD.get().floatValue();
-        boolean isCold = cw.temperature() < MoreActionConfig.ENV_COLD_THRESHOLD.get().floatValue();
-        boolean wasHot = pw != null && pw.temperature() > MoreActionConfig.ENV_HOT_THRESHOLD.get().floatValue();
-        boolean isHot = cw.temperature() > MoreActionConfig.ENV_HOT_THRESHOLD.get().floatValue();
+        boolean wasCold = pw != null && pw.temperature() < PassiveTaskConfig.ENV_COLD_THRESHOLD.get().floatValue();
+        boolean isCold = cw.temperature() < PassiveTaskConfig.ENV_COLD_THRESHOLD.get().floatValue();
+        boolean wasHot = pw != null && pw.temperature() > PassiveTaskConfig.ENV_HOT_THRESHOLD.get().floatValue();
+        boolean isHot = cw.temperature() > PassiveTaskConfig.ENV_HOT_THRESHOLD.get().floatValue();
         if (isCold && !wasCold) signals.add(EnvSignal.TEMP_COLD);
         if (isHot && !wasHot) signals.add(EnvSignal.TEMP_HOT);
         if (!isCold && !isHot && (wasCold || wasHot)) signals.add(EnvSignal.TEMP_NORMAL);
@@ -131,8 +131,8 @@ public final class EnvSenseBroadcaster {
         if (pw != null && pw.day() != cw.day()) signals.add(EnvSignal.DAY_NIGHT_CHANGE);
 
         // ── 黑暗 ──
-        boolean wasDark = pw != null && pw.lightAtMaid() < MoreActionConfig.ENV_DARKNESS_THRESHOLD.get();
-        boolean isDark = cw.lightAtMaid() < MoreActionConfig.ENV_DARKNESS_THRESHOLD.get();
+        boolean wasDark = pw != null && pw.lightAtMaid() < PassiveTaskConfig.ENV_DARKNESS_THRESHOLD.get();
+        boolean isDark = cw.lightAtMaid() < PassiveTaskConfig.ENV_DARKNESS_THRESHOLD.get();
         if (isDark && !wasDark) signals.add(EnvSignal.DARKNESS);
 
         // ── 维度/时段 ──
@@ -154,7 +154,7 @@ public final class EnvSenseBroadcaster {
         if (hasMaid && !hadMaid) signals.add(EnvSignal.MAID_NEARBY);
 
         // ── 结构 (低频独立通道, 默认 24000 tick = 1 MC 天) ──
-        if (MoreActionConfig.ENV_STRUCTURE_ENABLED.get()) {
+        if (PassiveTaskConfig.ENV_STRUCTURE_ENABLED.get()) {
             detectStructureSignals(signals, level, maid, now);
         }
 
@@ -163,7 +163,7 @@ public final class EnvSenseBroadcaster {
 
     private static void detectStructureSignals(Set<EnvSignal> out, ServerLevel level,
                                                 EntityMaid maid, long now) {
-        int structInterval = MoreActionConfig.ENV_STRUCTURE_INTERVAL.get();
+        int structInterval = PassiveTaskConfig.ENV_STRUCTURE_INTERVAL.get();
         long last = STRUCT_LAST.getOrDefault(maid.getId(), 0L);
         if (last != 0 && now - last < structInterval) return;
         STRUCT_LAST.put(maid.getId(), now);
@@ -171,7 +171,7 @@ public final class EnvSenseBroadcaster {
         int id = maid.getId();
         Set<EnvSignal> found = new HashSet<>();
         BlockPos center = maid.blockPosition();
-        int radius = MoreActionConfig.ENV_STRUCTURE_RADIUS.get();
+        int radius = PassiveTaskConfig.ENV_STRUCTURE_RADIUS.get();
 
         checkStructure(found, EnvSignal.VILLAGE_NEARBY,
                 net.minecraft.tags.StructureTags.VILLAGE, level, center, radius);

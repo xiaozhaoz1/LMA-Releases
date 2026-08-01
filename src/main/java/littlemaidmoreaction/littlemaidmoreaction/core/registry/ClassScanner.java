@@ -4,13 +4,13 @@ import io.github.classgraph.ClassGraph;
 import io.github.classgraph.ClassInfo;
 import io.github.classgraph.ScanResult;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleCondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.ScriptPlugin;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.script.ScriptPluginRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 
 /**
  * 类路径扫描器 — 使用 ClassGraph 在模组初始化时自动发现注解标记的扩展。

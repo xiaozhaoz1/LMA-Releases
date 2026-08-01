@@ -1,6 +1,6 @@
 # LMA 任务系统
 
-> v62 — 文件分层 / onStop 去重 / Pipeline 统一 / 数据模块化 / pipelineData()
+> v67.1 — 引擎上提: onPlayerTrigger 按键触发 / 通用配置动作 / TaskConfigs / 配置GUI
 
 ## 如何读这个包
 
@@ -11,7 +11,7 @@ task/
 ├── data/         数据读写/NBT key/开关    → 看这里
 ├── gui/          任务树展示
 ├── behavior/     默认行为 (吃/收集)
-├── pipeline/     8个Pipeline实现
+├── pipeline/     9个Pipeline实现
 └── service/      共享静态服务
 ```
 
@@ -20,8 +20,8 @@ task/
 ### api/ — 开发者写新Pipeline只看这个
 | 文件 | 什么 |
 |------|------|
-| `TaskPipeline.java` | Pipeline接口。15个方法只有 `taskType()` 抽象。默认行为：`enableWorkEat()` `collectFilter()`。数据：`pipelineData()` `pipelineConfig()` |
-| `TaskRegistry.java` | 注册入口：`register(name, pipeline, executor, showInBar)`。14个已注册 |
+| `TaskPipeline.java` | Pipeline接口。21个方法只有 `taskType()` 抽象。默认行为：`enableWorkEat()` `collectFilter()`。数据：`pipelineData()` `pipelineConfig()`。引擎链路：`onPlayerTrigger()` 按键触发、`handleConfigAction()` 配置GUI动作(通用 ACTION_TOGGLE/SET_INT/REMOVE)、`getConfigGuiProvider()` 配置界面 |
+| `TaskRegistry.java` | 注册入口：`register(name, pipeline, executor, showInBar)`。15个已注册 |
 
 ### runtime/ — 任务怎么跑起来的
 | 文件 | 什么 |
@@ -37,6 +37,7 @@ task/
 |------|------|
 | `TaskKeys.java` | 所有 `lma_flow_*` / `lma_task_*` NBT key常量 + 状态值 |
 | `FlowTaskData.java` | `lma_flow_*` 读写：`getTask/getState/getTick` + `start/initFull/clearAll` |
+| `TaskConfigs.java` | 静态上下文取管线配置：`get(maid, taskType)` → pipelineConfig (v67.1 替代各 Pipeline 静态 config()) |
 | `TaskMetaData.java` | `lma_task_*` 读写：`getTarget/setTarget` `getInput/setInput` + adapter标记 |
 | `TaskExtraData.java` | 动画/唱片机/开关/被动/重试 读写 |
 | `PipelineContext.java` | validate输入：target + targetCount + taskId |
@@ -50,7 +51,42 @@ task/
 |--------|-----|-------|------|------|
 | 全局共享 | `FlowTaskData` `TaskMetaData` | `lma_flow_*` `lma_task_*` | 调度层 | 任务类型/状态/目标 |
 | 管线临时 | `pipelineData(maid)` | `lma_pl_<task>` | `onCleanup` 自动 | 计时器/槽位/进度 |
-| 管线持久 | `pipelineConfig(maid)` | `lma_cfg_<task>` | 手动 | 材料锁定/配方缓存 |
+| 管线持久 | `pipelineConfig(maid)` | `lma_cfg_<task>` | 手动 | 材料锁定/配方缓存/任务配置 |
+
+## 引擎链路 (v67.1)
+
+### 按键触发 — onPlayerTrigger
+
+```
+客户端按键 (BlockInteractKeyMapping)
+  → InteractTriggerPacket (C→S, 通用)
+  → 服务端扫描 10 格内 owned 女仆
+  → TaskRegistry.get(当前任务).pipeline().onPlayerTrigger(maid, player)
+```
+
+任务支持按键触发只需覆写 `onPlayerTrigger` — 包/扫描/分发全部引擎提供。
+
+### 配置GUI动作 — TaskConfigActionPacket + handleConfigAction
+
+```
+客户端屏幕按钮
+  → TaskConfigActionPacket (C→S, 通用, ID 3)
+  → 服务端 isOwnedBy 校验 → TaskRegistry.get(taskType).pipeline().handleConfigAction(maid, action, payload)
+```
+
+引擎通用动作 (payload 带 "key"): `ACTION_TOGGLE` (boolean取反) / `ACTION_SET_INT` (key+value) /
+`ACTION_REMOVE` (删key) / `ACTION_SET_LIST` (v67.3: key+逗号分隔value → ListTag)。
+自定义动作从 16 起, 覆写 handleConfigAction。
+黑白名单 (v67.3): `ItemFilters` (task/service) — 黑名单优先, 白名单非空限定, `modid:*` 通配,
+per-maid 名单 (pipelineConfig blacklist/whitelist) 非空覆盖全局 (Cloth Config)。
+
+### 配置数据同步
+
+```
+屏幕 initAdditionWidgets → RequestTaskConfigPacket (C→S)
+  → 服务端 pipeline.getConfigNbt(maid) (默认 = pipelineConfig)
+  → ReplyTaskConfigPacket (S→C) → menu.updateConfig → 屏幕读取
+```
 
 ## 生命周期
 

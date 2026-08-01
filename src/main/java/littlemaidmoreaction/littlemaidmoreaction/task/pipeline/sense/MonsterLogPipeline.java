@@ -64,9 +64,5 @@ public final class MonsterLogPipeline implements TaskPipeline {
             }
         }
     }
-
-    @Override
-    public void onCleanup(EntityMaid maid) {
-        clearPipelineData(maid);
-    }
+    // onCleanup 用接口默认 (clearPipelineData) — v67.3 删除冗余覆写
 }

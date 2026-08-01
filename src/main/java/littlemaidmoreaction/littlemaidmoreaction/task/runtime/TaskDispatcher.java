@@ -17,6 +17,11 @@ import net.minecraft.server.level.ServerLevel;
  */
 public final class TaskDispatcher {
 
+    /** v67.3: 失败气泡节流 — 同一女仆 30 秒内不重复刷 (validate 失败无限重试循环防刷屏) */
+    private static final long FAIL_BUBBLE_INTERVAL = 600;
+    private static final java.util.Map<EntityMaid, Long> FAIL_BUBBLE =
+            new java.util.WeakHashMap<>();
+
     private TaskDispatcher() {}
 
     /**
@@ -37,7 +42,18 @@ public final class TaskDispatcher {
         // 1. 先验证 (失败则旧任务不受影响)
         PipelineResult result = TaskRegistry.validate(maid, taskType,
             "", target != null ? target : "", count);
-        if (!result.completed()) return false;
+        if (!result.completed()) {
+            // v67.3: 失败气泡 — 显示 validate feedback (30秒节流防无限重试刷屏)
+            if (!result.feedback().isEmpty() && maid.level() instanceof ServerLevel sl) {
+                long now = sl.getGameTime();
+                Long last = FAIL_BUBBLE.get(maid);
+                if (last == null || now - last >= FAIL_BUBBLE_INTERVAL) {
+                    FAIL_BUBBLE.put(maid, now);
+                    maid.getChatBubbleManager().addTextChatBubble("§c" + result.feedback());
+                }
+            }
+            return false;
+        }
 
         // 2. 冲突检测: 验证通过后再取消旧任务
         String current = FlowTaskData.getTask(maid);

@@ -52,8 +52,16 @@ public final class MaidAssemblyTask implements IMaidTask {
     @Override public FunctionCallSwitchResult onFunctionCallSwitch(EntityMaid maid) { return FunctionCallSwitchResult.OK; }
     @Override public String getMaidActionSummary() { return "执行便携装配任务"; }
 
+    /** v67.16: UID 路径带 "task/" 前缀, 默认 getName 生成 key 不匹配 lang — 显式覆写 */
+    @Override
+    public net.minecraft.network.chat.MutableComponent getName() {
+        return net.minecraft.network.chat.Component.translatable(
+                "task." + LittleMaidMoreAction.MOD_ID + ".maid_assembly");
+    }
+
     @Override
     public MenuProvider getTaskConfigGuiProvider(EntityMaid maid) {
-        return littlemaidmoreaction.littlemaidmoreaction.task.gui.TaskConfigGui.of(maid);
+        // v67.12: 按任务类型直查 — 避免任务刚选中 lma_flow_task 未初始化时误回退默认屏
+        return littlemaidmoreaction.littlemaidmoreaction.task.api.TaskConfigGuiFactory.forTask(maid, "maid_assembly");
     }
 }

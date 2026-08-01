@@ -3,6 +3,8 @@ package littlemaidmoreaction.littlemaidmoreaction.vanilla.execute;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.api.VanillaConstants;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskRegistry;
+import littlemaidmoreaction.littlemaidmoreaction.task.service.ItemFilters;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.output.block.JukeboxOutput;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -15,10 +17,13 @@ import net.minecraftforge.items.IItemHandler;
 
 import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
+import littlemaidmoreaction.littlemaidmoreaction.config.ActiveTaskConfig;
 
-/** v29: 唱片机编排 — enum状态机, INSERTING→PLAYING→EJECTING→PICKUP_WAIT→INSERTING */
+/**
+ * v29: 唱片机编排 — enum状态机, INSERTING→PLAYING→EJECTING→PICKUP_WAIT→INSERTING
+ * v67.3: 播放等待时长 Cloth Config (jukebox.wait_ticks), 选碟黑白名单 (全局 + per-maid)。
+ */
 public final class JukeboxExecute {
-    private static final int PLAY_TICKS = VanillaConstants.JUKEBOX_PLAY_TICKS;
     private static final int PICKUP_TICKS = VanillaConstants.JUKEBOX_PICKUP_TICKS;
 
     enum Phase {
@@ -39,6 +44,13 @@ public final class JukeboxExecute {
             LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} pos is not a jukebox", maid.getId());
             return false;
         }
+
+        // v67.3: 生效黑白名单 (per-maid lma_cfg_jukebox 覆盖全局)
+        CompoundTag cfg = TaskRegistry.get("jukebox").pipeline().pipelineConfig(maid);
+        List<String> black = ItemFilters.effective(ItemFilters.maidList(cfg, ItemFilters.KEY_BLACKLIST),
+                ActiveTaskConfig.JUKEBOX_BLACKLIST.get());
+        List<String> white = ItemFilters.effective(ItemFilters.maidList(cfg, ItemFilters.KEY_WHITELIST),
+                ActiveTaskConfig.JUKEBOX_WHITELIST.get());
 
         CompoundTag data = maid.getPersistentData();
         Phase phase = Phase.fromOrdinal(data.getInt("lma_jukebox_phase"));
@@ -74,7 +86,7 @@ public final class JukeboxExecute {
                 List<ItemStack> discs = new ArrayList<>();
                 for (int i = 0; i < inv.getSlots(); i++) {
                     ItemStack s = inv.getStackInSlot(i);
-                    if (s.is(ItemTags.MUSIC_DISCS)) discs.add(s);
+                    if (s.is(ItemTags.MUSIC_DISCS) && ItemFilters.isAllowed(s, black, white)) discs.add(s);
                 }
                 if (discs.isEmpty()) {
                     LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING: no discs in inventory", maid.getId());
@@ -120,8 +132,9 @@ public final class JukeboxExecute {
                     data.putLong("lma_jukebox_tick", now);
                     maid.getChatBubbleManager().addTextChatBubble(
                         "正在播放: " + chosen.getHoverName().getString());
-                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING→PLAYING ({} ticks={}min)",
-                        maid.getId(), PLAY_TICKS, PLAY_TICKS / 20 / 60);
+                    int wait = ActiveTaskConfig.JUKEBOX_WAIT_TICKS.get();
+                    LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING→PLAYING (wait {} ticks={}min)",
+                        maid.getId(), wait, wait / 20 / 60);
                 }
                 return inserted;
             }
@@ -133,7 +146,7 @@ public final class JukeboxExecute {
                     return false;
                 }
                 long elapsed = Math.abs(now - phaseTick);
-                if (elapsed >= PLAY_TICKS) {
+                if (elapsed >= ActiveTaskConfig.JUKEBOX_WAIT_TICKS.get()) {
                     data.putInt("lma_jukebox_phase", Phase.EJECTING.ordinal());
                     data.putLong("lma_jukebox_tick", now);
                     LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} PLAYING→EJECTING (elapsed {} ticks)",

@@ -1,12 +1,12 @@
 package littlemaidmoreaction.littlemaidmoreaction.core.cache;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.registry.ConditionRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.condition.ICondition;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 
 /**
  * 静态条件预计算器 — 启动时预计算所有 isStatic=true 的条件值。

@@ -154,7 +154,7 @@ public final class LmaTaskTypeRegistry {
         SIMPLE_TASKS.add(taskType);
     }
 
-    /** 从 ResourceLocation 路径提取 task_type (如 lma:task/altar_craft → altar_craft) */
+    /** 从 ResourceLocation 路径提取 task_type (如 lma:task/craft_chain → craft_chain) */
     public static String extractTaskType(String uidPath) {
         if (uidPath == null) return null;
         String prefix = "task/";

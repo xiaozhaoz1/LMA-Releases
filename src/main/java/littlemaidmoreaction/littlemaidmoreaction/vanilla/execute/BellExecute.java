@@ -4,10 +4,12 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.level.block.BellBlock;
 import net.minecraft.world.level.block.state.BlockState;
+import littlemaidmoreaction.littlemaidmoreaction.config.ActiveTaskConfig;
 
-/** v29: 敲钟编排 */
+/** v29: 敲钟编排. v67.5: 音量/音调配置驱动 */
 public final class BellExecute {
     private BellExecute() {}
 
@@ -16,8 +18,9 @@ public final class BellExecute {
         BlockState state = world.getBlockState(pos);
         if (!(state.getBlock() instanceof BellBlock bell)) return false;
         bell.attemptToRing(maid, world, pos, null);
-        world.playSound(null, pos, SoundEvents.BELL_BLOCK,
-            net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 1.0F);
+        world.playSound(null, pos, SoundEvents.BELL_BLOCK, SoundSource.BLOCKS,
+                ActiveTaskConfig.BELL_VOLUME.get().floatValue(),
+                ActiveTaskConfig.BELL_PITCH.get().floatValue());
         return true;
     }
 }

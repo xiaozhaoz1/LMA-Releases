@@ -5,7 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.mojang.datafixers.util.Pair;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.task.gui.TaskConfigGui;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskConfigGuiFactory;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;
@@ -110,9 +110,11 @@ public final class LmaTypedFlowTask implements IMaidTask {
         return FunctionCallSwitchResult.OK;
     }
 
-    @Override @Nullable
+    // v67.10: 永不为 null — 工厂内部回退 TLM 默认配置容器 (TLM 契约)
+    // v67.12: 按实例 taskType 直查 — 任务刚选中即点设置时 lma_flow_task 尚未初始化, of() 会误回退默认屏
+    @Override
     public MenuProvider getTaskConfigGuiProvider(EntityMaid maid) {
-        return TaskConfigGui.of(maid);
+        return TaskConfigGuiFactory.forTask(maid, taskType);
     }
 
     @Override
@@ -127,7 +129,7 @@ public final class LmaTypedFlowTask implements IMaidTask {
 
     // ── 辅助 ──
 
-    /** 获取原始 task_type 字符串 (如 "altar_craft") */
+    /** 获取原始 task_type 字符串 (如 "craft_chain") */
     public String taskType() {
         return taskType;
     }

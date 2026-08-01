@@ -3,7 +3,6 @@ package littlemaidmoreaction.littlemaidmoreaction.event;
 import com.github.tartaricacid.touhoulittlemaid.api.event.InteractMaidEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher;
 import littlemaidmoreaction.littlemaidmoreaction.task.pipeline.ArmTransferPipeline;
 import net.minecraft.core.BlockPos;
@@ -11,14 +10,13 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.Items;
-import net.minecraftforge.common.capabilities.ForgeCapabilities;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
 /**
  * 木棍标记容器 + 右键女仆启动 arm_transfer (v53: 移出 compat/create)。
+ * 木棍获取/容器判断/任务类型门控统一见 {@link StickBindUtil} (v67.1)。
  */
 @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID)
 public final class ArmTransferSetupHandler {
@@ -30,11 +28,11 @@ public final class ArmTransferSetupHandler {
     @SubscribeEvent
     public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
         ItemStack held = event.getItemStack();
-        if (!held.is(Items.STICK)) return;
+        if (!StickBindUtil.isMarkItem(held)) return;
         if (event.getLevel().isClientSide()) return;
 
         BlockPos pos = event.getPos();
-        if (!isContainer(event.getLevel(), pos)) return;
+        if (!StickBindUtil.isContainer(event.getLevel(), pos)) return;
 
         CompoundTag tag = held.getOrCreateTag();
         BlockPos curTake = readPos(tag, "take");
@@ -64,16 +62,11 @@ public final class ArmTransferSetupHandler {
     public static void onInteractMaid(InteractMaidEvent event) {
         Player player = event.getPlayer();
         EntityMaid maid = event.getMaid();
-        ItemStack held = player.getMainHandItem();
-        if (!held.is(Items.STICK)) { held = player.getOffhandItem(); if (!held.is(Items.STICK)) return; }
+        ItemStack held = StickBindUtil.getStickStack(player);
+        if (held == null) return;
         if (maid.level().isClientSide) return;
 
-        String taskType = LmaTaskTypeRegistry.extractTaskType(maid.getTask().getUid().getPath());
-        if (!"arm_transfer".equals(taskType)) {
-            String name = taskType != null ? taskType : "idle";
-            player.sendSystemMessage(comp("§c物品(木棍)不支持设置该任务(" + name + ")"));
-            return;
-        }
+        if (!StickBindUtil.checkTaskType(maid, "arm_transfer", player)) return;
 
         CompoundTag tag = held.getOrCreateTag();
         BlockPos takePos = readPos(tag, "take");
@@ -100,15 +93,6 @@ public final class ArmTransferSetupHandler {
 
     private static BlockPos readPos(CompoundTag tag, String key) {
         return tag.contains(key) ? NbtUtils.readBlockPos(tag.getCompound(key)) : null;
-    }
-
-    private static boolean isContainer(net.minecraft.world.level.LevelAccessor level, BlockPos pos) {
-        var be = level.getBlockEntity(pos);
-        if (be == null) return false;
-        for (var d : net.minecraft.core.Direction.values()) {
-            if (be.getCapability(ForgeCapabilities.ITEM_HANDLER, d).isPresent()) return true;
-        }
-        return false;
     }
 
     private static net.minecraft.network.chat.Component comp(String s) {

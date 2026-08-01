@@ -1,7 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.core.registry;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleCondition;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
@@ -22,6 +21,7 @@ import java.nio.file.attribute.BasicFileAttributes;
 import java.security.CodeSource;
 import java.util.Collections;
 import java.util.jar.JarFile;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 
 /**
  * Forge 原生类扫描器 — 直接扫描 mod 的 JAR/目录发现注解扩展。

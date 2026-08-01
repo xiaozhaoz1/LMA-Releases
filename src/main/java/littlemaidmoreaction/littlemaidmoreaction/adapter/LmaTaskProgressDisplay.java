@@ -12,7 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
  * <p>用法：
  * <pre>
  *   LmaTaskProgressDisplay.showProgress(maid, "合成木棍中...");
- *   LmaTaskProgressDisplay.showComplete(maid, "altar_craft", 3, 10);
+ *   LmaTaskProgressDisplay.showComplete(maid, "craft_chain", 3, 10);
  *   LmaTaskProgressDisplay.showNoContent(maid, "craft_chain");
  * </pre>
  *

@@ -58,7 +58,7 @@ AI assigns tasks, engine manages lifecycle, rules execute steps.
 
 ### AI Assignment
 ```
-lma_assign_task(task_type="altar_craft", task_id="1", max_count=10, data={"item_id":"coal"})
+lma_assign_task(task_type="craft_chain", task_id="1", max_count=10, data={"item_id":"coal"})
 ```
 
 ### Task Lifecycle
@@ -90,7 +90,7 @@ lma_assign_task(task_type="altar_craft", task_id="1", max_count=10, data={"item_
 ## Complex vs Simple Tasks
 
 - **Simple tasks** (bell_ring, jukebox): execute directly from GUI without AI content
-- **Complex tasks** (altar_craft, craft_chain, furnace, brewing): need AI to specify content (recipe, items). Without AI data, maid shows "I don't know what to craft" bubble.
+- **Complex tasks** (craft_chain, furnace, brewing): need AI to specify content (recipe, items). Without AI data, maid shows "I don't know what to craft" bubble.
 
 ## Functional Block Tasks
 
@@ -99,22 +99,21 @@ lma_assign_task(task_type="altar_craft", task_id="1", max_count=10, data={"item_
 - `brewing_interact` — brewing stand (add ingredients, bottles, take results)
 - `bell_ring` — ring village bell
 - `jukebox_interact` — insert/eject music discs
-- `place_altar_item` — TLM altar crafting automation
 
 ## Creating Rules
 
 Use `lma_create_rule` tool:
 ```json
 {
-  "name": "Task: altar_craft",
+  "name": "Task: craft_chain",
   "event": "task_changed",
   "priority": 70,
   "conditions": [
-    {"key": "task_active", "params": {"task_type": "altar_craft", "expected_state": "in_progress", "expected_step": "0"}},
+    {"key": "task_active", "params": {"task_type": "craft_chain", "expected_state": "in_progress", "expected_step": "0"}},
     {"key": "is_tamed", "params": {"operator": ":=:", "value": "true"}}
   ],
   "actions": [
-    {"type": "place_altar_item", "params": {"item_id": "minecraft:coal", "range": "10"}},
+    {"type": "lma_assign_task", "params": {"task_type": "craft_chain", "task_id": "1"}},
     {"type": "set_flow_task", "params": {"state": "completed"}}
   ]
 }

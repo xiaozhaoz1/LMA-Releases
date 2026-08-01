@@ -44,6 +44,8 @@ public final class RequestTaskConfigPacket {
             if (player == null) return;
             Entity e = player.serverLevel().getEntity(msg.maidId);
             if (!(e instanceof EntityMaid maid)) return;
+            // v67.3: 权限 — 仅女仆所有者可读配置 (对齐 TaskConfigActionPacket)
+            if (!maid.isOwnedBy(player)) return;
 
             TaskRegistry.TaskHandler handler = TaskRegistry.get(msg.taskType);
             if (handler == null) return;

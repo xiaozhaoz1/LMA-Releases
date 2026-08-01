@@ -82,8 +82,10 @@ public final class LmaCommand {
         };
     }
 
-    // ── rule ──
-    private static int openRuleEditor(CommandContext<CommandSourceStack> ctx) { return send(ctx, "§a规则编辑器请通过模组列表打开"); }
+    // ── rule (v67.2: 入口移至女仆编辑器右下角) ──
+    private static int openRuleEditor(CommandContext<CommandSourceStack> ctx) {
+        return send(ctx, "§a规则编辑: 模组列表→配置→女仆编辑器→右下角 全局规则/独立女仆规则");
+    }
 
     // ── trace ──
     private static int enableTrace(CommandContext<CommandSourceStack> ctx) { RuleTracer.setEnabled(true); return send(ctx, "§a追踪已启用"); }

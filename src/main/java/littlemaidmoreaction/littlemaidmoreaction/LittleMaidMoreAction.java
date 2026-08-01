@@ -1,14 +1,20 @@
 package littlemaidmoreaction.littlemaidmoreaction;
 
 import littlemaidmoreaction.littlemaidmoreaction.api.MoreActionAPI;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyMenu;
 import littlemaidmoreaction.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyScreen;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.ItemListConfigMenu;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.BellRingConfigMenu;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.BellRingConfigScreen;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.ItemListConfigScreen;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.CraftChainConfigMenu;
+import littlemaidmoreaction.littlemaidmoreaction.task.gui.CraftChainConfigScreen;
 import littlemaidmoreaction.littlemaidmoreaction.init.LmaRegistrar;
-import littlemaidmoreaction.littlemaidmoreaction.network.BlockInteractConfigPacket;
+import littlemaidmoreaction.littlemaidmoreaction.network.TaskConfigActionPacket;
 import littlemaidmoreaction.littlemaidmoreaction.network.InteractTriggerPacket;
 import littlemaidmoreaction.littlemaidmoreaction.network.LmaAnimSyncMessage;
 import littlemaidmoreaction.littlemaidmoreaction.network.OpenMaidEditorMessage;
+import littlemaidmoreaction.littlemaidmoreaction.network.ConfigSyncPacket;
 import littlemaidmoreaction.littlemaidmoreaction.network.ReplyTaskConfigPacket;
 import littlemaidmoreaction.littlemaidmoreaction.network.RequestTaskConfigPacket;
 import littlemaidmoreaction.littlemaidmoreaction.screen.LMAConfigScreen;
@@ -37,6 +43,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Optional;
+import littlemaidmoreaction.littlemaidmoreaction.config.ActiveTaskConfig;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
+import littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig;
 
 /**
  * 车万女仆「更多动作」附属模组。
@@ -74,12 +83,27 @@ public final class LittleMaidMoreAction {
     public static final RegistryObject<MenuType<BlockInteractConfigMenu>> BLOCK_INTERACT_CONFIG_MENU =
         MENU_TYPES.register("block_interact_config",
             () -> IForgeMenuType.create((id, inv, buf) -> new BlockInteractConfigMenu(id, inv, buf.readInt())));
+    /** v67.3: 通用黑白名单配置菜单 (furnace/jukebox/arm_transfer 共用) */
+    public static final RegistryObject<MenuType<ItemListConfigMenu>> ITEM_LIST_CONFIG_MENU =
+        MENU_TYPES.register("item_list_config",
+            () -> IForgeMenuType.create((id, inv, buf) -> new ItemListConfigMenu(id, inv, buf.readInt())));
+    /** v67.3: 配方链合成配置菜单 */
+    public static final RegistryObject<MenuType<CraftChainConfigMenu>> CRAFT_CHAIN_CONFIG_MENU =
+        MENU_TYPES.register("craft_chain_config",
+            () -> IForgeMenuType.create((id, inv, buf) -> new CraftChainConfigMenu(id, inv, buf.readInt())));
+    /** v67.13: 敲钟单女仆间隔配置菜单 */
+    public static final RegistryObject<MenuType<BellRingConfigMenu>> BELL_RING_CONFIG_MENU =
+        MENU_TYPES.register("bell_ring_config",
+            () -> IForgeMenuType.create((id, inv, buf) -> new BellRingConfigMenu(id, inv, buf.readInt())));
 
     public LittleMaidMoreAction() {
         IEventBus modBus = FMLJavaModLoadingContext.get().getModEventBus();
         modBus.addListener(this::commonSetup);
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, MoreActionConfig.SPEC, MOD_ID + "-common.toml");
+        // v67.6: 主动/被动任务配置拆分 — 子文件夹 (Forge 自动建目录)
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ActiveTaskConfig.ACTIVE_SPEC, MOD_ID + "/active.toml");
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, PassiveTaskConfig.PASSIVE_SPEC, MOD_ID + "/passive.toml");
         ModLoadingContext.get().registerExtensionPoint(
                 ConfigScreenHandler.ConfigScreenFactory.class,
                 () -> new ConfigScreenHandler.ConfigScreenFactory(
@@ -116,10 +140,10 @@ public final class LittleMaidMoreAction {
                     InteractTriggerPacket::decode,
                     InteractTriggerPacket::handle,
                     Optional.of(NetworkDirection.PLAY_TO_SERVER));
-            NETWORK.registerMessage(3, BlockInteractConfigPacket.class,
-                    BlockInteractConfigPacket::encode,
-                    BlockInteractConfigPacket::decode,
-                    BlockInteractConfigPacket::handle,
+            NETWORK.registerMessage(3, TaskConfigActionPacket.class,
+                    TaskConfigActionPacket::encode,
+                    TaskConfigActionPacket::decode,
+                    TaskConfigActionPacket::handle,
                     Optional.of(NetworkDirection.PLAY_TO_SERVER));
             NETWORK.registerMessage(5, RequestTaskConfigPacket.class,
                     RequestTaskConfigPacket::encode,
@@ -131,11 +155,30 @@ public final class LittleMaidMoreAction {
                     ReplyTaskConfigPacket::decode,
                     ReplyTaskConfigPacket::handle,
                     Optional.of(NetworkDirection.PLAY_TO_CLIENT));
-            LOGGER.info("[LMA] 网络通道初始化完成 (6 packets)");
+            // v67.11: 配置同步 (C→S 保存推送 / S→C 广播), 双向注册
+            NETWORK.registerMessage(7, ConfigSyncPacket.class,
+                    ConfigSyncPacket::encode,
+                    ConfigSyncPacket::decode,
+                    ConfigSyncPacket::handle,
+                    Optional.of(NetworkDirection.PLAY_TO_SERVER));
+            NETWORK.registerMessage(8, ConfigSyncPacket.class,
+                    ConfigSyncPacket::encode,
+                    ConfigSyncPacket::decode,
+                    ConfigSyncPacket::handle,
+                    Optional.of(NetworkDirection.PLAY_TO_CLIENT));
+            LOGGER.info("[LMA] 网络通道初始化完成 (9 packets)");
 
-            // v66: 配置屏幕注册
+            // v66: 配置屏幕注册. v67.10: 补 ItemList/CraftChain — 缺失导致对应任务设置点击没反应
             net.minecraft.client.gui.screens.MenuScreens.register(
                 BLOCK_INTERACT_CONFIG_MENU.get(), BlockInteractConfigScreen::new);
+            net.minecraft.client.gui.screens.MenuScreens.register(ITEM_LIST_CONFIG_MENU.get(),
+                (ItemListConfigMenu menu, net.minecraft.world.entity.player.Inventory playerInv,
+                 net.minecraft.network.chat.Component title) -> new ItemListConfigScreen(menu, playerInv, title));
+            net.minecraft.client.gui.screens.MenuScreens.register(
+                CRAFT_CHAIN_CONFIG_MENU.get(), CraftChainConfigScreen::new);
+            // v67.13: 敲钟单女仆间隔配置屏
+            net.minecraft.client.gui.screens.MenuScreens.register(
+                BELL_RING_CONFIG_MENU.get(), BellRingConfigScreen::new);
         });
     }
 

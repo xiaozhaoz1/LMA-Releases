@@ -2,7 +2,6 @@ package littlemaidmoreaction.littlemaidmoreaction.storage;
 
 import com.github.tartaricacid.touhoulittlemaid.TouhouLittleMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import net.minecraftforge.fml.loading.FMLPaths;
 
 import java.io.IOException;
@@ -11,6 +10,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import java.util.stream.Stream;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 
 /**
  * 启动加载器 — 扫描 config 目录，注册动画/音效。

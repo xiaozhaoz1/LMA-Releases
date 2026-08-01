@@ -1,7 +1,6 @@
 package littlemaidmoreaction.littlemaidmoreaction.task.pipeline.sense;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
@@ -16,6 +15,7 @@ import net.minecraft.server.level.ServerLevel;
 
 import java.util.List;
 import java.util.Set;
+import littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig;
 
 /**
  * v63: 雪天铲雪被动任务。
@@ -44,7 +44,7 @@ public final class SnowShovelPipeline implements TaskPipeline {
         // 轻量预检：附近真的有雪？
         List<BlockPos> snow = EnvScanner.scanSnowBlocks(
                 (ServerLevel) maid.level(), maid.blockPosition(),
-                MoreActionConfig.ENV_DEFAULT_RADIUS.get());
+                PassiveTaskConfig.ENV_DEFAULT_RADIUS.get());
         if (snow.isEmpty()) return;
         TaskDispatcher.submitPassive(maid, taskType());
     }
@@ -55,7 +55,7 @@ public final class SnowShovelPipeline implements TaskPipeline {
         int cd = pd.getInt("Cd") - 1;
         if (cd > 0) { pd.putInt("Cd", cd); return; }
 
-        int radius = MoreActionConfig.ENV_DEFAULT_RADIUS.get();
+        int radius = PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
         List<BlockPos> snow = EnvScanner.scanSnowBlocks(world, maid.blockPosition(), radius);
 
         if (snow.isEmpty()) {
@@ -67,9 +67,5 @@ public final class SnowShovelPipeline implements TaskPipeline {
         world.destroyBlock(snow.get(0), true, maid);
         pd.putInt("Cd", 40); // 2秒一块
     }
-
-    @Override
-    public void onCleanup(EntityMaid maid) {
-        clearPipelineData(maid);
-    }
+    // onCleanup 用接口默认 (clearPipelineData) — v67.3 删除冗余覆写
 }

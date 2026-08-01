@@ -14,6 +14,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.state.BlockState;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskConfigGuiFactory;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.ToolJudge;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -55,6 +56,12 @@ public final class ChainWoodPipeline implements TaskPipeline {
                 return ChainHarvestExecute.execute(w, m, p, d, ChainHarvestExecute.Mode.WOOD);
             }
         };
+    }
+
+    /** v67.8: 单女仆采集名单配置 (TLM 任务设置标签页) */
+    @Override
+    public net.minecraft.world.MenuProvider getConfigGuiProvider(EntityMaid maid) {
+        return TaskConfigGuiFactory.itemListConfig(maid, "collect_wood");
     }
 
     @Override

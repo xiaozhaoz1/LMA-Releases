@@ -1,11 +1,11 @@
 package littlemaidmoreaction.littlemaidmoreaction.adapter;
 
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.core.engine.ServerTaskQueue;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
+import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 
 /**
  * Forge 桥接: 将 ServerTaskQueue 注入服务端 Tick 事件 (v35.1)。

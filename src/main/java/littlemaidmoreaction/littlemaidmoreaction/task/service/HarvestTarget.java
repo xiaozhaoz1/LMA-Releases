@@ -2,7 +2,6 @@ package littlemaidmoreaction.littlemaidmoreaction.task.service;
 
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.item.ToolStateReader;
 import littlemaidmoreaction.littlemaidmoreaction.vanilla.input.search.ConnectedBlockSearch;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.BlockTags;
@@ -12,6 +11,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraftforge.common.Tags;
 
 import java.util.function.BiPredicate;
+import littlemaidmoreaction.littlemaidmoreaction.config.ActiveTaskConfig;
 
 /**
  * 采集目标抽象 (v36.6) — 矿物/树木检测原子化（用户要求）。
@@ -64,7 +64,7 @@ public abstract class HarvestTarget {
             return true; // 无斧慢砍语义 — 斧只影响速度与耗久
         }
         @Override public boolean validAt(ServerLevel world, BlockPos pos) {
-            return !MoreActionConfig.CHAIN_WOOD_NATURE_CHECK.get()
+            return !ActiveTaskConfig.CHAIN_WOOD_NATURE_CHECK.get()
                     || ConnectedBlockSearch.isNaturalTree(world, pos, NATURE_CHECK_MAX_LOGS);
         }
         @Override public BiPredicate<BlockPos, BlockState> veinPredicate(BlockState start) {

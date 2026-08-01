@@ -2,8 +2,7 @@ package littlemaidmoreaction.littlemaidmoreaction.impl.action.world;
 
 import littlemaidmoreaction.littlemaidmoreaction.api.context.RuleContext;
 import littlemaidmoreaction.littlemaidmoreaction.api.ParamExtractor;
-import littlemaidmoreaction.littlemaidmoreaction.vanilla.fakeplayer.LmaFakePlayer;
-import littlemaidmoreaction.littlemaidmoreaction.vanilla.fakeplayer.LmaPlayerSimulator;
+import littlemaidmoreaction.littlemaidmoreaction.vanilla.fakeplayer.FakePlayerInteract;
 import littlemaidmoreaction.littlemaidmoreaction.core.annotation.RuleAction;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.ActionCategory;
 import littlemaidmoreaction.littlemaidmoreaction.core.spi.action.IAction;
@@ -44,13 +43,7 @@ public final class InteractBlockAction implements IAction {
         BlockPos pos = ctx.maid().blockPosition().offset(p.getInt("offset_x"), p.getInt("offset_y"), p.getInt("offset_z"));
         Direction face = parseFace(p.getString("face"));
 
-        var fp = new LmaFakePlayer(sw, ctx.maid(), pos);
-        try {
-            LmaPlayerSimulator.simulate(fp, sw, pos, face, LmaPlayerSimulator.Mode.RIGHT_CLICK_ONCE);
-            LmaPlayerSimulator.syncHandToMaid(fp);
-        } finally {
-            LmaPlayerSimulator.cleanup(fp, sw);
-        }
+        FakePlayerInteract.rightClick(sw, ctx.maid(), pos, face);
     }
 
     private static Direction parseFace(String face) {

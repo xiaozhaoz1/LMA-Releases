@@ -6,7 +6,9 @@ import littlemaidmoreaction.littlemaidmoreaction.api.TaskResult;
 import littlemaidmoreaction.littlemaidmoreaction.api.io.IExecutor;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineContext;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.PipelineResult;
+import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskConfigGuiFactory;
 import littlemaidmoreaction.littlemaidmoreaction.task.service.ArmTransferService;
+import littlemaidmoreaction.littlemaidmoreaction.task.service.ItemFilters;
 import littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateMachine;
 import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
 import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskPipeline.StepType;
@@ -22,6 +24,7 @@ import net.minecraft.world.item.ItemStack;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import littlemaidmoreaction.littlemaidmoreaction.config.ActiveTaskConfig;
 
 /**
  * 女仆搬运管线 (v46 迁移至 TaskStateMachine, v53 移出 compat/create).
@@ -64,6 +67,12 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
     @Override
     public List<TaskStep> steps() {
         return List.of(new TaskStep("move", "搬运物品", StepType.INTERACT, List.of()));
+    }
+
+    /** v67.3: 搬运黑白名单配置 GUI (per-maid) */
+    @Override @javax.annotation.Nullable
+    public net.minecraft.world.MenuProvider getConfigGuiProvider(com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid) {
+        return TaskConfigGuiFactory.itemListConfig(maid, "arm_transfer");
     }
 
     @Override
@@ -121,7 +130,14 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
                 yield null;
             }
             case TAKING -> {
-                var item = ArmTransferService.readSourceItem(maid, takePos);
+                // v67.3: 搬运黑白名单 (per-maid 覆盖全局)
+                var cfg = pipelineConfig(maid);
+                var black = ItemFilters.effective(ItemFilters.maidList(cfg, ItemFilters.KEY_BLACKLIST),
+                        ActiveTaskConfig.ARM_BLACKLIST.get());
+                var white = ItemFilters.effective(ItemFilters.maidList(cfg, ItemFilters.KEY_WHITELIST),
+                        ActiveTaskConfig.ARM_WHITELIST.get());
+                var item = ArmTransferService.readSourceItem(maid, takePos,
+                        stack -> ItemFilters.isAllowed(stack, black, white));
                 if (item.isEmpty()) { yield null; } // 空源 → 等待
                 int count = ArmTransferService.computeExtractCount(maid, item);
                 if (count <= 0) { yield null; }

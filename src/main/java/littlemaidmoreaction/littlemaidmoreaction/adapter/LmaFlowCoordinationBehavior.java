@@ -19,7 +19,7 @@ import net.minecraft.world.entity.ai.memory.MemoryModuleType;
  * v53: Brain 导航 + 循环执行。
  * v64: tick 持续循环 — 不擦TARGET_POS, 工作站锚定, 冷却节流。
  *
- * <p>工作站任务 (furnace/jukebox/bell_ring/craft_chain/altar_craft):
+ * <p>工作站任务 (furnace/jukebox/bell_ring/craft_chain):
  * <ul>
  *   <li>start → searchForDestination → WALK_TARGET → 到达</li>
  *   <li>tick → 到达后每30tick执行一次, TARGET_POS保留</li>
@@ -122,8 +122,11 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
 
         BlockPos target = mem.get().currentBlockPosition();
 
-        // 未到达 → 等待导航
-        if (target.distSqr(maid.blockPosition()) >= ARRIVE_DIST_SQR) return;
+        // 未到达 → 导航中: 心跳防超时误杀 (v67.3, 慢导航/绕路 >60s 不被看门狗当卡死)
+        if (target.distSqr(maid.blockPosition()) >= ARRIVE_DIST_SQR) {
+            littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskStateManager.heartbeat(maid, gameTime);
+            return;
+        }
 
         // 冷却
         if (gameTime - lastExecuteTick < EXECUTE_INTERVAL) return;
@@ -183,11 +186,15 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
         }
     }
 
-    /** v64: 任务完成 — 清理导航记忆, 恢复idle */
+    /**
+     * v64: 任务完成 — 清理导航记忆, 恢复idle.
+     * v67.3: 统一走 TaskDispatcher.complete (onCleanup + STATE_COMPLETED + clearAll) —
+     * 修复绕过 Dispatcher 导致 FLOW_TASK/COUNTER/MAX_COUNT 残留 (跨任务累积误判)。
+     */
     private void completeTask(EntityMaid maid) {
         maid.getBrain().eraseMemory(InitEntities.TARGET_POS.get());
         maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
         maid.setTask(TaskManager.getIdleTask());
-        FlowTaskData.setState(maid, TaskKeys.STATE_COMPLETED);
+        littlemaidmoreaction.littlemaidmoreaction.task.runtime.TaskDispatcher.complete(maid);
     }
 }

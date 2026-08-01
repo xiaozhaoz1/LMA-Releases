@@ -293,7 +293,6 @@ public final class BuiltinRegistrar {
         register(new ExecuteCommandAction());
         register(new ExplosionAction());
         register(new InteractBlockAction());
-        register(new PlaceAltarItemAction());
         register(new PlaceBlockAction());
         register(new PutInContainerAction());
         register(new SendBubbleAction());

@@ -112,7 +112,7 @@ public final class LmaDocsTool implements ITool<String> {
             Teleport to self: teleport(mode=self, ...) — maid teleports
 
             === BLOCK TARGETS ===
-            Block actions (break_block, interact_block, place_altar_item) use offset_xyz
+            Block actions (break_block, interact_block) use offset_xyz
             and search range, not "target". They find blocks near the maid automatically.
 
             === ENTITY TARGETS ===

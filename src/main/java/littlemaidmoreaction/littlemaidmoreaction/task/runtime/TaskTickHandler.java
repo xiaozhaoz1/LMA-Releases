@@ -3,7 +3,6 @@ package littlemaidmoreaction.littlemaidmoreaction.task.runtime;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import littlemaidmoreaction.littlemaidmoreaction.LittleMaidMoreAction;
 import littlemaidmoreaction.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
-import littlemaidmoreaction.littlemaidmoreaction.config.MoreActionConfig;
 import littlemaidmoreaction.littlemaidmoreaction.task.api.TaskRegistry;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.FlowTaskData;
 import littlemaidmoreaction.littlemaidmoreaction.task.data.TaskKeys;
@@ -14,6 +13,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
+import littlemaidmoreaction.littlemaidmoreaction.config.PassiveTaskConfig;
 
 /**
  * v53: 通用 game-tick 驱动.
@@ -121,7 +121,7 @@ public final class TaskTickHandler {
     private static void tickBroadcast(ServerLevel sl) {
         long now = sl.getGameTime();
         if (now < nextBroadcastTick) return;
-        int interval = MoreActionConfig.ENV_SCAN_INTERVAL.get();
+        int interval = PassiveTaskConfig.ENV_SCAN_INTERVAL.get();
         nextBroadcastTick = now + interval;
         EnvSenseBroadcaster.broadcast(sl);
     }
