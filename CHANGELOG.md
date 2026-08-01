@@ -173,3 +173,19 @@
 
 - **P0 根因**: lma_flow_tick 无心跳 → TaskEngine 60 秒超时杀活任务 → auto-restart 无限 churn（"卡住"的真凶，日志实锤）
 - **TaskStateService**（新）: lma_flow_* 状态写入单一所有者 — init/heartbeat/fail/complete/clearAll；协调行为全部委托；执行器 keepAlive 打心跳 → 活任务永不被超时杀
+
+## [v67] — 2026-08-01 — 任务配置体系 (v67.4-v67.16)
+
+### 配置体系
+- **硬编码→配置**: 连锁采集扫描间隔/采集距离 (v67.4), 敲钟音量/音调/间隔 (v67.5)
+- **配置拆分**: 3 Spec 分文件夹 (common/active/passive) + 3 类 (MoreActionConfig/ActiveTaskConfig/PassiveTaskConfig) (v67.6/v67.7)
+- **采集单女仆名单**: GUI 桥接 + 引擎 per-maid 覆盖 (v67.8)
+- **配置屏幕 API 上提**: TaskConfigGuiFactory (task/api, 外部任务配屏幕入口) (v67.9)
+- **专用服务器配置同步**: ConfigSyncPacket 双向 (OP 校验, 36 项快照) (v67.11)
+- **敲钟单女仆间隔**: 步进屏 + pipelineConfig 覆盖 (v67.13)
+
+### 任务设置修复
+- **null 契约回退 + MenuScreens 注册补全** — 任务设置点击无反应双根因 (v67.10)
+- **首开空屏** — forTask 按 taskType 直查 (v67.12)
+- **GUI 布局**: 名单中文标签/合成上限重叠/任务栏选择框自绘/装配中文名 (v67.13-16)
+- 设置入口改名: 详细设置
