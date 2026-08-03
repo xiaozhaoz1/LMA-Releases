@@ -96,3 +96,11 @@ v64 架构 — 六层: 调度/状态/注册/引擎/执行/IO。规则引擎六�
 ## 许可
 
 MIT
+
+## 发布 jar
+
+| 文件 | 版本 | 说明 |
+|------|------|------|
+| `littlemaidmoreaction-forge-0.71+1.20.1.jar` | 0.71 | **1.20.1 Forge** 当前版 (v75 石板化假人桥 + Create 双平台) |
+| `littlemaidmoreaction-neoforge-0.71+1.21.1.jar` | 0.71 | **1.21.1 NeoForge** 当前版 (v75 石板化假人桥 + Create 双平台; 前置: Numen + OpenYSM 2.6.6+) |
+| `littlemaidmoreaction-1.0-SNAPSHOT-legacy-pre-1.20.1.jar` | 1.0-SNAPSHOT | **1.20.1 之前的老版本** (规则引擎时代) — 仅存档, 不再维护 |
