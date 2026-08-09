@@ -1,0 +1,55 @@
+plugins {
+
+// v75.3: javadoc 读 UTF-8 源 (Windows GBK 默认 → 中文注释乱码错)
+
+    id 'com.iamkaf.multiloader.common'
+}
+
+def minecraftVersion = project.name
+
+
+repositories {
+    maven { url "https://maven.shedaniel.me/" }
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+    mavenCentral()
+}
+
+dependencies {
+    // TLM (libs 本地 jar; forge 1.20.1 = SRG reobf 需 deobf, neoforge 1.21.1 = 官方名直发)
+    if (minecraftVersion == '1.20.1') {
+        implementation files(rootProject.file("libs/touhoulittlemaid-1.5.3-forge+mc1.20.1.jar"))
+        implementation 'me.shedaniel.cloth:cloth-config-forge:11.1.136'
+    } else {
+        compileOnly files(rootProject.file('libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar'))
+        implementation 'maven.modrinth:cloth-config:15.0.140+neoforge'
+    }
+
+    // v75.3: OpenYSM (org.openysm 开源包 — 假人模型全自动化 setModelAndTexture, 替代混淆 YSM 指令)
+    compileOnly files(rootProject.file('libs/openysm-neoforge-1.21.1-2.6.6-r5-neoforge+mc1.21.1.jar'))
+
+    implementation 'io.github.classgraph:classgraph:4.8.168'
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
+    // 任务系统状态机单元测试 (mock EntityMaid — 纯 JVM, 不启动服务器)
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+    // Gradle 9 要求 launcher 在测试运行时类路径
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+test {
+    useJUnitPlatform()
+}
+
+
+
+// v75.3: javadoc 读 UTF-8 源 (Windows GBK 默认 → 中文注释乱码错)
+tasks.withType(Javadoc).configureEach {
+    options.encoding = "UTF-8"
+}
+

@@ -1,0 +1,37 @@
+{
+  "task.littlemaidmoreaction.craft_chain": "配方链合成",
+  "task.littlemaidmoreaction.furnace": "熔炉烧炼",
+  "task.littlemaidmoreaction.brewing": "炼药",
+  "task.littlemaidmoreaction.bell_ring": "敲钟",
+  "task.littlemaidmoreaction.jukebox": "唱片机",
+  "task.littlemaidmoreaction.collect_wood": "采集木材",
+  "task.littlemaidmoreaction.collect_ore": "采集矿石",
+  "task.littlemaidmoreaction.go_to_bed": "去睡觉",
+  "task.littlemaidmoreaction.flow_task": "流程任务",
+  "task.littlemaidmoreaction.arm_transfer": "搬运",
+  "task.littlemaidmoreaction.crank": "手摇曲柄",
+  "task.littlemaidmoreaction.power": "动力齿轮",
+  "task.littlemaidmoreaction.press": "女仆冲压",
+  "task.littlemaidmoreaction.mix": "女仆搅拌",
+  "task.littlemaidmoreaction.cannon_load": "装填炮弹",
+  "task.littlemaidmoreaction.running_belt": "跑步发电",
+  "task.littlemaidmoreaction.block_interact": "右键交互",
+  "task.littlemaidmoreaction.maid_assembly": "便携装配",
+  "task.littlemaidmoreaction.ai_control": "AI 操控",
+
+  "block.littlemaidmoreaction.maid_power_belt": "女仆发电皮带",
+
+  "overlay.lma.task_can_execute": "可直接执行",
+  "overlay.lma.task_needs_ai_content": "需要 AI 设定内容",
+
+  "screen.littlemaidmoreaction.maid_list": "女仆选择",
+  "screen.littlemaidmoreaction.maid_list.empty": "没有找到你拥有的女仆",
+  "screen.littlemaidmoreaction.maid_list.not_near": "女仆不在附近，请靠近后再查看",
+  "gui.littlemaidmoreaction.maid_list.open_attr": "进入属性界面",
+  "gui.littlemaidmoreaction.maid_list.level": "等级 %s",
+  "screen.littlemaidmoreaction.maid_attr": "女仆属性",
+  "gui.littlemaidmoreaction.maid_list.button": "女仆选择",
+  "gui.littlemaidmoreaction.maid_list.button.desc": "打开女仆独立选择界面",
+  "gui.littlemaidmoreaction.main.button": "LMA 设置",
+  "gui.littlemaidmoreaction.main.button.desc": "打开 LMA 模组主界面"
+}

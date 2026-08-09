@@ -1,0 +1,89 @@
+plugins {
+    id 'com.iamkaf.multiloader.neoforge'
+}
+
+def minecraftVersion = project.name
+def libs = catalogFor(project, minecraftVersion)
+
+repositories {
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+    maven { url "https://maven.shedaniel.me/" }
+}
+
+dependencies {
+    // TLM 1.21.1 (libs 本地 jar, 官方名直发)
+    compileOnly files(rootProject.file('libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar'))
+    // TLM 运行时 mod (LMA mods.toml 声明 required; TLM 自身 neoforge 范围 [21,) 开区间, 21.1.62 满足)
+    runtimeOnly files(rootProject.file('libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar'))
+    // Cloth Config 17
+    implementation 'maven.modrinth:cloth-config:15.0.140+neoforge'
+    // ClassGraph
+    implementation 'io.github.classgraph:classgraph:4.8.168'
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ["-Xlint:-removal"]
+}
+
+// 1.21.1 compat 前置 (compileOnly — compat 源码已排除编译, 运行时勿加载:
+// create 6.0.10/aero/sable 生态要求 neoforge ≥21.1.219-228, 本地 21.1.62 版本检查不过 → 冒烟崩溃)
+dependencies {
+    compileOnly files(
+            rootProject.file("libs/create-1.21.1-6.0.10.jar"),
+            rootProject.file("libs/create-aeronautics-bundled-1.21.1-1.3.0.jar"),
+            rootProject.file("libs/sable-neoforge-1.21.1-2.0.3.jar"),
+            rootProject.file("libs/ysm-2.6.5-neoforge+mc1.21.1-release.jar"),
+            rootProject.file("libs/openysm-neoforge-1.21.1-2.6.6-r5-neoforge+mc1.21.1.jar"),   // v75.3: OpenYSM 开源 API (假人模型直接设置)
+            rootProject.file("libs/flywheel-neoforge-1.21.1.jar"),
+            rootProject.file("libs/catnip-neoforge-1.21.1.jar"),
+            // v73: ponder 从 create jar 内嵌提取 (jarjar/ponder-neoforge-1.0.82) — BlockEntity 继承链接口
+            rootProject.file("libs/ponder-neoforge-1.0.82+mc1.21.1.jar"),
+            // v74: numen-api 从 numen mod jarjar 提取 (MIT) — Numen 假人桥 (女仆 AI 宿主)
+            rootProject.file("libs/numen-api-neoforge-1.21.1-0.0.8-SNAPSHOT.jar")
+    )
+}
+
+// v73: neoforge 21.1.247 ≥ 21.1.228 (create 生态要求) — create 4 基础管线双平台编译 (common);
+// cbc compat 未移植 (1.20.1 仅) 仍排除; CreateCompat* 已删 (v73 compat 清理)
+sourceSets.main.java {
+    exclude "com/github/xiaozhaoz1/littlemaidmoreaction/compat/createbigcannons/**"
+}
+
+// ModDevGradle userdev: FML UserdevLocator 将 classes/java/main 作为 mod 目录候选, 必须含 META-INF/neoforge.mods.toml
+// 否则 "is not a valid mod file" 崩溃。multiloader 插件覆盖了 processResources 输出目录,
+// 故用独立 Copy 任务把处理后的资源灌入 classes (官方 MDG 布局)
+// 另: 插件 filesMatching 对 mods.toml 做 expand — Windows 默认编码(GBK)读 UTF-8 中文注释会写坏
+// (实测 0xa8 孤立字节插入) → 显式 UTF-8
+tasks.named('processResources') {
+    filteringCharset = 'UTF-8'
+}
+tasks.register('copyResourcesToClasses', Copy) {
+    from(layout.buildDirectory.dir('resources/main'))
+    into(layout.buildDirectory.dir('classes/java/main'))
+    dependsOn('processResources')
+}
+tasks.named('runClient') {
+    dependsOn('copyResourcesToClasses')
+}
+
+// classes 含 copyResourcesToClasses 灌入的资源 → jar 与 resources/main 来源重复 (pack.mcmeta 等)
+tasks.named('jar') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// gametest run (neoforge 节点, 同 forge: gameTestServer 模式 — 客户端单机 /test 命令不注册)
+neoForge {
+    runs {
+        gameTestServer {
+            type = "gameTestServer"
+            gameDirectory = project.file('run/gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'littlemaidmoreaction'
+        }
+    }
+}

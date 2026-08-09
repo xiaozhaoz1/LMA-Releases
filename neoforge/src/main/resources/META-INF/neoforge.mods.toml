@@ -1,0 +1,36 @@
+modLoader = "javafml"
+loaderVersion = "[1,)"
+license = "All rights reserved"
+
+[[mods]]
+modId = "littlemaidmoreaction"
+version = "0.9.23"
+displayName = "Little Maid More Action"
+description = '''车万女仆「更多动作」附属模组 — 可视化规则编辑器 + 事件驱动女仆战斗动作 + 任务系统。'''
+authors = "xiaozhaoz1"
+
+[[dependencies.littlemaidmoreaction]]
+modId = "neoforge"
+type = "required"
+versionRange = "[1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.littlemaidmoreaction]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1, 1.22)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.littlemaidmoreaction]]
+modId = "touhou_little_maid"
+type = "required"
+versionRange = "[1.5.0,)"
+
+[[dependencies.littlemaidmoreaction]]
+modId = "cloth_config"
+type = "optional"
+versionRange = "[1,)"
+ordering = "AFTER"
+side = "BOTH"

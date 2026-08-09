@@ -1,0 +1,19 @@
+{
+  "task.littlemaidmoreaction.cannon_load": "Load Cannon",
+  "task.littlemaidmoreaction.running_belt": "Running Power",
+  "task.littlemaidmoreaction.block_interact": "Block Interact",
+  "task.littlemaidmoreaction.maid_assembly": "Maid Assembly",
+  "task.littlemaidmoreaction.ai_control": "AI Control",
+  "block.littlemaidmoreaction.maid_power_belt": "Maid Power Belt",
+
+  "screen.littlemaidmoreaction.maid_list": "Select Maid",
+  "screen.littlemaidmoreaction.maid_list.empty": "No owned maids found",
+  "screen.littlemaidmoreaction.maid_list.not_near": "Maid not nearby, move closer",
+  "gui.littlemaidmoreaction.maid_list.open_attr": "Open Attributes",
+  "gui.littlemaidmoreaction.maid_list.level": "Level %s",
+  "screen.littlemaidmoreaction.maid_attr": "Maid Attributes",
+  "gui.littlemaidmoreaction.maid_list.button": "Select Maid",
+  "gui.littlemaidmoreaction.maid_list.button.desc": "Open maid selection screen",
+  "gui.littlemaidmoreaction.main.button": "LMA Settings",
+  "gui.littlemaidmoreaction.main.button.desc": "Open LMA main screen"
+}

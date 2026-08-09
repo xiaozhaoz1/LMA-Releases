@@ -1,0 +1,14 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "com.example.template.mixin",
+  "compatibilityLevel": "${mixin_compat_common}",
+  "mixins": [],
+  "client": [
+    "CommonBootMixin"
+  ],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

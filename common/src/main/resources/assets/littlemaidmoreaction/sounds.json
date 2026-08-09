@@ -1,0 +1,67 @@
+{
+  "man": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:man", "stream": true}
+    ]
+  },
+  "manbaout": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:manbaout", "stream": true}
+    ]
+  },
+  "whatcanisay": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:whatcanisay", "stream": true}
+    ]
+  },
+  "ha_1": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:ha_1", "stream": true}
+    ]
+  },
+  "ha_2": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:ha_2", "stream": true}
+    ]
+  },
+  "ha_3": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:ha_3", "stream": true}
+    ]
+  },
+  "ha_4": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:ha_4", "stream": true}
+    ]
+  },
+  "ha_5": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:ha_5", "stream": true}
+    ]
+  },
+  "laowu_1": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:laowu_1", "stream": true}
+    ]
+  },
+  "laowu_2": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:laowu_2", "stream": true}
+    ]
+  },
+  "laowu_3": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:laowu_3", "stream": true}
+    ]
+  },
+  "laowu_4": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:laowu_4", "stream": true}
+    ]
+  },
+  "laowu_5": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:laowu_5", "stream": true}
+    ]
+  }
+}

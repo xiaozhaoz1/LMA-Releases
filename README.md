@@ -1,106 +1,66 @@
-# LittleMaidMoreAction — 车万女仆「更多动作」
+# Little Maid More Action (LMA)
 
-为 Touhou Little Maid 添加可视化规则编辑器与事件驱动的女仆战斗动作系统。
+车万女仆 (Touhou Little Maid) 附属模组 — 管线 + API 任务系统 (代码注册任务/连锁采集/环境感知/哈气动画/女仆 GUI)。
+
+Stonecutter 多版本架构: **forge 1.20.1** (0.9.23) + **neoforge 1.21.1** (0.9.23)。
+
+当前形态: **管线 + API** — TaskRegistry 代码注册 12+ 任务 (连锁砍树/挖矿、熔炉、敲钟、搬运、右键交互、Create 系等) + LMAT 扩展点 + FsmPipeline 主动引擎 + 27 动作/7 检查/10 条件 + 寻路 (走路全 TLM + 上下垂直挖穿 + 危险堵护 + 卡方块自救)。
+
+## 快速开始
+
+```bash
+# 编译 (缓存不可靠, 必带 --no-build-cache)
+./gradlew :forge:1.20.1:compileJava --no-build-cache
+./gradlew :neoforge:1.21.1:compileJava --no-build-cache
+
+# 冒烟 (游戏窗口, 看 run/logs/latest.log 0 ERROR)
+./gradlew --configure-on-demand :forge:1.20.1:runClient --console=plain
+./gradlew --configure-on-demand :neoforge:1.21.1:runClient --console=plain
+
+# 单元测试 (forge 节点)
+./gradlew :forge:1.20.1:test --no-build-cache
+
+# gametest 7/7 双节点
+./gradlew :forge:1.20.1:runGameTestServer --no-build-cache
+./gradlew :neoforge:1.21.1:runGameTestServer --no-build-cache
+
+# 打包 (javadoc 中文 GBK 解析炸 → 一律 -x javadoc)
+./gradlew :forge:1.20.1:jar :neoforge:1.21.1:jar -x javadoc --no-build-cache
+```
 
 ## 功能
 
-- **可视化规则编辑器** — Cloth Config GUI, 无需手写 JSON
-- **SelectionScreen v2** — 搜索框 + 分类下拉，107 条件/75 动作中 3 字符定位
-- **9 条预设** — 处决/闪避/弹反/肘击..., 开箱即用
-- **33 触发事件** — TLM + Forge 事件全覆盖
-- **83 动作类型** — 战斗(19)/移动(10)/特效(5)/物品(4)/女仆控制(20)/世界(7)/流程控制(8)/消息(2)/脚本(1)（含 YSM 兼容 4 个，set_ysm_model 支持随机模型）
-- **111 条件键** — MAID(67)/TARGET(21)/OWNER(5)/WORLD(16) 全覆盖，支持参数化条件（含 YSM 兼容 6 个）
-- **条件参数支持** — 条件可携带参数(如 effect_id)，Pipeline 贯通 ConditionDef→CondRow→GUI→evaluate
-- **20tick 时间窗口** — 瞬时条件(is_mainhand_attack 等)触发后 1 秒内保持有效
-- **CompatScanner** — 通用三扩展扫描器（条件/动作/事件），新 compat 模块 ~15 行
-- **注解驱动** — @RuleCondition/@RuleAction 自动注册, 外部模组 SPI 扩展
-- **脚本支持** — JavaScript/Lua 脚本动作 (JSR-223)
-- **可选 MVEL 表达式** — @{...} 语法支持复杂条件
-- **动画元数据** — 每动画独立配置 (优先级/锁移动/冻结AI/可打断)，INSTANT/FULL 双模式
-- **热重载** — F3+T 识别新增动画/音效
+- **连锁采集** — collect_wood / collect_ore: 连块脉 BFS + 蓄力整脉破坏 + 工具判断 (镐/斧/铲按目标方块) + 换工具不丢旧工具
+- **寻路** — 走路全 TLM 原版导航 (maid_useful_task 模式): 上下垂直挖穿 (深度 6) / 危险矿堵护 (6 侧液体堵方块) / 卡方块自救 / 跳过集 TTL
+- **哈气互动** — 对女仆/主人哈气 + YSM 动画 + 语音 + 表情气泡 (5s 防刷屏) + 概率挥击
+- **任务气泡 API** — MaidChatBubbleApi 5 类 (进度替换式/失败超时 600t 节流) + 任务步骤气泡
+- **女仆 GUI** — 独立女仆列表屏 (服务端全维度扫描, 3D 预览) + 属性屏 (16 属性) + 模组主界面 (全景背景)
+- **环境感知** — 200t 扫描 18 信号 → 4 被动管线 (铲雪/照明/温度/怪物日志)
+- **兼容** — Create 6 生态 (曲柄/动力/压片/搅拌/跑步机/装配) + CBC 火炮装填 (1.20.1) + Numen 假人桥 + YSM 动画注入 (config/animations/ 零代码接入)
 
-## 版本
+## 布局
 
-**v64** — 2026-07-28 — 架构瘦身 + Brain持续循环 + AI流程完善
+- `common/` — 平台中性代码 (314 java, `//? if 1.20.1` 条件化)
+- `forge/src/` — Forge 专属 (LmaForgeClientEntry + create/cbc compat)
+- `neoforge/src/` — NeoForge 专属 (LmaNeoForgeEntry/payload 网络 + Numen 石板桥)
+- `versions/<mc>/gradle.properties` — 版本节点唯一真相源 (project.version = 正式版本号)
+- `libs/` — 本地 jar 依赖 (不入库)
 
-| 指标 | 值 |
-|------|-----|
-| 任务类型 | 14 (8 Vanilla + 6 Create) |
-| 条件/动作/事件 | 111 / 83 / 36 |
-| 源文件 | ~580 |
-| 测试 | 144 |
-| 兼容模块 | 6 (Create · SlashBlade · TPM · YSM · AI · FlowTask) |
-| 架构层 | 6 (调度→状态→注册→引擎→执行→IO) |
-| 版本演进 | v1→v64 |
+## 支持节点
 
-## 开发
+- `1.20.1-forge` (MDG legacyforge)
+- `1.21.1-neoforge` (MDG, Parchment 2024.11.17 与 TLM 同款)
 
-v64 架构 — 六层: 调度/状态/注册/引擎/执行/IO。规则引擎六边形架构。
+## 关键约定
 
-| 层 | 包 | 说明 |
-|----|-----|------|
-| 调度 | `task/runtime/TaskDispatcher.java` | 所有任务唯一入口/出口 — submit/cancel/complete/fail/timeout |
-| 状态 | `task/runtime/TaskStateManager.java` + `TaskTickHandler.java` | NBT 25键读写 + 每tick TLM_SWITCH/GUI_INIT/超时处理 |
-| 注册 | `task/api/TaskRegistry.java` | `register(name, pipeline, executor, showInBar)` — 统一入口 |
-| 引擎 | `task/runtime/TaskStateMachine.java` | 泛型 FSM — 显式枚举状态·转换图验证·onEnter/onExit |
-| 执行 | `adapter/` + `compat/` | Brain 导航 + ServerTick 驱动 · 持续循环 |
-| IO | `task/data/TaskKeys.java` + `FlowTaskData.java` | 26 NBT 常量 · 19读取器+16写入器 |
-| AI | `ai/` | ITool(7) + IMaidContext(5) + 任务状态查询 |
-| core | `core/spi/` | 类型安全参数系统 (sealed TypedParam) |
+- 修改 common 后**必须双节点编译验证** (条件化分支各自独立)
+- 版本号: `versions/<mc>/gradle.properties` project.version + 双节点 mods.toml 手写同步; 改后必须清 Stonecutter merged 缓存 (common/versions/*/build) 重打
+- neoforge 资源改动后 `:neoforge:1.21.1:copyResourcesToClasses --rerun-tasks` (FML 从 classes 读 mod)
+- 专用服务器兼容: 主类字节码不可引用客户端类 (Screen 等) — 客户端注册走独立入口
+- 1.21.1 数据包差异: pack_format 48, 结构路径 `structure/` (单数)
+- TlmEventAdapter 仅 2 订阅者 (InvariantTest 守护) — 新事件桥走独立类
+- 静态缓存管理: maidId key 的静态 map 终结即清 + 实体卸载清理 (EntityCleanupListener)
 
-新增条件: 实现 `ICondition` + `@RuleCondition` → 自动注册
-新增动作: 实现 `IAction` + `@RuleAction` → 自动注册
-
-### Compat 模块 — 6 模组兼容层
-
-| 模块 | 路径 | 功能 |
-|------|------|------|
-| Create | `compat/create/` | 6 机械动力任务 — crank/power/press/mix/running_belt/arm_transfer |
-| SlashBlade | `compat/slashblade/` | 拔刀剑 Sa 槽 + 连段攻击 |
-| TPM | `compat/tpm/` | True Power of Maid 连段修改 |
-| YSM | `compat/ysm/` | Yes Steve Model — 条件/动作自动注册 |
-| AI | `ai/` | 多个 AI 模型集成 |
-| FlowTask | `compat/flowtask/` | 通用流程任务基类
-
-参考 TLM compat 架构。每个模块 `compat/<modid>/impl/condition/` + `action/`。门控加载 `CompatRegistry.checkModLoad()`。
-
-**新增兼容模组**：创建 `compat/<modid>/` 文件夹 → 实现条件/动作 → 在 `CompatRegistry` 添加一行 `checkModLoad`。
-
-## 安装
-
-1. 安装 Touhou Little Maid (>=1.5.0) + Cloth Config
-2. 将 jar 放入 mods/ 目录
-3. 启动游戏
-
-## 使用
-
-**规则编辑器**: Forge 模组列表 → LittleMaidMoreAction → 打开规则编辑器
-
-**自定义动画**: 将 `.animation.json` 放入 `config/littlemaidmoreaction/animations/` → F3+T
-
-**内置音效**: JAR内置 3 个音效(man/manbaout/whatcanisay)，自定义音效通过资源包添加
-
-**动画参数编辑**: 规则编辑器 → 动作编辑 → 选 play_anim → [编辑] 按钮 → 配置每动画参数
-参数保存在 `config/littlemaidmoreaction/animationsetup/<name>.json`
-
-**条件参数编辑**: 规则编辑器 → 条件编辑 → 选择带参数条件(如女仆效果) → 出现参数输入框
-
-**独立规则编辑** ★ v8.7: 手持木棍右键女仆 → 打开该女仆独立规则界面 → 规则仅对该女仆生效
-独立规则保存在 `config/littlemaidmoreaction/maid_rules/<uuid>.json`
-
-## 贡献者 / Contributors
-
-- **xiaozhaoz1** — 作者、设计、开发
-- **DeepSeek AI** (deepseek-v4-pro) — AI 协作开发: 代码生成、架构设计、文档撰写、Bug 诊断修复、测试编写。累计贡献 582 源文件中大量代码，111 条件 + 83 动作实现，v5 六边形架构设计，v7 模块化重构
-
-## 许可
+## License
 
 MIT
-
-## 发布 jar
-
-| 文件 | 版本 | 说明 |
-|------|------|------|
-| `littlemaidmoreaction-forge-0.71+1.20.1.jar` | 0.71 | **1.20.1 Forge** 当前版 (v75 石板化假人桥 + Create 双平台) |
-| `littlemaidmoreaction-neoforge-0.71+1.21.1.jar` | 0.71 | **1.21.1 NeoForge** 当前版 (v75 石板化假人桥 + Create 双平台; 前置: Numen + OpenYSM 2.6.6+) |
-| `littlemaidmoreaction-1.0-SNAPSHOT-legacy-pre-1.20.1.jar` | 1.0-SNAPSHOT | **1.20.1 之前的老版本** (规则引擎时代) — 仅存档, 不再维护 |
