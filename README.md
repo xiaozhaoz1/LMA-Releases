@@ -61,6 +61,11 @@ Stonecutter 多版本架构: **forge 1.20.1** (0.9.23) + **neoforge 1.21.1** (0.
 - TlmEventAdapter 仅 2 订阅者 (InvariantTest 守护) — 新事件桥走独立类
 - 静态缓存管理: maidId key 的静态 map 终结即清 + 实体卸载清理 (EntityCleanupListener)
 
+## Contributors
+
+- [xiaozhaoz1](https://github.com/xiaozhaoz1) — 项目作者
+- DeepSeek — AI 编程辅助 (代码生成 / Bug 调试 / 文档)
+
 ## License
 
 MIT
