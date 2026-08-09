@@ -5,17 +5,104 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.35 (2026-08-09) — v79.37 死代码清理 + 修复
+
+- 删 DataKey 25 零引用键 + CLEAR_ALL_KEYS 补 4 键 (JUKEBOX_LAST/ANIM_TIME/WEAPON_ANIM/RETRY_COUNT — 跨任务残留修复)
+- 删死方法: TaskMetaData 6 / FlowTaskData 3 / TaskToggle disabledTypes/hiddenTypes / TaskRegistry passiveTasks / CraftChain merge
+- TaskToggle.isEnabledFor 简化 (per-maid 禁用键无写入方, 死功能)
+- 修 nextBroadcastTick 跨 session 残留 (ServerStopping 归零, EnvSense 广播重启后立即恢复)
+- changelog 清理: 移除全部用户原话 (只留原因与结果)
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.35
+
+## 0.9.34 (2026-08-09) — v79.36 重试机制删除
+
+- 删 RetryPolicy (TaskDispatcher timeout/fail 重试分支 + TaskPipeline.retryPolicy + 类 + 测试) — 主动任务靠 TLM 任务栏自动重启, 被动靠信号重触发; 顺带消掉计数自毁假 bug
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.34
+
+## 0.9.33 (2026-08-09) — v79.35 工作点模式 + 背包满暂停恢复
+
+- workPointTask 标记 (TaskPipeline 新方法 + 6 工作站管线覆写 + LmaTypedFlowTask 桥接 TLM)
+- 背包满暂停恢复 (ChainHarvestExecute hasInventorySpace + 条件挂起, 清包自动恢复)
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.33
+
+## 0.9.32 (2026-08-09) — v79.34 装饰性状态机简化
+
+- ChainOre/ChainWood 去 TaskStateMachine 继承 (SEARCHING/CHOPPING 2 态为执行数据镜像无实际语义) → 直接实现 TaskPipeline 每 tick 直执行
+- 树内 TaskStateMachine 只剩 7 个真状态机 (语义纯净化, 行为不变)
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.32
+
+## 0.9.31 (2026-08-09) — v79.33 注册去 showInBar + 可视开关生效
+
+- TaskRegistry/LMAT 注册去 showInBar 参数 (主动/被动由 register/registerPassive API 区分)
+- TaskToggle.isVisible 接入 TLM 任务栏 (LmaTypedFlowTask.isHidden) — 任务树 GUI 可视开关真实生效 (原半成品)
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.31
+
+## 0.9.30 (2026-08-09) — v79.32 executor 整合删除
+
+- TaskPipeline.executor() → execute(world, maid, pos): TaskResult 一次工作单元 (默认 CONTINUE)
+- 14 管线 executor 覆写迁移 (Furnace/CraftChain/Jukebox/BellRing SUCCESS 计数链保留)
+- 删 IExecutor.java + TaskRegistry deprecated 重载/executor 字段/passiveExecutor + LMAT 3/4 参重载 + LMAT.exec
+- LmaFlowCoordinationBehavior 驱动点改 pipeline().execute(); gametest 适配
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.30
+
+## 0.9.29 (2026-08-09) — v79.31 FSM 内存化 + Phase 3 碎片迁移
+
+- FSM 状态内存化: TaskStateMachine 状态改存 MaidData.pl(<type>.fsm) 的 "s" 键 — 每 tick 零 NBT 读 (原 getString+Enum.valueOf+try/catch); 心跳 flush 改 flushAllPl 覆盖 FSM 键
+- Phase 3 静态键碎片迁移 8 文件: LmaFlowTask/LmaTaskGuiHandler/TlmEventAdapter/TlmTaskMonitor/MaidTaskContext/MaidAssemblyInventory/MaidAssemblyEventHandler/ArmTransferSetupHandler (PREV_TASK/FLOW 键/ASSEMBLY_INV/ARM_TAKE/ARM_DEPOSIT → MaidData)
+- 修复: 1.21.1 NbtUtils.writeBlockPos 返回 Tag (非 CompoundTag) — cast; FQCN → import 短名统一
+- 保留边界: TimerBasedCreate 私有键/VisualOutput 动态拼接/CombatOutput 通用实体
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.29
+
+## 0.9.28 (2026-08-09) — v79.30.1 终局清理
+
+- 删 TaskState 死代码 (task/service/TaskState.java — persistent/memory 零业务使用, 被 MaidData 取代) + MaidUnloadRegistry 注册行
+- FlowTaskData.clearAll 键表驱动化 (DataKey.CLEAR_ALL_KEYS 遍历 remove, 消除 26 处手写清单双源漂移)
+- LMAT javadoc 示例更新 (新 2 参 register + TaskConfigurable 示例, 弃 deprecated 3 参)
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.28
+
+## 0.9.27 (2026-08-09) — v79.30 数据管理层 Phase 2
+
+- DataKey 类型化键表 (task/data/DataKey.java, ~55 键引 TaskKeys 常量, TLM TaskDataKey 参考简化版)
+- MaidData 分区实现: 类型化 get/put/has/remove (FLOW/META/ANIM/MISC root 直读写)
+- FlowTaskData/TaskMetaData 内部收编 MaidData (公开 API 不变)
+- 直读点迁移 ~40 处: TaskDispatcher/LmaFlowCoordinationBehavior/GameTickPipelineManager/AiControlGate/LmaMagicCastingProvider (13 处 ANIM 键)/JukeboxExecute/FurnaceExecute/ProgressNotifier/MaidEmojiApi/MaidChatBubbleApi/MovementOutput
+- 明确保留: 动态键 (passiveKey/私有键/setup 拼接) + 通用实体操作 (CombatOutput 流血/MovementOutput 冻结 — target 是 LivingEntity 非女仆, 不属于 MaidData 职责)
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.27
+
+## 0.9.26 (2026-08-09) — v79.29.1 数据层补丁
+
+- ServerStopping 兜底: 服务器停止 (保存前) 全女仆 PL 内存态落盘 (被动任务无心跳场景, 强制关闭覆盖)
+- TaskStateMachine 键收编遗漏 (lma_fsm_ → TaskKeys.FSM_PREFIX)
+- 合并卸载监听: 删 Extension.ServerEvents (EntityCleanupListener 唯一监听, MaidUnloadRegistry 幂等)
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.26
+
+## 0.9.25 (2026-08-09) — v79.29 统一数据管理层 Phase 1
+
+- 新建 MaidData 门面 (task/data/): PL 分区内存态 (tick 零 NBT, flush 心跳 20t/实体离开/终结三处落盘, 跨 session 恢复不变) + CFG 直读
+- TaskKeys 散键收编 (lma_ai_control/lma_weapon_anim/lma_anim_time/节流键/chain 键/PL/CFG/FSM 前缀)
+- 新建 MaidUnloadRegistry: 13 静态缓存统一卸载清理 (ChainHarvest/PathingApi/GameTick/EnvSense/AutoCrop/TlmTaskMonitor/FakePlayer/MaidData PL)
+- 修 2 个泄漏 bug: TaskState.MemoryTaskState clear() 键不匹配、MaidAssemblyInventory.CACHE 无清理
+- 字面量收编 8 文件 (AiControlGate/ChainHarvestExecute/JukeboxExecute/FurnaceExecute/MaidChatBubbleApi/MaidEmojiApi/VisualOutput)
+- 验证: 双编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.25
+
+## 0.9.24 (2026-08-09) — v79.28 管线接口瘦身
+
+- TaskPipeline 拆分三接口: 核心 TaskPipeline (执行/生命周期/展示) + TaskConfigurable (配置维度) + TaskSignalListener (信号维度)
+- TaskRegistry.register 去 executor 参数 (executor 由 pipeline.executor() 提供, 默认 = tick 委托); 旧签名 deprecated 兼容
+- 18 个管线 implements 适配 + 9 个调用点 instanceof 适配 (TaskConfigGuiFactory/DefaultBehaviorBrain/网络包链/EnvSenseBroadcaster/InteractTriggerPacket)
+- 行为零变化: 双节点编译 / 149 单测 / gametest 7/7 ×2 / 打包 0.9.24
+
 ## 0.9.27 (2026-08-08) — v79.26 卡顿修复 + 女仆列表/属性屏大面板重设计 + 3D 预览半身修复
 
-### v79.26.2 Changed (2026-08-08, 实测 "用原版那个3d旋转背景吧, 记得去模糊" + "加载世界要卡很久")
+### v79.26.2 Changed (2026-08-08, 实测反馈)
 
-- **女仆列表背景改原版主菜单旋转全景** (用户裁定: "我说的是背景, MC原版自带的那个旋转背景" — 旧仓库 v75.3 女仆选择屏用过 `Screen.renderPanorama`, v79.25 重写独立屏时丢失): `PanoramaRenderer` 双平台类均在 **`net.minecraft.client.renderer`** 包 (本地 decompile 实证, 不在 gui.screens — 此前 WebSearch 误导 import 错包编译失败), 构造收 `CubeMap` (MainMenuScreen 同款); 1.20.1 `render(float, float)` 无参版传 1.0F / 1.21.1 `render(GuiGraphics, int, int, float, float)` 传 width/height (编译实证双平台签名不同); **不调 super.renderBackground** — 1.21 默认含 renderBlurredBackground 背景模糊, 用户明确"去模糊是为了让字不模糊"; 纸感面板 + 深色文字保留浮在全景上
+- **女仆列表背景改原版主菜单旋转全景** (用户裁定 — 旧仓库 v75.3 女仆选择屏用过 `Screen.renderPanorama`, v79.25 重写独立屏时丢失): `PanoramaRenderer` 双平台类均在 **`net.minecraft.client.renderer`** 包 (本地 decompile 实证, 不在 gui.screens — 此前 WebSearch 误导 import 错包编译失败), 构造收 `CubeMap` (MainMenuScreen 同款); 1.20.1 `render(float, float)` 无参版传 1.0F / 1.21.1 `render(GuiGraphics, int, int, float, float)` 传 width/height (编译实证双平台签名不同); **不调 super.renderBackground** — 1.21 默认含 renderBlurredBackground 背景模糊, 用户明确反馈; 纸感面板 + 深色文字保留浮在全景上
 - **★加载世界卡很久根因 (日志实证 19:08:04-19:09:44)**: 进世界后 AnimFileSyncPacket 动画同步 **7 个包逐包 5.5 秒间隔 (共 40 秒)**, 每包渲染线程全量 reload 链: StartupLoader.reload + DynamicAnimationResources.reload + remergeAll (8 次磁盘 IO+解析) + **YsmAnimInjector.injectHaqiIfNeeded (22 模型包 × 8 源文件 × ~3 次读 + Gson 解析 ≈ 528 次磁盘 IO)** + [LMA/Registrar] ISS 未缓存 WARN 每包刷。修复三件套: ① **YsmAnimInjector 源文件指纹快检** (fileName+size+mtime 串, 8 次 lstat 替代 528 次内容读; 源只在 AnimSync 落盘时变 → 指纹不变零 IO 跳过; builtin 未就绪/遍历失败不缓存指纹下次重试 — 竞态兜底) ② **AnimFileSyncPacket 防抖** (handleClient 只落盘, 2 秒无新包 flushPending 统一 reload 一次 — 7 次 5.5 秒卡顿 → 1 次; 由 YsmReloadListener.onClientTick 每 tick 驱动) ③ Registrar ISS 未缓存 WARN 只打一次 (后续 DEBUG 静默)
 - 验证: 双节点编译 ✅ / 单测 ✅ / 打包 unzip 验 jar ✅ / 部署双端 (轮换 .bak-0808g)
 
-### v79.26.1 Fixed (2026-08-08, 实测 "主界面的女仆列表怎么是英文的, 改中文")
+### v79.26.1 Fixed (2026-08-08, 实测反馈)
 
-### 卡顿修复 (日志风暴实证: 1935 行日志中 1664 行是 LMA — 用户"删了 A* 怎么进游戏卡那么多")
+### 卡顿修复 (日志风暴实证: 1935 行日志中 1664 行是 LMA — 用户反馈)
 
 - `[LMA/YsmReload]` 1002 行: tick 补全遍历 **123 个 YSM 模型文件 × 8 动画 = 984 次磁盘读取 + JSON/Molang 解析**, 全在 Render thread 同步跑 4.3 秒 — **进世界卡主因**。修复: 源文件解析缓存 (磁盘 IO + 解析 984→8 次, 剩余纯内存 putAnimation 合并) + IdentityHashMap 幂等去重 (同 AnimationFile 实例同源只合并一次; F3+T 重建新实例自动重合并, 内容相等不误跳) + 合并日志降 DEBUG
 - `[LMA/Provider]` 419 行: TLM 每帧调 getMagicCastingState/getAnimationBuilder, **每帧 2-3 条 INFO** — 游戏内持续卡顿源。修复: 降 DEBUG (FIRST CALL 保留 INFO)
@@ -31,14 +118,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - MaidAttributeScreen 面板 **420×300 → 480×360**; 行高 14 → **22**; 组标题 18 → **24** 金色大字 + 装饰短横线; 值右对齐金色 (0x9C6B1F); 双层边框纸感卷面板 + 顶部女仆名金 + 分隔线
 
-### v79.26.1 Fixed (2026-08-08, 实测 "主界面的女仆列表怎么是英文的, 改中文")
+### v79.26.1 Fixed (2026-08-08, 实测反馈)
 
 - **列表行/预览区硬编码 `Lv N` → lang key** `gui.littlemaidmoreaction.maid_list.level` (zh `等级 %s` / en `Level %s`, translatable 带参数) — v79.26 双行信息新加的行内唯一英文源; 其余屏内 literal 全中文 (grep 全 screen 目录验证)
 - **★打包坑: jar 内 lang 陈旧** — neoforge jar 从 `build/classes/java/main` 打包 (copyResourcesToClasses 产物), 但 jar task 不依赖它 → lang 改动后 jar 里 zh_cn.json 停留在旧版 (缺 v79.25 GUI key), 双平台按钮/文本 fallback 显示 key 原文。修复链路: 清 `build/generated` (stonecutter merged) → `--rerun-tasks` 重打包 → **neoforge 必跑 `:neoforge:1.21.1:copyResourcesToClasses --rerun-tasks`** (CLAUDE.md 既有规则) — 之后 jar 内 zh_cn.json 1966B 全 key 齐。**教训: 打包后必须 unzip 验 jar 内资源, 不能只信 BUILD SUCCESSFUL**
 
 ## 0.9.26 (2026-08-08) — v79.25.2 女仆列表服务端全维度扫描 + TLM 棕色面板 GUI 统一
 
-### v79.25.2 Changed (2026-08-08, 实测 "女仆列表应该显示自己有的女仆不是搜索周围女仆" + "用 TLM 泥土背景, 左边列表右边 3D 和进入属性按钮")
+### v79.25.2 Changed (2026-08-08, 实测反馈)
 
 - **★女仆列表数据源 = 服务端全维度扫描**: 新 `network/MaidListQueryPacket` (C2S, forge ID 12 / neo playToServer) — 服务端 `player.server.getAllLevels()` 全维度 `getAllEntities()` 过滤 `EntityMaid + isAlive + getOwnerUUID().equals(player)` → 按 distSqr 排序; 新 `network/MaidListResponsePacket` (S2C, forge ID 13 / neo playToClient) — `record MaidEntry(uuid, name, dimension, distSqr)` + 客户端静态缓存 tick 轮询; MaidListScreen 删旧 64 格 AABB 附近扫描 (跨维度/远距离女仆全可见)
 - **★TLM 棕色主面板背景 (5 屏统一)**: 新 `screen/MaidPanelStyle` — blit TLM `maid_gui_main.png` 256×256 (touhou_little_maid namespace, 1.20/1.21 ResourceLocation 构造条件化) + 深棕渐变衬底 (0xFF4A3424→0xFF20150C); MaidListScreen (256×256 面板居中: 左列表名字+距离格 / 右 3D 预览 / 底部返回+进入属性界面) + MaidAttributeScreen/LMAConfigScreen (按钮排进面板)/TaskTreeScreen/CompatConfigScreen 全屏背景统一
@@ -48,7 +135,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 0.9.25 (2026-08-08) — v79.25.1 动画骨名误诊更正 (maimeng 统一) + 界面模糊修复
 
-### v79.25.1 Fixed (2026-08-08, 实测 "ISS 注册的 maimeng 还是没播放, haqi 都能正常播放" + "新界面忘记关模糊")
+### v79.25.1 Fixed (2026-08-08, 实测反馈)
 
 - **★maimeng 播不出真因 (错题 #134)**: v79.20.6 误诊 — 当时认为 TLM 原版模型骨 = 全小写 → 造 maimeng_vanilla/haqi_vanilla (小写骨) + isYsmModel 分流。实际 TLM 官方模型 winefox.json 骨名 **PascalCase** (Root/AllBody/UpBody/Head/LeftArm/LeftForeArm/.../Tail/Tail2-7) — vanilla 小写动画在 winefox 上 **0 骨匹配** → geckolib 播了但模型不动。管线全通 (触发→写侧→网络→Provider seq=46→合并 123 模型文件→无 "Could not load animation") — 唯一断点是骨名。haqi 能播是巧合: haqi.animation.json 用 **AllBody** (TLM 通用根骨, 双模型均匹配)。注: v79.20.6 对小写骨模型 (灵梦/chen 实证) 的修复真实存在 — 但用户主测试 winefox 是 PascalCase → vanilla 分流对用户场景无效
 - **修复**: HaqiPipeline 删 isYsmModel 分流 + 删 HAQI_ANIM_VANILLA/HAQI_OWNER_ANIM_VANILLA 常量 → 统一播 maimeng/haqi (PascalCase 骨: YSM 全匹配 / TLM winefox 系部分匹配 — 头/臂/上身/尾动, 腿骨 Leg/LeftLeg2/RightLeg2 不匹配无妨); StartupLoader.ANIM_PRESETS 删 2 条目; 删 2 资源文件; gametest 断言 → HAQI_ANIM/HAQI_OWNER_ANIM
@@ -61,7 +148,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### v79.22 Added (2026-08-08)
 
 - **★LMA 首个物品注册点**: `init/LmaItems` — 双平台条件化 DeferredRegister\<Item\> (forge ForgeRegistries.ITEMS / neoforge BuiltInRegistries.ITEM, 逐字镜像 LmaBlocks 结构); 挂载 `LmaRegistrar.registerItems` → forge LittleMaidMoreAction / neoforge LmaNeoForgeEntry 构造器; **当前零物品** — 注册点就绪, 后续物品在此注册 (javadoc 含双平台注册示例)
-- **饰品撤销 (裁定)**: 曾注册 3 饰品 (task_progress/rule_trigger/wireless_io_boost + MaidBaubleApi 门面 + 3 行为 + bindMaidBauble + addMaidTips 提示 + 测试/资源/lang) — "我还没想要加饰品, 现在是先把注册写完方便以后注册" → 全部删除, 只留注册点
+- **饰品撤销 (裁定)**: 曾注册 3 饰品 (task_progress/rule_trigger/wireless_io_boost + MaidBaubleApi 门面 + 3 行为 + bindMaidBauble + addMaidTips 提示 + 测试/资源/lang) — 注册基础设施先行裁定 → 全部删除, 只留注册点
 - **TLM 桥接盘点** (ILittleMaid 22 方法): 已接 8 + addMaidTips (客户端物品提示, 有物品后接) + 3 预留钩子 (addMaidBackpack/addChestType/addMaidMeal — 需 LMA 自有类型, 无则硬接 = 死代码); 13 不接 (无 LMA 语义 + 1 deprecated)。盘点入 ARCHITECTURE.md §11.10
 - 验证: 双节点编译 ✅
 
@@ -95,7 +182,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **gametest 7/7 双节点**: 新 lmaHaqiHitOwner (自构造注册 ServerPlayer + spawnInvulnerableTime 反射清零)
 - 验证: 双节点编译 / 单测 186 / gametest 7/7 ×2
 
-### v79.20.3 Changed (2026-08-07, 裁定: "A*不适合女仆留着干嘛" → "删 A* 但加 BFS 替代")
+### v79.20.3 Changed (2026-08-07, 裁定)
 
 - **A* 裁撤, 网格 BFS 替代 (★)**: 删 `AStarPathFinder` (启发搜索矿洞不适配女仆) → 新 `BfsPathFinder` — FIFO 无启发无代价, 移动集裁剪 (traverse 走/挖/桥 + ascend 挖头/ASCEND-place + descend 下 1-2 格; 跑酷删 — 全局禁用, 搭柱删 — 被 ASCEND-place 覆盖); 保留 bound 剪枝 + 链式放置支撑。链路 (v79.20.3b 统一入口, 裁定 "都加"): PathingApi.findPath 内部分支 — 激进 (EXPLORER/allowMine) → 直线优先 → null → BFS; 其他 (SAFE/BRIDGE) → 直接 BFS; TLM 模式 → TLM 原生导航 (Mode.TLM 分支不动)。PathExecutor.plan/precomputeNext/hasPath 预检全走统一入口, findPathSafe/findPathExplorer 委托 findPath
 - **MAX_NODES 15k→12k ("16格就多少节点")**: 有 bound 目标 AABB 25×25×17 = 10,625 格硬上界, 15k 永不触发; 12k = 上界 + 10% 缓冲, 仅 near(16)/anyOf 无 bound 时防爆
@@ -156,7 +243,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **寻路目标 reach (3 格球) → oneAway (1 格邻域 3x3x3, ★核心)**: 原 A* 停在 (3,1,0) 等斜/极限格 (3D ≤ 3 但整格 distSqr > 9) → 破块门挖不到 → "矿物在三格外但寻路觉得在三个内" 死锁。新到达 = 旁 1 格 (含对角) / 正上方 (站目标头上挖脚下) / 正下方 (目标在头顶 → 挖头顶) — 3D 距离 ≤ √3 ≈ 1.73 < 破块门 3 格, **到达必可挖, 永不卡极限**
 - **idleScan 到达判定同步 1 格邻域**: 与寻路目标同一语义 (原 3 格球不一致 → 寻路 ARRIVED 但判定不挖) — 到达后立即 tryStartVein, 流程不停: 挖完 → 重扫 → 下个矿
-- **ASCEND 头顶净空挖掘**: 跳 1 格台阶头最高 ≈ feet.y+3 需 2 格净空 — 实测 "头顶一格挡住跳不起来" → 跳前每 tick 无状态检查 f.above() + f.above().above(), 实心可挖先挖 (渐进跨 tick) — 挖空自动跳; A* 侧已有同款代价 (tryAscend src y+1 / dest y+2), 执行端补齐
+- **ASCEND 头顶净空挖掘**: 跳 1 格台阶头最高 ≈ feet.y+3 需 2 格净空 — 实测反馈 → 跳前每 tick 无状态检查 f.above() + f.above().above(), 实心可挖先挖 (渐进跨 tick) — 挖空自动跳; A* 侧已有同款代价 (tryAscend src y+1 / dest y+2), 执行端补齐
 - 新增 NavGoalTest 5 用例 (oneAway 旁/对角/头脚下/极限格不算/目标格 sacred)
 - 验证: 双节点编译 / 186 测试 0 failed / gametest 6/6 ×2 / jar 0.9.8 已部署双节点
 
@@ -234,19 +321,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### v79.19e Fixed (2026-08-07, 实测: 女仆被面前 1 格方块挡住, 能走上或挖掉却不做)
 
-- **ascend 被压成 walk 纯导航 → 女仆 AI 不自动上 1 格台阶 → 被面前 1 格方块挡住** (实测 "会被自己前面一格的方块挡住, 但明明可以直接走上那个方块")。参照 Baritone `MovementAscend` (跳门 L205-226: 水平距 dest ≤1.2 + 侧向 ≤0.2 + 横速 ≤0.1 → JUMP; SUCCESS = feet==dest): 新增 **`PathStep.StepAction.ASCEND`** 独立动作 + `AStarPathFinder.tryAscend` 改发 ascend (原 walk) — 执行端 `PathExecutor` 新 `case ASCEND`: 导航 + 跳门 (`f.y < dest.y && |dx|≤1.2 && |dz|≤1.2 && lateral<0.5` → `jump`), 完成 = 脚格 == dest
+- **ascend 被压成 walk 纯导航 → 女仆 AI 不自动上 1 格台阶 → 被面前 1 格方块挡住** (实测反馈)。参照 Baritone `MovementAscend` (跳门 L205-226: 水平距 dest ≤1.2 + 侧向 ≤0.2 + 横速 ≤0.1 → JUMP; SUCCESS = feet==dest): 新增 **`PathStep.StepAction.ASCEND`** 独立动作 + `AStarPathFinder.tryAscend` 改发 ascend (原 walk) — 执行端 `PathExecutor` 新 `case ASCEND`: 导航 + 跳门 (`f.y < dest.y && |dx|≤1.2 && |dz|≤1.2 && lateral<0.5` → `jump`), 完成 = 脚格 == dest
 - **tryTraverse 实心方块前加 mine 分支** (baritone 同: 实心前 ascend 走上 或 mine 挖穿 二选一, A* 按代价选): `avoidWalkingInto || !canWalkThrough` 时, `allowMine && isMineable && !isSacred` → `PathStep.mine(dest, dest)` (挖掉走过去)
-- **WALK 到达判定收严** (v79.19e): 原 `distSqr ≤ 4` (2 格含 Y) → 提前"到达" → 提前推进 → 目标外卡住 (实测 "卡在矿物 3 格外既不挖也不走"); 改 = **同脚层 && 水平曼哈顿 ≤ 1** (Baritone feet==dest 精确语义容差版); `SWITCH_TOLERANCE_SQR` 16→4 (4 格→2 格)
+- **WALK 到达判定收严** (v79.19e): 原 `distSqr ≤ 4` (2 格含 Y) → 提前"到达" → 提前推进 → 目标外卡住 (实测反馈); 改 = **同脚层 && 水平曼哈顿 ≤ 1** (Baritone feet==dest 精确语义容差版); `SWITCH_TOLERANCE_SQR` 16→4 (4 格→2 格)
 - **ChainHarvestExecute 到达判定 3 格 → 1 格** (6 邻): 矿物旁 1 格才开挖; `moveTo` FAILED (不可达) → **立即 idleScan 重扫** (原等 3 秒扫描间隔 — "周围 1 格没有矿物就去挖别处的矿直接开始新寻路"; baritone MineProcess 不可达黑名单 + 重扫语义) + 跳过格记录 + "无法到达目标" 气泡
 - **速度 0.7f → 0.5f** (实测 0.7f 仍偏快; 1.0F = 跑, 0.7F = 归家行走, 0.5F = 更慢速; 3 处 `setWalkAndLookTargetMemories` WALK/ASCEND)
-- **pillar 放置门** (v79.19e 补, 原 v79.19b 无状态版缺): `aux == 脚格` 时滞空即放 → 刚离地 `y < dest.y` → 身体与块重叠 → 原版水平推挤 → 站不上块 → 完成判定永不过 (实测 "先往脚下前一格放, 然后上面放一格就卡住"); 加 Baritone `MovementPillar` 放置门: `position().y > dest.y + 0.1` 才放 — 全滞空窗口, 无窄窗错过
+- **pillar 放置门** (v79.19e 补, 原 v79.19b 无状态版缺): `aux == 脚格` 时滞空即放 → 刚离地 `y < dest.y` → 身体与块重叠 → 原版水平推挤 → 站不上块 → 完成判定永不过 (实测反馈); 加 Baritone `MovementPillar` 放置门: `position().y > dest.y + 0.1` 才放 — 全滞空窗口, 无窄窗错过
 - 验证: 双节点编译 + 全测试 (canSwitchSegments 断言同步 4.0) / jar 复制 1.21.1 mods / 待游戏内实测 (1 格台阶跳上 / 实心方块挖穿 / 矿物 1 格到达)
 
 ## 0.9.9 (2026-08-06) — v79.19c PLACE 完成判定修正是走上 + 纯块放置 (状态机否决后两轮重写)
 
 ### v79.19c Fixed (2026-08-06, 实测: 面前连搭 2-3 格上不去)
 
-- **v79.19b 完成判定只查 aux 实心 → 桥步放完即完成, 漏"走上 dest"阶段**: 女仆原地连放 2-3 格垫块, 自己没站上去 (实测 "一直在自己面前搭方块...上不去")。对照 Baritone/Numen MovementTraverse: 放置格 = `dest.below()` (与 LMA A* tryBridge aux=dest.below 完全一致) — 执行 = **放好桥块 → moveTowards 走过去 → 脚到 dest 才 SUCCESS**; MovementPillar SUCCESS = `playerFeet().equals(dest) && blockIsThere`
+- **v79.19b 完成判定只查 aux 实心 → 桥步放完即完成, 漏"走上 dest"阶段**: 女仆原地连放 2-3 格垫块, 自己没站上去 (实测反馈)。对照 Baritone/Numen MovementTraverse: 放置格 = `dest.below()` (与 LMA A* tryBridge aux=dest.below 完全一致) — 执行 = **放好桥块 → moveTowards 走过去 → 脚到 dest 才 SUCCESS**; MovementPillar SUCCESS = `playerFeet().equals(dest) && blockIsThere`
 - **PLACE 完成判定 = `aux 已实心 && 脚格 == dest`** + 每 tick 导航 dest (BehaviorUtils): 桥 → 放好走上; 柱 → 跳起放脚格 → 落回站上 dest (放置无实体碰撞, 女仆上升穿过/下落撞顶, 窗口 = 全滞空期)。修正了放置成功即推进导致的竞态 (下一柱步把女仆将落的格提前填掉 → 站不上 dest → 卡死)
 - **纯块放置链** (`LmaPlayerSimulator.simulatePlaceBlock` + `FakePlayerInteract.placeBlock`): 仿 maid_useful_task `MaidUtils.placeBlock` (BlockHitResult → UseOnContext → onItemUseFirst → PASS → useOn), **无 interactEntity 扫描 / 无 RightClickBlock 事件** — 参考源码 (maid_useful_task / Baritone processRightClickBlock) 放置均走纯块链; 原链 interactEntity 扫 target 格排除假人但**不排除女仆** → 女仆站点击格时放块变交互女仆
 - **findSupportFace 还原** (去 v79.19b 加的 maid 跳过 — 纯块放置无抢占; 桥 aux=dest.below 侧壁 = 女仆脚下块, 本就不冲突)
