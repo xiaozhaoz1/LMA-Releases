@@ -159,12 +159,8 @@ public final class MaidStateWriter {
     }
 
     // === NBT/PersistentData ===
-    public static void setPersistentInt(EntityMaid m, String key, int value) { m.getPersistentData().putInt(key, value); }
-    public static void setPersistentFloat(EntityMaid m, String key, float value) { m.getPersistentData().putFloat(key, value); }
-    public static void setPersistentLong(EntityMaid m, String key, long value) { m.getPersistentData().putLong(key, value); }
-    public static void setPersistentString(EntityMaid m, String key, String value) { m.getPersistentData().putString(key, value); }
-    public static void setPersistentBoolean(EntityMaid m, String key, boolean value) { m.getPersistentData().putBoolean(key, value); }
-    public static void removePersistent(EntityMaid m, String key) { m.getPersistentData().remove(key); }
+    // setPersistentInt/Float/Long/String/Boolean/removePersistent 已删 (2026-08-15 数据层检查):
+    // 6 个通用任意-key 直写方法全库零调用方 — 数据写入一律走 task/data MaidData+DataKey 门面
 
     // saveAndSwitchTask/restorePreviousTask 已删 (v79.54, 错题 #180): 零调用方死代码,
     // "lma_prev_task" 键写方全死 — task 恢复由 TLM TASK_TAG 原生持久化负责

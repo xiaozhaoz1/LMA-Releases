@@ -78,7 +78,7 @@ public final class TaskDispatcher {
         }
         // 存储数量 — 0=无限, >0=指定数量
         if (count > 0) {
-            MaidData.put(maid, DataKey.FLOW_MAX_COUNT, (long) count);
+            FlowTaskData.setMaxCount(maid, count);
         }
         // 重试机制删除 (RetryPolicy) — 主动任务靠 TLM 任务栏自动重启, 被动靠信号重触发
         // 任务开始气泡 (信息型, 无节流 — 任务生命周期天然限频)

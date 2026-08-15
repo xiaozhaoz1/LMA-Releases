@@ -7,10 +7,13 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.api.navigation.NavigationUtil;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.PathingApi;
 import com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskStateManager;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.HarvestTarget;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ItemFilters;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ToolJudge;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ToolStateReader;
@@ -136,6 +139,22 @@ public final class ChainHarvestExecute {
         return STATES.computeIfAbsent(maid.getUUID(), k -> new MaidChainState());
     }
 
+    /** 采集方块黑白名单 (方块id); per-maid pipelineConfig 非空覆盖全局。
+     *  (2026-08-15 依赖方向归位: 原 ChainScan.allowed — task 配置面读取留在协调器,
+     *   消除 ChainScan 对 task/api 的反向依赖) */
+    static boolean allowed(EntityMaid maid, BlockState state) {
+        // 防御 — 任务已终结 (超时 clearAll, 错题 #124) 时 getTask 为空 → get 为 null;
+        // maidList 对 null cfg 也 NPE — 空任务走全局默认名单 (主修: GameTickPipelineManager 超时 return)
+        String task = FlowTaskData.getTask(maid);
+        var h = task.isEmpty() ? null : TaskRegistry.get(task);
+        // 配置维度拆分 — 未实现 TaskConfigurable 的管线走全局默认名单
+        CompoundTag cfg = h == null || !(h.pipeline() instanceof TaskConfigurable c)
+                ? null : c.pipelineConfig(maid);
+        var lists = ItemFilters.effectivePair(cfg == null ? new CompoundTag() : cfg,
+                ActiveTaskConfig.COLLECT_BLACKLIST.get(), ActiveTaskConfig.COLLECT_WHITELIST.get());
+        return ItemFilters.isAllowed(state, lists.get(0), lists.get(1));
+    }
+
     private ChainHarvestExecute() {}
 
     // ── 主流程: 每 tick 执行 ──
@@ -204,7 +223,7 @@ public final class ChainHarvestExecute {
         }
 
         BlockState state = world.getBlockState(pos);
-        if (target.matches(state) && ChainScan.allowed(maid, state)) {
+        if (target.matches(state) && allowed(maid, state)) {
             return tryStartVein(world, maid, pos, data, target, tool);
         }
         return ChainScan.idleScan(world, maid, data, target, tool, false);
@@ -217,7 +236,7 @@ public final class ChainHarvestExecute {
         LinkedHashSet<Long> skip = ChainScan.skippedFor(maid, tool);
         BlockState state = world.getBlockState(pos);
 
-        if (skip.contains(pos.asLong()) || !ChainScan.allowed(maid, state)) {
+        if (skip.contains(pos.asLong()) || !allowed(maid, state)) {
             // v79.56 (错题 #184): 已跳过不刷新时间戳 — 原每 tick addSkip → expire 永 false →
             // TTL 失效 → 目标永久跳过 (用户实测 "跳过集不能正常工作"); 已跳过也不 immediate
             // 重扫 (60t 内全被过滤, immediate 绕过节流 = 每 tick 全量扫描风暴)

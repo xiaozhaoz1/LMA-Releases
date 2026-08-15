@@ -102,10 +102,11 @@ public final class MaidData {
 
     // ── 类型化读写 (FLOW/META/ANIM/MISC 分区, root 直读写) ──
 
-    /** 读 — 按 {@link DataKey#type()} 分发; 缺键返回 def */
+    /** 读 — 按 {@link DataKey#type()} 分发; 缺键返回 {@link DataKey#def()} (兑现 def 契约) */
     @SuppressWarnings("unchecked")  // 按 DataType 分发强制转换, 键-类型由 DataKey 泛型保证
     public static <T> T get(EntityMaid maid, DataKey<T> k) {
         CompoundTag r = root(maid);
+        if (!r.contains(k.key())) return defaultValue(k);
         return switch (k.type()) {
             case STRING -> (T) r.getString(k.key());
             case INT -> (T) Integer.valueOf(r.getInt(k.key()));
@@ -113,6 +114,15 @@ public final class MaidData {
             case BOOLEAN -> (T) Boolean.valueOf(r.getBoolean(k.key()));
             case COMPOUND -> (T) r.getCompound(k.key());
         };
+    }
+
+    /** 缺键默认值 — DataKey.def 单一真相 (COMPOUND 返回副本, 防共享默认实例被调用方改脏) */
+    @SuppressWarnings("unchecked")
+    public static <T> T defaultValue(DataKey<T> k) {
+        if (k.type() == DataKey.DataType.COMPOUND) {
+            return (T) ((net.minecraft.nbt.CompoundTag) k.def()).copy();
+        }
+        return k.def();
     }
 
     /** 写 — 按 {@link DataKey#type()} 分发 (root 直写, 语义同原 getPersistentData().putX) */

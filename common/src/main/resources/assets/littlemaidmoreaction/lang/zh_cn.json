@@ -56,6 +56,8 @@
   "gui.littlemaidmoreaction.main.button": "LMA 设置",
   "gui.littlemaidmoreaction.main.button.desc": "打开 LMA 模组主界面",
   "item.littlemaidmoreaction.maid_codex": "女仆图鉴",
+  "item.littlemaidmoreaction.tamed_milk_bucket": "酒狐奶",
+  "item.littlemaidmoreaction.wild_dogmilk": "野生酒狐奶",
   "gui.littlemaidmoreaction.maid_codex.title": "女仆图鉴",
   "gui.littlemaidmoreaction.maid_codex.back": "返回",
   "gui.littlemaidmoreaction.maid_codex.empty": "还没有击杀记录 — 让女仆去战斗吧",

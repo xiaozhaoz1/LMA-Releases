@@ -14,6 +14,7 @@ import java.util.Comparator;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.MoreActionConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
+import com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig;
 
 /**
  * v67.2: Cloth Config 设置屏 — 模组全部配置项 + 任务自定义入口。
@@ -363,6 +364,57 @@ public final class ClothSettingsScreen {
                         ActiveTaskConfig.FAVOR_COST_L3.get())
                 .setDefaultValue(0.5).setMin(0.1).setMax(1.0)
                 .setSaveConsumer(ActiveTaskConfig.FAVOR_COST_L3::set).build());
+
+        // ── 挤奶 (v79.6x) ──
+        ConfigCategory kitsune = root.getOrCreateCategory(Component.literal("挤奶"));
+        kitsune.addEntry(eb.startBooleanToggle(Component.literal("挤奶主开关"),
+                        WildKitsuneMilkConfig.TOGGLE_ENABLED.get())
+                .setDefaultValue(WildKitsuneMilkConfig.TOGGLE_ENABLED.getDefault())
+                .setTooltip(Component.literal("空桶右键女仆挤奶 (已驯服自己的 / 未驯服)"))
+                .setSaveConsumer(WildKitsuneMilkConfig.TOGGLE_ENABLED::set).build());
+        kitsune.addEntry(eb.startBooleanToggle(Component.literal("野生奶副开关"),
+                        WildKitsuneMilkConfig.TOGGLE_WILD_EXTRA.get())
+                .setDefaultValue(WildKitsuneMilkConfig.TOGGLE_WILD_EXTRA.getDefault())
+                .setTooltip(Component.literal("开=未驯服产野生酒狐奶, 关=未驯服也产酒狐奶桶"))
+                .setSaveConsumer(WildKitsuneMilkConfig.TOGGLE_WILD_EXTRA::set).build());
+        kitsune.addEntry(eb.startIntField(Component.literal("奶桶抗性时长 (tick)"),
+                        WildKitsuneMilkConfig.TAMED_RESISTANCE_TICKS.get())
+                .setDefaultValue(WildKitsuneMilkConfig.TAMED_RESISTANCE_TICKS.getDefault())
+                .setMin(20).setMax(12000)
+                .setSaveConsumer(WildKitsuneMilkConfig.TAMED_RESISTANCE_TICKS::set).build());
+        kitsune.addEntry(eb.startIntField(Component.literal("奶桶恢复时长 (tick)"),
+                        WildKitsuneMilkConfig.TAMED_REGENERATION_TICKS.get())
+                .setDefaultValue(WildKitsuneMilkConfig.TAMED_REGENERATION_TICKS.getDefault())
+                .setMin(20).setMax(12000)
+                .setSaveConsumer(WildKitsuneMilkConfig.TAMED_REGENERATION_TICKS::set).build());
+        kitsune.addEntry(eb.startIntField(Component.literal("野生奶恢复时长 (tick)"),
+                        WildKitsuneMilkConfig.WILD_REGENERATION_TICKS.get())
+                .setDefaultValue(WildKitsuneMilkConfig.WILD_REGENERATION_TICKS.getDefault())
+                .setMin(20).setMax(12000)
+                .setSaveConsumer(WildKitsuneMilkConfig.WILD_REGENERATION_TICKS::set).build());
+        kitsune.addEntry(eb.startIntField(Component.literal("奶桶饰品耐久"),
+                        WildKitsuneMilkConfig.BAUBLE_DURABILITY.get())
+                .setDefaultValue(WildKitsuneMilkConfig.BAUBLE_DURABILITY.getDefault())
+                .setMin(1).setMax(1000)
+                .setSaveConsumer(WildKitsuneMilkConfig.BAUBLE_DURABILITY::set).build());
+        kitsune.addEntry(eb.startIntField(Component.literal("野生无敌时长 (tick)"),
+                        WildKitsuneMilkConfig.WILD_INVINCIBLE_TICKS.get())
+                .setDefaultValue(WildKitsuneMilkConfig.WILD_INVINCIBLE_TICKS.getDefault())
+                .setMin(20).setMax(12000)
+                .setTooltip(Component.literal("与音乐时长一致, 默认 600 = 30s"))
+                .setSaveConsumer(WildKitsuneMilkConfig.WILD_INVINCIBLE_TICKS::set).build());
+        kitsune.addEntry(eb.startIntField(Component.literal("野生无敌 CD (tick)"),
+                        WildKitsuneMilkConfig.WILD_CD_TICKS.get())
+                .setDefaultValue(WildKitsuneMilkConfig.WILD_CD_TICKS.getDefault())
+                .setMin(100).setMax(72000)
+                .setTooltip(Component.literal("默认 12000 = 10 分钟"))
+                .setSaveConsumer(WildKitsuneMilkConfig.WILD_CD_TICKS::set).build());
+        kitsune.addEntry(eb.startDoubleField(Component.literal("野生音乐音量"),
+                        WildKitsuneMilkConfig.WILD_MUSIC_VOLUME.get())
+                .setDefaultValue(WildKitsuneMilkConfig.WILD_MUSIC_VOLUME.getDefault())
+                .setMin(0.0).setMax(2.0)
+                .setTooltip(Component.literal("默认 0.5 = 50%"))
+                .setSaveConsumer(WildKitsuneMilkConfig.WILD_MUSIC_VOLUME::set).build());
 
         root.setSavingRunnable(() -> {
             MoreActionConfig.saveAll();

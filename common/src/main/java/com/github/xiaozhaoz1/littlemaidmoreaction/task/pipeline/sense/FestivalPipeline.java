@@ -10,6 +10,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSnapshot;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.FestivalTable;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.Signals;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.DailyDedup;
 import net.minecraft.server.level.ServerLevel;
 
 import java.time.LocalDate;
@@ -28,9 +29,9 @@ public final class FestivalPipeline implements PassiveSignalSkeleton {
     /** 去重键: 上次触发日期 (EpochDay long) — 每天覆盖, 无残留 (v79.55 收编 TaskKeys) */
     static final String LAST_ANNOUNCE_KEY = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.FESTIVAL_DAY;
 
-    /** 去重判定纯函数 — 上次触发日 != 今天 → 应触发 (跨年: EpochDay 不同自然重新触发) */
+    /** 去重判定纯函数 — 委托 {@link DailyDedup} (v79.61x S3 上提, 保留本签名供测试/调用方兼容) */
     static boolean shouldAnnounce(long lastEpochDay, LocalDate today) {
-        return lastEpochDay != today.toEpochDay();
+        return DailyDedup.shouldAnnounce(lastEpochDay, today);
     }
 
     @Override public String taskType() { return "festival"; }

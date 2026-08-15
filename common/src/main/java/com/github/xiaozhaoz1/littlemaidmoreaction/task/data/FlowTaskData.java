@@ -51,6 +51,10 @@ public final class FlowTaskData {
         MaidData.put(maid, DataKey.FLOW_COUNTER, count);
     }
 
+    public static void setMaxCount(EntityMaid maid, long count) {
+        MaidData.put(maid, DataKey.FLOW_MAX_COUNT, count);
+    }
+
     // setMaxCount/setStep/getStep/getTimeout 已删 (v79.55, 错题 #181): 零调用方死门面 —
     // FLOW_MAX_COUNT 由 TaskDispatcher:81 直写; FLOW_TIMEOUT 键无写方恒默认超时 (GMPM 恒 DEFAULT_TIMEOUT)
 
@@ -88,6 +92,9 @@ public final class FlowTaskData {
         data.remove("lma_anim_time");
         data.remove("lma_flow_step");
         data.remove("lma_flow_data");
+        // v79.61x S1 相位机迁移: JUKEBOX_PHASE/FURNACE_PHASE 键常量删 (状态入 FSM 内存态) — 旧存档残留字面量兜底
+        data.remove("lma_jukebox_phase");
+        data.remove("lma_furnace_phase");
         // 动画运行时键统一清理 — 原仅清 5 个 ANIM_* 主键, AnimExecute 写入的
         // 15 个运行时键 (seq/phase/start/casting/end/priority/lock_move/dur_*/wait_ticks) 全残留,
         // 跨 session 存活 (错题 #67 类 bug)。单一来源 = TaskKeys.ANIM_RUNTIME_KEYS。

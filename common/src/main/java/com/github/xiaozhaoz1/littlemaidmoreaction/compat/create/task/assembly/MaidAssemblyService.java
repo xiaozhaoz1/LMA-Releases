@@ -161,8 +161,8 @@ public final class MaidAssemblyService {
 
     public static int getDuration(MachineKind kind, EntityMaid maid) {
         int base = switch (kind) { case DEPLOYER -> 120; default -> BASE_DURATION; };
-        // 好感度效率乘区 (原 switch 分档 → base / speed 倍率)
-        return (int) (base / com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.workSpeedMultiplier(maid));
+        // 好感度效率乘区 (v79.61x 重复抽取 → MaidFavorability.workTicks)
+        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.workTicks(maid, base);
     }
 
     // ═══ Nearby search (委托 NearbyContainerService) ═══

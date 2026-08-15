@@ -43,7 +43,7 @@ task/
 |------|------|
 | `TaskDispatcher.java` | 生命周期门面: `submit()` `cancel()` `complete()` `fail()` `timeout()` `submitPassive()` `cancelPassive()`。**无重试** — 主动任务 TLM 任务栏自动重启, 被动靠信号重触发 |
 | `GameTickPipelineManager.java` | **单一驱动源**: 每 tick 驱动所有 in_progress 主动管线 tick; 心跳 20t (仅 isLongRunning) / 看门狗 / 被动位掩码节流 / PL flush |
-| `TaskStateMachine.java` | FSM 基类 (7 真状态机): 子类定义 `S` 枚举 → `tick(S, w, m)` 返回下状态; 状态内存化 (MaidData.pl); 转换图校验 + onEnter/onExit 钩子 |
+| `TaskStateMachine.java` | FSM 基类 (9 common + forge CannonLoad): 子类定义 `S` 枚举 → `tick(S, w, m)` 返回下状态; 状态内存化 (MaidData.pl); 转换图校验 + onEnter/onExit 钩子; workStationGated 复用 WorkStationPipeline.gate (furnace/jukebox) |
 | `TaskTickHandler.java` | 事件入口: ServerTick → 驱动; ServerStopping → PL flush + 广播节流归零 |
 | `TaskStateManager.java` | 状态写入: `init()` `heartbeat()` `clearAll()` |
 | `MaidUnloadRegistry.java` + `EntityCleanupListener.java` | 卸载统一清理 (13 静态缓存 + PL flush, 幂等) |
@@ -63,9 +63,9 @@ task/
 ### service/ — 共享静态服务
 | 文件 | 什么 |
 |------|------|
-| `MaidFavorability.java` | 好感度双乘区: `workSpeedMultiplier` (效率) / `costMultiplier` (消耗) — 管线自己乘, 每级可配 |
+| `MaidFavorability.java` | 好感度双乘区: `workSpeedMultiplier` (效率) / `costMultiplier` (消耗) / `workTicks(maid, base)` (效率计时, v79.61x 收敛 4 处) — 管线自己乘, 每级可配 |
 | `ToolJudge.java` | 工具判断: suitableToolType / canHarvest / isToolUsable / 挖掘速度表 |
-| `ItemFilters.java` | 黑白名单过滤 |
+| `ItemFilters.java` | 黑白名单过滤 + `effectivePair(cfg, gBlack, gWhite)` (v79.61x 收敛 pair 解析) |
 | `TaskConfigs.java` | 管线配置读取 (get(maid, taskType)) |
 | `HarvestTarget.java` | 采集目标定义 (含 TOOL_RESERVE_DURABILITY) |
 | `AiControlGate.java` | AI 操控权限 |
@@ -134,7 +134,7 @@ public final class MyPipeline implements TaskPipeline, TaskConfigurable {
     @Override public PipelineResult validate(ServerLevel w, EntityMaid m, PipelineContext c) { ... }
 }
 
-// 3. 工作站类任务 (熔炉/合成/敲钟/唱片机) — 继承 WorkStationPipeline
+// 3. 工作站类任务 (合成/敲钟) — 继承 WorkStationPipeline (furnace/jukebox 相位机已迁 FSM, 见下)
 public final class MyStation extends WorkStationPipeline {
     @Override public String taskType() { return "my_station"; }
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos pos, BlockState state, EntityMaid m) {
@@ -145,7 +145,7 @@ public final class MyStation extends WorkStationPipeline {
     }
 }
 
-// 4. 状态机 (真状态机才用 — 7 个现有: ArmTransfer/BlockInteract/Crank/Power/Press/Mix/MaidAssembly)
+// 4. 状态机 (真状态机才用 — 9 common: ArmTransfer/BlockInteract/Crank/Power/Press/Mix/MaidAssembly/Furnace/Jukebox; forge 另加 CannonLoad)
 public final class MyStateMachine extends TaskStateMachine<MyStateMachine.S> {
     enum S { IDLE, WORKING }
     @Override protected Class<S> stateClass() { return S.class; }

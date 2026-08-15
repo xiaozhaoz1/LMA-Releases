@@ -15,7 +15,6 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.StepType
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.InteractionHand;
 
 import java.util.List;
 import java.util.Map;
@@ -131,12 +130,10 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
         if (takePos == null) return null;
         // 搬运黑白名单 (per-maid 覆盖全局)
         var cfg = com.github.xiaozhaoz1.littlemaidmoreaction.task.service.TaskConfigs.get(maid, "arm_transfer");
-        var black = ItemFilters.effective(ItemFilters.maidList(cfg, ItemFilters.KEY_BLACKLIST),
-                ActiveTaskConfig.ARM_BLACKLIST.get());
-        var white = ItemFilters.effective(ItemFilters.maidList(cfg, ItemFilters.KEY_WHITELIST),
-                ActiveTaskConfig.ARM_WHITELIST.get());
+        var lists = ItemFilters.effectivePair(cfg,
+                ActiveTaskConfig.ARM_BLACKLIST.get(), ActiveTaskConfig.ARM_WHITELIST.get());
         var item = ArmTransferService.readSourceItem(maid, takePos,
-                stack -> ItemFilters.isAllowed(stack, black, white));
+                stack -> ItemFilters.isAllowed(stack, lists.get(0), lists.get(1)));
         if (item.isEmpty()) { return null; } // 空源 → 等待
         int count = ArmTransferService.computeExtractCount(maid, item);
         if (count <= 0) { return null; }
@@ -152,7 +149,7 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
         }
         com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.container.ContainerOutput
                 .withdrawItemStack(maid, handler, item, count);
-        if (world.getGameTime() % 20 == 0) maid.swing(InteractionHand.MAIN_HAND);
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, 20);
         data.putString(KEY_ITEM, ArmTransferService.itemId(maid, item));
         return State.TO_DEPOSIT;
     }
@@ -189,7 +186,7 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
         }
         com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.container.ContainerOutput
                 .depositItemStack(maid, handler, mItem, count);
-        if (world.getGameTime() % 20 == 0) maid.swing(InteractionHand.MAIN_HAND);
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, 20);
         return State.TO_TAKE;
     }
 

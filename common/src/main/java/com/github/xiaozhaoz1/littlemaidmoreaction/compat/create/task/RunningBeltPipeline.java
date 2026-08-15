@@ -115,8 +115,8 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
 
         // 顺带摇周围 2 格内曲柄 (最多 2 个 — 跑步不移动, 就近摇; 发电上报式不中断)
         var cranks = CrankService.findCranks(world, maid.blockPosition(), 2, 2);
-        if (!cranks.isEmpty() && world.getGameTime() % 20 == 0) {
-            maid.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        if (!cranks.isEmpty()) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, 20);
         }
         for (BlockPos c : cranks) {
             CrankService.crank(world, c);

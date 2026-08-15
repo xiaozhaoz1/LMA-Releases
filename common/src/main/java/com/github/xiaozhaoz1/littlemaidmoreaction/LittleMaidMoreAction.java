@@ -108,6 +108,9 @@ public final class LittleMaidMoreAction {
         // 主动/被动任务配置拆分 — 子文件夹 (Forge 自动建目录)
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, ActiveTaskConfig.ACTIVE_SPEC, MOD_ID + "/active.toml");
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, PassiveTaskConfig.PASSIVE_SPEC, MOD_ID + "/passive.toml");
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON,
+                com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.KITSUNE_SPEC,
+                MOD_ID + "/kitsune_milk.toml");
 
         LmaRegistrar.init();
         LmaRegistrar.initServer();
@@ -117,6 +120,8 @@ public final class LittleMaidMoreAction {
         LmaRegistrar.registerBlockEntityTypes(modBus);
         // 女仆饰品物品
         LmaRegistrar.registerItems(modBus);
+        // 酒狐奶物品 (v79.6x)
+        com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.register(modBus);
         // 便携装配 MenuType
         MENU_TYPES.register(modBus);
         // 网络发送注入 (SimpleChannel) — M-4: 统一走 setSender 记注入状态日志

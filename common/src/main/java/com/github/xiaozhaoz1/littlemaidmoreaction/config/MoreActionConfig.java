@@ -70,14 +70,15 @@ public final class MoreActionConfig {
         SPEC.save();
         ActiveTaskConfig.ACTIVE_SPEC.save();
         PassiveTaskConfig.PASSIVE_SPEC.save();
+        com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.KITSUNE_SPEC.save();
     }
 
     // ── 配置同步 (专用服务器) — ConfigValue 句柄注册表 ──
 
 //? if 1.20.1 {
-    static <T> void reg(Map<String, ForgeConfigSpec.ConfigValue<?>> map, String prefix,
+    public static <T> void reg(Map<String, ForgeConfigSpec.ConfigValue<?>> map, String prefix,
 //?} else {
-    static <T> void reg(Map<String, ModConfigSpec.ConfigValue<?>> map, String prefix,
+    public static <T> void reg(Map<String, ModConfigSpec.ConfigValue<?>> map, String prefix,
 //?}
 //? if 1.20.1 {
                                 ForgeConfigSpec.ConfigValue<T> value) {
@@ -100,6 +101,7 @@ public final class MoreActionConfig {
 //?}
         all.putAll(ActiveTaskConfig.ACTIVE_VALUES);
         all.putAll(PassiveTaskConfig.PASSIVE_VALUES);
+        all.putAll(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.KITSUNE_VALUES);
         return all;
     }
 

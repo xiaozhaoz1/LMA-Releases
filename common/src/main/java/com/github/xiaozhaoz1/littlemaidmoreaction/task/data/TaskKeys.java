@@ -71,7 +71,6 @@ public final class TaskKeys {
             ANIM_PRIORITY, LOCK_MOVE, DUR_START, DUR_CASTING, DUR_END, WAIT_TICKS);
 
     // ── 唱片机 ──
-    public static final String JUKEBOX_PHASE = "lma_jukebox_phase";
     public static final String JUKEBOX_TICK  = "lma_jukebox_tick";
 
     // ── adapter→task 通信标记 ──
@@ -96,9 +95,6 @@ public final class TaskKeys {
     // ── 女仆属性 ──
     public static final String RESIST_PREFIX = "lma_resist_";
 
-    // ── 熔炉 ──
-    public static final String FURNACE_PHASE = "lma_furnace_phase";
-
     // ── 其他运行时键 (标准化: 高频内联字面量收拢) ──
     /** 便携装配背包键 (MaidAssemblyInventory) */
     public static final String ASSEMBLY_INV       = "lma_assembly_inv";
@@ -117,7 +113,8 @@ public final class TaskKeys {
     /** 连锁采集队列/蓄力结束 (ChainHarvestExecute) */
     public static final String CHAIN_QUEUE = "lma_chain_queue";
     public static final String CHAIN_CHARGE_END = "lma_chain_charge_end";
-    /** 连锁采集相位 (v79.61x 状态机化: SCAN/CHARGE — 队列存在不再兼任状态判据) */
+    /** 连锁采集相位 (v79.61x 状态机化: SCAN/CHARGE — 入队单点写 CHARGE, 队列闭环单点清;
+     *  仅 phaseOf() 读, 用于旧档兼容判据: 无 phase 键时队列存在 = CHARGE) */
     public static final String CHAIN_PHASE = "lma_chain_phase";
     /** 节日跨天去重 (FestivalPipeline) */
     public static final String FESTIVAL_DAY = "lma_festival_day";

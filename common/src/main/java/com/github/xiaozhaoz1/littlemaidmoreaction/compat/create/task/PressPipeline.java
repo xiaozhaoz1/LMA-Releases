@@ -43,7 +43,8 @@ public final class PressPipeline extends MoveToBlockStateMachine<PressPipeline.S
     protected void onEnter(State state, ServerLevel world, EntityMaid maid) {
         if (state == State.WORKING) {
             // 好感度效率乘区 (原私有 workTicks 收编)
-            pipelineData(maid).putInt("timer", (int) (100 / com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.workSpeedMultiplier(maid)));
+            pipelineData(maid).putInt("timer",
+                    com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.workTicks(maid, 100));
         }
     }
 

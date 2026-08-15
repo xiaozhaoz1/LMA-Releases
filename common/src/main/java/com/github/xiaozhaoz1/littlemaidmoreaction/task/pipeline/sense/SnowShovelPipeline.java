@@ -53,9 +53,13 @@ public final class SnowShovelPipeline implements PassiveSignalSkeleton, TaskConf
 
     @Override
     public void tick(ServerLevel world, EntityMaid maid) {
-        var pd = pipelineData(maid);
-        int cd = pd.getInt("Cd") - 1;
-        if (cd > 0) { pd.putInt("Cd", cd); return; }
+        // v79.61x S3: 铲雪节奏改 ThrottleUtil 时戳节流 (原 pipelineData "Cd" 递减自管);
+        // 间隔 = 40 / 好感度乘区 (行为零变化) — 复用 MaidFavorability.workTicks
+        long interval = com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.workTicks(maid, 40);
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                .shouldFire(maid, "snow_shovel", interval)) {
+            return;
+        }
 
         int radius = PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
         List<BlockPos> snow = EnvScanner.scanSnowBlocks(world, maid.blockPosition(), radius);
@@ -67,9 +71,6 @@ public final class SnowShovelPipeline implements PassiveSignalSkeleton, TaskConf
 
         // 清除最近的一块雪
         world.destroyBlock(snow.get(0), true, maid);
-        // v79.58 (用户裁定): 好感度乘区 — 等级高铲得快 (40 / speed, 同挖矿蓄力/吃食间隔模式)
-        pd.putInt("Cd", Math.max(1, (int) (40
-                / com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.workSpeedMultiplier(maid))));
     }
     // onCleanup 用接口默认 (clearPipelineData) — 删除冗余覆写
 }

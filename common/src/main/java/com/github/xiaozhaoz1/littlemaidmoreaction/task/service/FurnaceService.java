@@ -46,8 +46,9 @@ public final class FurnaceService {
     /** 校验可烧炼 — null = 通过; 非 null = 失败文案 (与原 validate 文案逐字一致) */
     public static String validateSmelt(ServerLevel level, EntityMaid maid, String target) {
         Map<Item, Integer> allItems = VanillaInputRegistry.readAllItems(maid);
-        List<String> black = effectiveBlack(maid);
-        List<String> white = effectiveWhite(maid);
+        var lists = effectiveLists(maid);
+        List<String> black = lists.get(0);
+        List<String> white = lists.get(1);
 
         // 空 target — 检查是否有任何可烧炼材料
         if (target.isEmpty()) {
@@ -106,8 +107,9 @@ public final class FurnaceService {
         Item targetItem = BuiltInRegistries.ITEM.get(ResourceLocation.tryParse(target));
  //?}
         if (targetItem == null) return "";
-        List<String> black = effectiveBlack(maid);
-        List<String> white = effectiveWhite(maid);
+        var lists = effectiveLists(maid);
+        List<String> black = lists.get(0);
+        List<String> white = lists.get(1);
         if (!ItemFilters.isAllowed(targetItem, black, white)) return "";
         Map<Item, Integer> allItems = VanillaInputRegistry.readAllItems(maid);
  //? if 1.20.1 {
@@ -131,18 +133,10 @@ public final class FurnaceService {
         return "";
     }
 
-    /** 生效黑名单 — per-maid 覆盖全局 */
-    private static List<String> effectiveBlack(EntityMaid maid) {
-        return ItemFilters.effective(
-                ItemFilters.maidList(TaskConfigs.get(maid, "furnace"), ItemFilters.KEY_BLACKLIST),
-                ActiveTaskConfig.FURNACE_BLACKLIST.get());
-    }
-
-    /** 生效白名单 — per-maid 覆盖全局 */
-    private static List<String> effectiveWhite(EntityMaid maid) {
-        return ItemFilters.effective(
-                ItemFilters.maidList(TaskConfigs.get(maid, "furnace"), ItemFilters.KEY_WHITELIST),
-                ActiveTaskConfig.FURNACE_WHITELIST.get());
+    /** 生效黑+白名单 pair [0]=black [1]=white — per-maid 覆盖全局 (v79.61x 收敛 effectiveBlack/effectiveWhite) */
+    private static List<List<String>> effectiveLists(EntityMaid maid) {
+        return ItemFilters.effectivePair(TaskConfigs.get(maid, "furnace"),
+                ActiveTaskConfig.FURNACE_BLACKLIST.get(), ActiveTaskConfig.FURNACE_WHITELIST.get());
     }
 
     // ── 单拍业务动作 (v79.61x 定级修正: 原 FurnaceOutput 多步业务动作, 非 io 原语 —

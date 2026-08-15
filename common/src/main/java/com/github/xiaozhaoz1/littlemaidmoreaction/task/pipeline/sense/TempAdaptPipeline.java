@@ -61,9 +61,14 @@ public final class TempAdaptPipeline implements PassiveSignalSkeleton, TaskConfi
         String goal = pd.getString("goal");
         if (goal.isEmpty()) { TaskDispatcher.cancelPassive(maid, taskType()); return; }
 
-        int cd = pd.getInt("Cd") - 1;
-        if (cd > 0) { pd.putInt("Cd", cd); return; }
-        pd.putInt("Cd", 100);
+        // v79.61x S3: 扫描节奏改 ThrottleUtil 时戳节流 (原 "Cd" 递减自管); 间隔存 pipelineData
+        // (默认 100, 无目标时 600 背压) — 行为与原先 CD=100/600 语义一致
+        int interval = pd.getInt("interval");
+        if (interval <= 0) interval = 100;
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                .shouldFire(maid, "temp_adapt", interval)) {
+            return;
+        }
 
         int radius = PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
         BlockPos center = maid.blockPosition();
@@ -74,10 +79,11 @@ public final class TempAdaptPipeline implements PassiveSignalSkeleton, TaskConfi
         };
 
         if (target != null) {
+            pd.putInt("interval", 100);
             maid.getNavigation().moveTo(target.getX() + 0.5, target.getY(),
                     target.getZ() + 0.5, 0.8);
         } else {
-            pd.putInt("Cd", 600);
+            pd.putInt("interval", 600);
         }
     }
     // onCleanup 用接口默认 (clearPipelineData) — 删除冗余覆写

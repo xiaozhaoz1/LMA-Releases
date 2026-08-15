@@ -63,5 +63,10 @@
     "sounds": [
       {"name": "littlemaidmoreaction:laowu_5", "stream": true}
     ]
+  },
+  "dogmilk": {
+    "sounds": [
+      {"name": "littlemaidmoreaction:dogmilk", "stream": true}
+    ]
   }
 }

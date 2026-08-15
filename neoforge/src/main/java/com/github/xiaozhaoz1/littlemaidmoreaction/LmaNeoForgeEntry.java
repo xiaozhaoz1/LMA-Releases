@@ -64,6 +64,9 @@ public final class LmaNeoForgeEntry {
                 LittleMaidMoreAction.MOD_ID + "/active.toml");
         modContainer.registerConfig(ModConfig.Type.COMMON, PassiveTaskConfig.PASSIVE_SPEC,
                 LittleMaidMoreAction.MOD_ID + "/passive.toml");
+        modContainer.registerConfig(ModConfig.Type.COMMON,
+                com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.KITSUNE_SPEC,
+                LittleMaidMoreAction.MOD_ID + "/kitsune_milk.toml");
 
         // 通用注册 (common 双平台代码)
         LmaRegistrar.init();
@@ -74,6 +77,8 @@ public final class LmaNeoForgeEntry {
         LmaRegistrar.registerBlockEntityTypes(modBus);
         // v79.22: 女仆饰品物品
         LmaRegistrar.registerItems(modBus);
+        // 酒狐奶物品 (v79.6x)
+        com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.register(modBus);
         MENU_TYPES.register(modBus);
 
         // 网络发送注入 (无注册依赖) — M-4: 统一走 setSender 记注入状态日志

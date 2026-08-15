@@ -43,22 +43,8 @@ public abstract class WorkStationPipeline implements TaskPipeline {
 
     @Override
     public final void tick(ServerLevel w, EntityMaid m) {
-        var mem = m.getBrain().getMemory(InitEntities.TARGET_POS.get());
-        if (mem.isEmpty()) return;  // Brain 导航中/无目标 — 等重搜
-        BlockPos target = mem.get().currentBlockPosition();
-
-        // 未到达 → 导航中 (心跳由 GMPM 20t 全局写, 不误杀)
-        if (target.distSqr(m.blockPosition()) >= VanillaConstants.ARRIVE_DIST_SQR) return;
-
-        // 节拍
-        if (w.getGameTime() % executeInterval() != 0) return;
-
-        // 目标失效 → 擦导航记忆 (Brain tick 检测后重搜)
-        if (!isTargetBlock(w, target, w.getBlockState(target), m)) {
-            m.getBrain().eraseMemory(InitEntities.TARGET_POS.get());
-            m.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
-            return;
-        }
+        BlockPos target = gate(w, m, this);
+        if (target == null) return;
 
         switch (executeOne(w, m, target)) {
             case SUCCESS -> countSuccess(m);
@@ -71,11 +57,40 @@ public abstract class WorkStationPipeline implements TaskPipeline {
     protected abstract TaskResult executeOne(ServerLevel w, EntityMaid m, BlockPos pos);
 
     /**
+     * 工作站门 — 到达 + 节拍 + 目标失效 (v79.61x 抽取单一实现, 供
+     * {@link WorkStationPipeline#tick} 与 TaskStateMachine(workStationGated) 共用,
+     * 消除两处漂移)。
+     *
+     * @param p 实现 {@link #isTargetBlock}/{@link #executeInterval()} 的管线 (this 或 FSM)
+     * @return 已到达且在节拍上的目标方块; 未就绪/导航中/目标失效返回 null (不派发工作单元)
+     */
+    public static BlockPos gate(ServerLevel w, EntityMaid m, TaskPipeline p) {
+        var mem = m.getBrain().getMemory(InitEntities.TARGET_POS.get());
+        if (mem.isEmpty()) return null;  // Brain 导航中/无目标 — 等重搜
+        BlockPos target = mem.get().currentBlockPosition();
+
+        // 未到达 → 导航中 (心跳由 GMPM 20t 全局写, 不误杀)
+        if (target.distSqr(m.blockPosition()) >= VanillaConstants.ARRIVE_DIST_SQR) return null;
+
+        // 节拍
+        if (w.getGameTime() % p.executeInterval() != 0) return null;
+
+        // 目标失效 → 擦导航记忆 (Brain tick 检测后重搜)
+        if (!p.isTargetBlock(w, target, w.getBlockState(target), m)) {
+            m.getBrain().eraseMemory(InitEntities.TARGET_POS.get());
+            m.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
+            return null;
+        }
+        return target;
+    }
+
+    /**
      * SUCCESS 计数链 + 完成判定 (原 Brain doExecute L172-195 迁入; TaskDispatcher.complete
      * 不含 setTask(idle)/erase 导航记忆 — 此处显式清理)。
+     * v79.61x 改 static — TaskStateMachine 迁移的 furnace 复用 (按拍计数的 FSM)。
      * v79.46b: 删 max=0 一次性分支 (基类恒 isLongRunning=true → 永假; 工作站 max=0 = 永续任务)。
      */
-    protected final void countSuccess(EntityMaid m) {
+    static void countSuccess(EntityMaid m) {
         int counter = (int) FlowTaskData.getCounter(m) + 1;
         FlowTaskData.setCounter(m, counter);
         int max = (int) FlowTaskData.getMaxCount(m);

@@ -55,6 +55,8 @@
   "gui.littlemaidmoreaction.main.button": "LMA Settings",
   "gui.littlemaidmoreaction.main.button.desc": "Open LMA main screen",
   "item.littlemaidmoreaction.maid_codex": "Maid Codex",
+  "item.littlemaidmoreaction.tamed_milk_bucket": "Kitsune Milk",
+  "item.littlemaidmoreaction.wild_dogmilk": "Wild Kitsune Milk",
   "gui.littlemaidmoreaction.maid_codex.title": "Maid Codex",
   "gui.littlemaidmoreaction.maid_codex.back": "Back",
   "gui.littlemaidmoreaction.maid_codex.empty": "No kill records yet — let your maids fight!",

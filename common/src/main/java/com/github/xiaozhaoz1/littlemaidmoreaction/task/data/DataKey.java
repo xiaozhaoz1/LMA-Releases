@@ -43,9 +43,7 @@ public record DataKey<T>(String key, DataType type, T def) {
     // ── MISC 区 (散键收编) ──
 
     public static final DataKey<Boolean> AI_CONTROL = new DataKey<>(TaskKeys.AI_CONTROL, DataType.BOOLEAN, false);
-    public static final DataKey<Integer> JUKEBOX_PHASE = new DataKey<>(TaskKeys.JUKEBOX_PHASE, DataType.INT, 0);
     public static final DataKey<Long> JUKEBOX_TICK = new DataKey<>(TaskKeys.JUKEBOX_TICK, DataType.LONG, 0L);
-    public static final DataKey<Integer> FURNACE_PHASE = new DataKey<>(TaskKeys.FURNACE_PHASE, DataType.INT, 0);
     // 3 个 COMPOUND 默认值在 <clinit> 实例化 new CompoundTag() — 纯 JVM 实测安全:
     // CompoundTag 是纯 NBT 数据结构, 无注册表依赖 (DataKeyConsistencyTest 现网直接加载
     // 本类触发 clinit 全绿实证; 与 Items.*/BuiltInRegistries 等注册表类不同, 不触发 MC bootstrap)
@@ -74,6 +72,5 @@ public record DataKey<T>(String key, DataType type, T def) {
             TASK_TARGET,
             ANIM_MODE, ANIM_NAME, ANIM_SEQ, ANIM_PHASE,
             ANIM_START, ANIM_CASTING, ANIM_END, LOCK_MOVE,
-            FURNACE_PHASE,
-            JUKEBOX_PHASE, JUKEBOX_TICK);
+            JUKEBOX_TICK);
 }

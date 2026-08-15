@@ -109,4 +109,16 @@ public final class ItemFilters {
         for (int i = 0; i < list.size(); i++) out.add(list.getString(i));
         return out;
     }
+
+    /**
+     * 黑+白名单生效 pair (v79.61x 重复抽取) — 收敛 Jukebox/ArmTransfer 三处同形两行解析。
+     * 返回固定长度 2: {@code [0]=black, [1]=white} (各为 {@link #effective} 结果)。
+     */
+    public static List<List<String>> effectivePair(CompoundTag cfg,
+                                                   List<? extends String> globalBlack,
+                                                   List<? extends String> globalWhite) {
+        List<String> black = effective(maidList(cfg, KEY_BLACKLIST), globalBlack);
+        List<String> white = effective(maidList(cfg, KEY_WHITELIST), globalWhite);
+        return List.of(black, white);
+    }
 }

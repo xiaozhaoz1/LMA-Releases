@@ -7,7 +7,6 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.TaskStep
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.InteractionHand;
 
 import java.util.List;
 import java.util.Map;
@@ -84,7 +83,7 @@ public final class PowerPipeline extends MoveToBlockStateMachine<PowerPipeline.S
                 }
                 if (!arrived(maid, target)) { stopPower(maid); yield State.NAVIGATING; }
                 PowerService.providePower(world, target, getRpm(maid));
-                if (world.getGameTime() % 20 == 0) maid.swing(InteractionHand.MAIN_HAND);
+                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, 20);
                 yield null;
             }
         };

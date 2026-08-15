@@ -155,6 +155,13 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         LittleMaidMoreAction.LOGGER.info("[LMA] 哈气表情气泡已注册 (haqi_emoji)");
     }
 
+    /** 注册 LMA 女仆饰品 (v79.6x 酒狐奶) — TLM BaubleManager 构造期绑定 */
+    @Override
+    public void bindMaidBauble(com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager manager) {
+        com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkBaubleRegistry.bind(manager);
+        LittleMaidMoreAction.LOGGER.info("[LMA] 酒狐奶饰品已注册 (tamed_milk_bucket / wild_dogmilk)");
+    }
+
     // ── 预留扩展钩子 (待实现) ──
 
     /** [预留] 注册女仆背包类型 */

@@ -46,6 +46,20 @@ public final class MaidFavorability {
     }
 
     /**
+     * 效率乘区计时 (v79.61x 重复抽取) — 等级高干得快: {@code workTicks = max(1, (int)(base / speed))}。
+     * 收敛 4 处同形重复 (Press/Mix 冲压搅拌 100t / SnowShovel 铲雪 40t / MaidAssemblyService 装配时长)。
+     */
+    public static int workTicks(EntityMaid maid, int baseTicks) {
+        return workTicks(baseTicks, workSpeedMultiplier(maid));
+    }
+
+    /** 纯函数 (JVM 可测) — 计时 = max(1, base / speed); 非法 speed (≤0) 防御为 base (无加乘) */
+    public static int workTicks(int baseTicks, double speed) {
+        if (!(speed > 0) || Double.isNaN(speed)) return Math.max(1, baseTicks);
+        return Math.max(1, (int) (baseTicks / speed));
+    }
+
+    /**
      * 消耗乘区 — Lv0=1.0, Lv1/2/3 查配置 (默认 0.9/0.75/0.5)。
      * 管线用法: 消耗 = max(1, (int)(基准消耗 × costMultiplier))。
      */

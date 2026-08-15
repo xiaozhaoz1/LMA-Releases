@@ -5,6 +5,271 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.59 (2026-08-15) — 新功能: 酒狐奶桶 / 野生酒狐奶饰品
+
+- **两个可饮+可装备饰品的奶桶** (继承 TLM `IMaidBauble`, 经 `bindMaidBauble` 注册): 酒狐奶桶 (喝=抗性提升II+生命恢复I 10s; 饰品受伤=双buff+掉耐久, 总30) / 野生酒狐奶 (喝=生命恢复I 30s; 无法破坏; 饰品濒死=无敌30s+音乐+CD10min 图腾式, 触发后保留)
+- **右键挤奶三态判定 (主人维度)**: 空桶右键已驯服自己的女仆→酒狐奶桶+好感+1 (CD 5min 硬编码, 仅好感有CD); 未驯服→野生奶(副开关开)/奶桶(副开关关)+哈气动画+攻击(伤害读哈气管线HAQI_HIT_DAMAGE); 已驯服别人的→不能挤 (TLM mobInteract 事实: InteractMaidEvent 只主人 fire, 未驯服走 EntityInteract)
+- **配置 8 项** `kitsune_milk.toml`: 主/副开关 + 3 效果时长 + 耐久 + 无敌时长 + CD; 加好感CD不进配置 (用户裁定)
+- **落位**: `bauble/` 只放饰品 API 基座 (BaubleApi 时间戳状态), `bauble/WildKitsuneMilk/` 放业务实现 (API/实现分离)
+- **素材**: 野生奶贴图 dogmilk.png (32×32 缩放落盘) + 音乐 dogmilk.ogg (SoundEvent 注册, 播放时附近全听)
+- **测试**: KitsuneMilkInteract.decide 纯函数 5 用例 + ConfigConsistency 补 kitsune 段断言; 口径 54 类 392 用例 0 失败
+- 验证 (2026-08-15 实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 54 类 392 用例 0 失败 ✅ + gametest 双节点 11/11 ×2 ✅
+
+## 0.9.58 (2026-08-15) — 全量重审修复批次 (B1 正确性 + B2 卫生 + T1 测试) + 文档 P0
+
+- **B1 正确性 12 项**: WorkEat 吃后清手槽 (堆叠复制修复) / MeleeAttackTool 自身+主人+距离校验 / RecipeTreeResolver 假环判定改路径祖先集 + 原料变体按 available 选择 / ScanJob sectionCursor 续扫 (预算中断整段跳过修复) / MaidCodexKillListener 迁 event 包 (input 分层违例) / ENVSENSE 开关无键默认开取反语义 / FurnaceService 燃料判定改 AbstractFurnaceBlockEntity.isFuel (有铁锭即开炉失败循环修复) / ArmTransfer 放货容器消失终态 / 被动位掩码 63 上限守卫 / NumenCompanionSyncPayload 2048 上界 / H3 装配库存恢复 neoforge 直写 PersistentData (ForgeData 包装实证失效)
+- **B2 卫生**: Furnace/CBC 每 tick INFO→DEBUG / /lma 命令小写注册 / FestivalLoader+TaskToggle 逐条容错 / TaskGroup 损坏配置保留默认 / BlockInteractService 未用 import / WorkStationPipeline+TorchLight 注释反写 / BellRingPipeline 死常量
+- **T1 测试**: MaidFavorability 抽纯 forLevel + 4 用例 / AnimExecutePureTest 5 用例 / LmaAnimationDefTest 3 用例 / gametest lmaStructureSenseState (per-player 缓存生命周期, 端到端结构信号因测试层无结构降级)
+- **D2 文档 P0**: README/ARCHITECTURE/architecture×2/pipeline-task/usage-manual/task-system-reference/task-registration/pipeline-inventory 数字与形态全清 (53 类 382 用例 / 7 被动 / 19 信号 / digVertical 退役 / core 退役)
+- **版本统一升 0.9.58** (gradle.properties ×2 + mods.toml ×2 + 本节转正; 0.9.57 节保留为历史)
+- **数据层检查修复 (用户批准)**: MaidData.get 兑现 DataKey.def 契约 (COMPOUND 缺省返回副本防共享改脏, +3 用例) / MaidStateWriter 6 个零调用任意-key 直写方法删除 / FlowTaskData 补 setMaxCount 委托 (TaskDispatcher 直写收敛) / ChainScan.allowed 归位 ChainHarvestExecute (消除 vanilla→task/api 反向依赖) / README 补两条「已裁定反向例外」注记
+- **管线细节优化 S1-S4 (用户批准, 方案 A)**: S1 相位机统一进 TaskStateMachine — Furnace/Jukebox 从 WorkStationPipeline 迁移为 FSM (workStationGated 复用 WorkStationPipeline.gate 单门 + countSuccess 改 static 复用), DataKey.JUKEBOX_PHASE/FURNACE_PHASE 退役状态入 FSM 内存态; S2 死键清理 + clearAll 字面量兜底 + CHAIN_PHASE 注释修正 (实证仍活跃非死键); S3 被动 Cd→ThrottleUtil (SnowShovel/TempAdapt) + DailyDedup 上提 (Festival 委托); S4 Signals 注释计数修正 19 + 消费映射 + 孤儿 javadoc 清理
+- **重复方法抽取 (用户批准)**: MaidFavorability.workTicks(maid, base) 收敛 Press/Mix/SnowShovel/MaidAssemblyService 4 处好感度计时 / ItemFilters.effectivePair(cfg,黑,白) 收敛 Jukebox×2+ArmTransfer 名单 pair 解析 / MaidSwing.onInterval(maid,20) 收敛 ArmTransfer×2+Crank+Power+RunningBelt 节拍挥臂 io 原语 (行为零变化; Press/Mix 的 timer%20 摆动语义不同不回抽); 补收敛 ChainHarvestExecute.allowed + FurnaceService.effectiveBlack/White → effectivePair; +workTicks 纯函数化 (非法 speed 防御返回 base) + effectivePair/workTicks 共 4 测试用例 (382→386)
+- 验证 (2026-08-15 实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 53 类 386 用例 0 失败 ✅ + gametest 双节点 11/11 ×2 ✅ + 0.9.58 双 jar unzip 验 ✅ (只打包不部署; 本轮代码改动后 jar 需重打包)
+
+
+- **外部注册闭环 (LMAT)**: 补 submitPassive/cancelPassive 门面 (TaskDispatcher 早有实现未暴露); LmaTaskTypeRegistry 迟注册钩子 onTaskRegistered — 外部 mod 晚于 LMA 注册也进 TLM 任务栏, 注册顺序无关 (TLM TaskManager.init ImmutableMap 冻结实证 → 注册过晚 fail-soft 降 WARN); LMAT javadoc 预设目录 5 项 / 命名防冲突 (净化撞 uid) / 注册时机 / currentState 4 状态
+- **FSM 分派收敛**: ArmTransfer/BlockInteract 删 HANDLERS Map + StateCtx + Function 双重间接 → switch 分派 (短状态内联, 长状态拆顶层方法); TaskPipeline 四段式注释补分派约定; 行为零变化
+- **注释漂移清理 11 处**: executor/execute 墓碑族 (v79.45 已删概念) / TaskRegistry 3 参 register 死链 / 孤儿 javadoc
+- **LMAT.simple 先建后删** (用户裁定): 极简糖对真实 modder 零价值 — 预设价值是可抄模板 + 接口默认兜底, 不是压缩行数
+- **测试补强**: TaskTypeUid 纯化抽取 (sanitize/extractTaskType 自 MC 宿主类抽出 — 宿主含 Items/IMaidTask 静态链, 纯 JVM 一碰即炸 #174) + TaskTypeUidTest 6 用例 (净化撞 uid 契约); LmatTaskTest 4 用例 (LMAT.Task 模板默认契约); gametest 新增 lmaExternalRegistration (LMAT 门面注册/迟注册钩子 fail-soft/submit-cancel 生命周期/submitPassive-cancelPassive 键闭环)
+- **架构审计 A+B+C (五层尺收敛)**: FurnaceService 抽取 (validateSmelt/resolveSmeltIngredient/生效名单, FurnacePipeline 177→56 行, 消灭配方扫描两处重复); HaqiService 抽取 (挥击/音效行为细节, TARGET_OWNER/SOUND_* 常量随迁, HaqiTrigger/gametest 引用同步); ArmTransferService 归位 itemId/findMaidItem; 行为零变化 (逐行搬移)
+- **来源验证 + HandSwap 抽取**: 6 条 TLM 注释断言逐条对源码核实全成立 (1 条 maid_useful_task 源码不在本地标待核) → docs/external-reuse.md 复用清单 (WeightedPicker 纯工具可直接用); 换手+旧物三链兜底两处复制收敛为 vanilla/input/item/HandSwap (swapTool/placeMaterial 委托)
+- **execute 瘦身第一样本**: FurnaceExecute 相位机收编进 FurnacePipeline (状态键原样, 行为零变化; 单拍动作 = FurnaceOutput 原语; VanillaTasks.furnace + FurnaceExecute 删除); execute 层 14 类分类: 5 真协调器 + 6 已单拍 (后续样本按此推进)
+- **execute 瘦身样本 2**: JukeboxExecute 四相位机收编进 JukeboxPipeline (状态键 DataKey.JUKEBOX_PHASE/TICK 原样; TaskRegistry cast 改管线直调 pipelineConfig; 每相位一个顶层方法); BellExecute 内联 BellRingPipeline (敲钟 = BellBlock 原语调用); VanillaTasks 只剩 craft 条目; JukeboxExecute/BellExecute 删除
+- **execute 瘦身样本 3**: CraftExecute 归位 task/service/CraftService (单拍合成编排: 配方链解析→预验证→执行→音效, 行为零变化); CraftChainPipeline 直调; **VanillaTasks 门面整类退役** (v30 起四条目 furnace/jukebox/bell/craft 全归位); CraftExecute/VanillaTasks 删除
+- **execute 瘦身样本 4 (ChainHarvest 扫描域抽取)**: 新建 ChainScan (空闲扫描/近扫/最近目标/跳过集/采集名单/扫描参数), ChainHarvestExecute 612→460 行 — 主循环三件套 (守卫链/开脉/蓄力) 聚焦; 行为零变化 (逐行搬移, 跨类调用经包级可见性)
+- **方案 B 状态机化 (ChainHarvest 显式相位)**: 隐式状态「队列存在=蓄力中」→ 显式 lma_chain_phase (SCAN/CHARGE 两真状态; DIG 为 CHARGE 到期同 tick 事务不持久化); 入队单点写相位, clearChainData 单点清 (队列与相位同生同灭); 旧存档兼容 shim (无 phase 键时以队列存在为据, 语义逐字一致); gametest 挖矿链补 2 相位断言 (开脉=CHARGE / 破块闭环)
+- **两轴定级修正**: 承认五层尺执行不一致 (io/service 标签贴错) — FurnaceOutput 合并进 FurnaceService / JukeboxOutput 迁 JukeboxService (多步业务动作非原语, 读实现后修正); HandSwap 定级「通用复合原语」(io 判据是通用性不是粒度); BlockUp/DigThrough/SelfRescue/AnimExecute 类头补两轴定级; README 五层尺换两轴表 (跨 tick? / 业务语义?)
+- **分层作用文档**: 每层文件夹下 README.md (作用/判据/依赖方向/代表/修改注意 — 只写作用不写细节): task/api·pipeline·pipeline/sense·runtime·data·service·behavior + vanilla/execute·input·output + api 门面, task/README 索引串联
+- **全项目分层作用文档 + 规划体检**: 17 个包层 README (adapter/ai/chatbubble/client/commands/compat/config/core/event/gametest/init/network/resource/screen/storage/vanilla+fakeplayer + forge/neoforge 平台); 体检发现并删除 19 个空壳目录 (engine 整包 + TeaKit 模板 core 12 子包 + 退役代码壳); core/api/adapter/client 包「杂货间」问题标注进 README
+- **core 杂货间归位 (2026-08-15)**: MaterialChecker/MaterialReport → task/service (合成域), LmaAnimationDef → resource (动画域), core 包整包退役 (4 个引用点同步: CraftChainPipeline 通配已覆盖 / AnimExecute / LmaAnimationStorage / MaterialCheckerTest; 行为零变化)
+- **0.9.57 双 jar 打包 (2026-08-15)**: forge/neoforge 打包 + neoforge copyResourcesToClasses 前置 + unzip 验 (新包类在位 / core 0 残留 / zh_cn 在位 / 陈旧 0.9.50 jar 清出 build/libs); 只打包不部署 (用户裁定)
+- 验证: 双编译 + 单测 49 类 367 用例 0 失败 + gametest 双节点 10/10 ✅ (2026-08-15 复验; 用例数口径修正 — 上轮 318 为 UTF-8 XML 漏计, Gradle 报告与 XML 全量解析均 367)
+
+## 0.9.57 (2026-08-13) — v79.61 结构信号状态机重设计 (用户裁定)
+
+- **信号语义重设计**: `env:structure:{id}:nearby|leave` (2 种) → **4 种**: `discover|refresh|enter|leave` — discover 首次扫到 / refresh 周期重发 / enter 进入 / leave 离开 (enter+leave 静默信号, 留未来 LLM 上下文, 不弹气泡)
+- **discover 气泡**: 主人首次扫到结构 → 随机 1 个附近主人女仆气泡; ≤enter 40 格 "附近有X" / 远 "{方向}方向有X"
+- **refresh 提醒**: 结构外 (40<d≤100) 每 2400t (120 秒) 重发方向气泡, 上限 3 次 (含首次); 走回 (离开后 ≤100) 重新发现提醒
+- **状态机 per-player per-structure**: Phase OUT/NEAR/IN, OUT 即剪枝; bubble=最近结构只冻结 NEAR 停留提醒预算 (displaced 结构 enter/leave 照发)
+- **新增 4 配置** (GUI 4 项): ENV_STRUCTURE_ENTER_DIST (40, 1-100) / ENV_STRUCTURE_LEAVE_DIST (100, 2-256) / ENV_STRUCTURE_REFRESH_TICKS (2400, 1200-168000) / ENV_STRUCTURE_REFRESH_MAX (3, 1-10)
+- **错题 #193**: v79.60 flash 实现 leave 气泡死链 — buildTexts 只为当轮扫描到的结构建文案, 结构移出范围时 leave 文案不在缓存 → textFor null → 气泡永不显示; 教训: 信号文案生命周期必须覆盖信号消费时点; 本次 leave 改静默信号死链自然消除
+- 测试: 全量 336 全绿 + 双编译 ✅
+
+## 0.9.56 (2026-08-13) — v79.60 结构信号 per-player 重构 (用户裁定, 版本号待统一升)
+
+- 结构检测维度 per-maid → **per-player**: 玩家为中心扫 1 次 (scanAllStructures) → 缓存 (位置+文案, 清旧写新不落盘) → 差集 → 动态信号 env:structure:{id}:nearby|leave
+- **onSignal 零重扫**: 文案 emit 侧按玩家位置算好存缓存, 女仆共享 (原 nearby 信号 onSignal 全量重扫 289 区块找位置 — 重扫浪费消除)
+- **只发主人女仆选 1 个** (随机/最近可配, 默认随机; 信号半径默认 10 格) — 多女仆只 1 个弹气泡, 无重叠
+- 白名单过滤 (registry id, 支持 minecraft:village_* 任意前缀通配, 空=全部) + 最近开关 (白名单内只发最近 1 个, 默认开)
+- 文案格式: ≤10 格 "附近有村庄" / 远 "西北方向有村庄" (8 方向词无距离数字; 新增 directionWord, directionLabel 重构复用)
+- 玩家下线懒清理 (sweep 每广播轮扫 players(), 200t 内自动回收 — 零新事件零新类)
+- 配置 4 项 (三段式 + GUI 4 项): structure_signal_radius 10 / structure_whitelist 空 / structure_nearest_only true / structure_random_maid true
+- 测试: StructureSenseFilterTest 16 用例 (白名单/最近/文案/方向词); 全量 314 全绿 + 双编译 ✅
+- 相关: 错题 #190 后续优化 (v79.58 重扫浪费/多女仆重复扫/信号无归属)
+
+## 0.9.55 (2026-08-13) — v79.56/57/58 挖矿/哈气/环境感知/结构批次 (版本号待统一升, jar 仍 0.9.50)
+
+### v79.56 — 跳过集修复 + 挖矿整理
+- 跳过集刷新死循环修复 (错题 #184): tryStartVein 已跳过目标每 tick addSkip 刷新时间戳 → TTL 永 false → 永久跳过 → firstFail 门控 (已跳过不刷新 + 不 immediate 重扫)
+- 失败计数退避 (用户裁定): 连续失败 ≥3 次 → TTL 60t → 600t (30 秒封顶, 永久不可达不卡住); MaidChainState.failCounts
+- navigate FAILED 气泡 "目标不可达, 暂时跳过" (40t 节流)
+- 结构整理: failAndSkip 出口单点 / ensureBestTool 提取 / 方法重排 / swapTool javap 还原
+- 铲雪好感度乘区 (Cd = 40/speed)
+
+### v79.57 — 下挖退役 + 工具收拢
+- digVertical 退役 (错题 #185, 用户裁定): 下挖换铲卡管线 → 只挖裸露表面矿; digUp 头顶保留; CHAIN_DIG_DOWN_DEPTH 注释语义改头顶
+- charge 蓄力期主手兜底 (回归 #185) + 无工具气泡 (回归 #186)
+- 工具判断收拢 ToolJudge (isModeOptimal/selectBestForMode/selectBestForBlock/isSuitableUsable) + 纯逻辑抽层 (matchesToolTypeFlags/isModeOptimalFlags/intervalTicksForTier) + 13 纯 JVM 用例
+
+### v79.58 — 自救被动化 + 哈气体系 + 环境感知
+- 自救被动任务 (self_rescue): MaidDamageEvent 掉血触发 → SelfRescuePipeline 被埋瞬破; 与主动任务并行 (用户裁定修订: 不暂停); SelfRescueState 上下文预留 (未来更多自救方法); SELF_RESCUE_ENABLED 独立配置 (passive 段)
+- 哈气门控 (用户裁定): 哈气运行时其他被动全停 tick; 续哈气 (tryContinue — 结束瞬间扫描女仆无缝续, 消除周期间隙)
+- F-1 信号重放 (错题 #187): 哈气中 PREV_SNAPSHOTS 不更新 → 边沿保留重发
+- TorchLight 重构 (错题 #189): 100t 节流检查 / 空+食物直接顶 (lightUp 腾副手) / 天亮放回 cancel / 删补盾死代码
+- WorkEat 交替 (错题 #189): 吃 1 个剩余放回 + 手腾空; eatHand 改 isEdible 判定 (复核 HIGH 修复)
+- LightControl 删除 (用户裁定): 管线/信号/枚举/scanRedstoneLamps 死 API 全清
+- monster_log 删除 (另一窗口) + 残留清理
+- 结构感知新方案 (错题 #190): getAllStarts 一次遍历全量结构 → 动态信号 env:structure:* → 通配订阅 → labelOf + directionLabel 方向气泡; StructureSense 合集类
+
+## 0.9.54 (2026-08-12) — v79.55 全项目同类模式扫描修复 (回归扫描铁律批次, 19 文件)
+
+- ① **FLOW_TIMEOUT 死键删除** (错题 #181): 键无写方 (FlowTaskData 连 setTimeout 都没有, submit 不写) → 看门狗恒默认 1200t; 删键 + GMPM 恒 DEFAULT_TIMEOUT (行为不变) + 旧存档残留清理保留 (clearAll)
+- ② **CraftChainPipeline 目标解析路径不一致修复** (错题 #182): validate 4 级回退 vs executeOne 只读 TASK_TARGET → GUI 设置产物/默认产物配置时任务永不执行 (CraftExecute:36 空 target return false 实证) → 抽 resolveTarget 共用 (提交目标 → pipelineConfig → 默认产物 → TASK_TARGET)
+- ③ **FAIL_REASON/TASK_INPUT 死写删除**: fail() put 后同方法 clearAll 立即删零读方 (删 TaskDispatcher:151); FurnacePipeline 每工作单元 setInput 死写 (值已直传 VanillaTasks.furnace); 连带删 setTarget/setMaxCount/setStep/getStep 死门面 + ANIM_TIME/FLOW_STEP 死 DataKey (键保留旧存档清理)
+- ④ **NbtCodecs 写侧绕过修复** (错题 #183, 用户 javap 字节码实锤): MC 1.21.1 NbtUtils.writeBlockPos 返回 IntArrayTag — ArmTransferSetupHandler L143 强转 CompoundTag **必 CCE 崩溃** (1.21.1 右键女仆启动 arm_transfer 瞬间); BlockInteractSetupHandler L122 存 IntArrayTag → 读侧 null 绑定失效 (守卫静默); NbtCodecs.writeBlockPos 0 调用方死代码 + 1.20.1 分支自身不对称 (包 "pos" 子键 vs 读顶层) — 修对称 + 两写侧改走 NbtCodecs (单点收敛, 1.20.1 格式不变零迁移) + gametest 补 lmaNbtCodecsRoundTrip 双平台 round-trip 断言
+- ⑤ **常量收编**: TaskKeys 新增 FESTIVAL_DAY/CODEX/COMPANION_UUID (FestivalPipeline/MaidCodexKillListener/NumenMaidBridge 改引用); ArmTransferPipeline KEY_TAKE/KEY_DEPOSIT/KEY_ITEM 值指向 TaskKeys.ARM_* (影子常量漂移风险)
+- ⑥ **GMPM 格式哨兵日志**: TLM_SWITCH tryParse 失败非空 → WARN (防 #179 复发 — 新写方再写裸 taskType 立即暴露)
+- 验证: 双节点 clean 编译 + 单测 264 全绿 + gametest 双节点 9/9 (含新增 round-trip) + grep 回归零残留
+
+## 0.9.53 (2026-08-12) — v79.54 adapter 包代码审查修复 (9 文件)
+
+- ① **TLM_SWITCH 值格式契约修复** (错题 #179): LmaFlowCoordinationBehavior.checkExtraStartConditions 原写裸 taskType ("craft_chain") — 消费方 GameTickPipelineManager.tickActive 用 ResourceLocation.tryParse (期望完整 uid "lma:task/craft_chain"), 无 ":" 解析失败 → 误走 TaskDispatcher.cancel 取消当前任务; 改写 curTask.getUid().toString() 与 TlmTaskMonitor 写入一致 + 值格式契约注释
+- ② **PREV_TASK 死链路删除** (错题 #180): "lma_prev_task" 键全项目仅 2 写方 (LmaFlowTask.savePreviousTask / MaidStateWriter.saveAndSwitchTask) 均零调用方 → 键恒空 → restorePreviousTask 恒走 idle 回退; 用户实测恢复正常的真实链路 = TLM 原生 TASK_TAG 持久化 (EntityMaid.readAdditionalSaveData) + onEntityJoin FLOW_TASK findTask→setTask 双通道; 删除 6 处 (savePreviousTask/restorePreviousTask + MaidStateWriter 2 死方法 + PREV_TASK 键 ×2 + onEntityJoin 调用), 行为等价实证
+- ③ **friendlyName 补注册名 collect_wood/collect_ore** (原 chain_wood/chain_ore 过时名 — TaskRegistry 实证注册名) → 任务气泡不再显示英文原文; 测试联动更新 (LmaTaskProgressDisplayTest)
+- ④ **死代码清理**: LmaTaskTypeRegistry 5 (findByTaskType/registerSimple/typedCount/TASK_KEYWORD_MAP/buildTaskKeywordPrompt) + LmaFlowTask 2 (savePreviousTask/getCurrentFlowTaskType/restorePreviousTask 连带) + LmaTaskProgressDisplay 3 (showFail/showNoContent/verbFor — 用户裁定失败气泡直接调 MaidChatBubbleApi 是有意设计, 门面方法删) + MaidStateWriter 2 (saveAndSwitchTask/restorePreviousTask) + 悬空注释 + 5 死 import
+- 验证: 双节点 clean 编译 (--no-build-cache) + 单测 264 全绿 + grep 回归零残留
+
+## 0.9.52 (2026-08-11) — v79.53 挖矿管线审计修复 (检查报告 1-6)
+
+- ① **扫描垂直范围对齐挖穿深度**: V_RANGE 硬编码 ±5 → `vRange() = max(5, CHAIN_DIG_DOWN_DEPTH)` — 原配置深度 6-8 时 digVertical/digUp 的 6-8 段首次扫描不可见, 上下双向挖穿配置失效 (审计发现, 用户确认双向)
+- ② **大矿脉按可达 3 格球裁剪**: tryStartVein BFS 后 vein 只留 3 格球内块 — 原 queue 含全脉 (蓄力按全脉算 → 大矿脉白等 N 秒只破球内几块); 裁剪后蓄力=实破量, 球外块由重扫+移动后重新开脉覆盖 (自洽)
+- ③ **寻路放弃日志 INFO→DEBUG**: 60t 重试周期内每次重扫重打 (日志实证一轮 9 条风暴)
+- ④ **背包满检查 20t 节流**: 原每 tick 全背包 32 槽遍历 → MaidChainState.invCheckTick/hasSpace 缓存 (满时暂停, 清包后 ≤20t 恢复)
+- ⑤ **DangerGuard 看门狗 240→60t**: 对齐跳过集 TTL — 原 240 与 SKIP_TTL=60 不匹配 (堵护 240t 超时 FAILED → skip 60t 重试 → 每 60t 循环空转); 6 侧液体最多 6 块 60t 足够
+- ⑥ **destroyBlock 不 fire BreakEvent 决策记录**: TLM 源码实证 (L2416-2428 无事件) — 领地/防破坏 mod 无法拦截 LMA 挖矿破坏; 用户裁定保持现状 (TLM 原版同行为), 类 javadoc 记录
+- ⑦ **DangerGuard javadoc 死引用更正**: "防摔落由 BlockUpCoordinator 垫柱负责" — 垫柱链 v79.26.8e 已删, 现仅堵护放置链; 挖穿逐格下落无坠落伤害属现状语义
+- ⑧ **ChainHarvestPipeline 双模式并存注释** (2026-08-11c 外部已加): isTargetBlock 供 Brain 导航匹配, tick 自行扫描 — 两通道互补非冗余
+- ⑨ **gametest 补 lmaChainOre** (双节点 8/8): 开脉→强制蓄力到点→charge 破块→队列闭环; 全同步驱动 (runAfterDelay 等待期女仆位置漂移实证坑) + moveTo/getBlockState 必须 absolutePos (相对坐标 teleport 到结构偏移外实证坑)
+- ⑩ **换工具后跳过集 tier 重新维护**: tryStartVein ensureToolFor 后重调 skippedFor — 原当轮 addSkip 入旧 tier 集, 下轮被清空丢失
+- ⑬ **魂符恢复 FLOW_TICK 陈旧超时修复** (用户实测日志 5270t > 1200t): TlmEventAdapter 魂符恢复分支保留陈旧 FLOW_TICK (魂符/卸载期间心跳停) → 恢复首 tick 看门狗立即超时 → 任务重置丢状态 (KEY_QUEUE/跳过集); 清 FLOW_TICK 让心跳重起 (状态保留不重置, 与跨 session 分支同款)
+- ⑫ **validate 与换工具冲突修复** (用户实测 "主手不是镐背包有镐就一直不挖"): ChainHarvestPipeline.validate 原仅查主手持镐 — 主手空/拿剑 + 背包有镐 = submit validate 失败任务永不启动, execute 的自动换镐 (ItemSelect+swapTool) 永远没机会跑; 改为主手可用镐直接过 / 主手非镐查背包 (有 → "背包有镐, 将自动装备", 无 → "背包没有可用的镐")
+- ⑪ **到达对齐恢复** (用户实测 "女仆到不了附近和移动太快飞出去"): v79.26.8f 删 NavWatchdog 时连带删除近程减速 → 女仆全速冲过头 → TLM 折返摆动 (v79.26.8c 教训: "对齐归零水平速度 — 惯性冲过柱底 = 走太快表现, 0.5F 本身正确"); PathingApi.navigate reached 分支恢复 clearNav + alignToCenter (水平速度朝格中心衰减 min(0.2, d*0.5), dist≤0.05 停稳, 垂直分量保留); alignVelocity 纯函数抽离 + PathingApiTest 6 用例
+- 验证: 双编译 --no-build-cache (forge/neoforge) + 单测全绿 + gametest 双节点 8/8
+
+## 0.9.51 (2026-08-11) — v79.52 ChainHarvest 状态 per-maid 化 (静态 map 三缺陷根治)
+
+- 新建 MaidChainState (vanilla/execute/): 原 ChainHarvestExecute 6 张跨女仆静态 map (LAST_SCAN/LAST_NEAR_SCAN/SKIPPED/SKIP_AT/IDLE_NOTIFIED/LAST_MODE) 收编为 per-maid 对象 — UUID 注册表单表 + 5 张内化字段; 三缺陷根治: ① SKIP_AT 全局共享 (跨女仆 pos→time, 女仆 A 清理误删女仆 B 的 TTL) → 时间戳归属 per-maid ② int 实体 ID key (MC ID 复用, 新女仆继承旧跳过集) → UUID 稳定 ③ 清理散落 3 处 (管线 onCleanup/EntityCleanupListener/模式切换逐表 remove) → clearMaidState 一行 STATES.remove(uuid)
+- 跳过集行为收进 MaidChainState (maintainTier tier 分组清空 / addSkip 容量 10 淘汰最旧 / expire TTL=60 过期) — 纯 JVM 可测, 不触碰 lastMode 字段 (MC 枚举惰性加载)
+- ChainHarvestExecute: 模式切换 (Wood↔Ore) 重建状态对象 (原 4 表逐清 + SKIP_AT 连带清收敛 1 行, 错题 P-2/P-3 语义由归属根治); skippedFor/addSkip/findNearestValid 过期清理全部委托状态对象; 对外签名零改动 (管线/协调器/调用方不受影响)
+- 测试 MaidChainStateTest 8 用例 (tier 变化清空/同 tier 保留/容量淘汰最旧/直接添加/过期移除/未过期保留/时间戳 0/双实例隔离 — 隔离用例即原全局 SKIP_AT 误删的根因场景)
+- 验证: 双编译 --no-build-cache (forge/neoforge) + 单测 39 类 233 方法全绿
+
+## 0.9.50 (2026-08-11) — v79.51 KeyTrigger 通用按键触发线路
+
+- 用户决策: 不删孤儿包 (InteractTriggerPacket 双平台注册但 sendToServer 零调用) — 改造为通用按键触发基础设施: KeyTriggerRegistry (keyId → handler 静态表, 只存代码引用免泄漏, 重复注册抛异常) + KeyTriggerHandler 接口 (maid, player) → void
+- InteractTriggerPacket 加 String keyId 字段 (writeUtf/readUtf) + sendToServer(String keyId); 服务端 handle 补 NET-H1 20t 节流 (C2SThrottle key_trigger) + 注册表分发 (未注册 id 静默) + 原 AABB 范围扫描保留 (BI_TRIGGER_RANGE 恢复真实消费方); 双平台 handle 逻辑收敛共用 dispatch
+- 客户端 MaidKeyTriggerClient (v67 BlockInteractKeyMapping 泛化): KeyMapping 6 参双平台同签名, 默认数字键 0 (key.lma.trigger / key.categories.lma 新 lang key zh/en), isInGame 四查守卫原样
+- 双平台接线: forge LmaForgeClientEntry MOD bus 注册键 + GAME bus 检测 (同款 addListener); neoforge LmaNeoForgeClientEntry 构造器手动注册 (v79.18 教训: GAME bus 静态订阅失效)
+- block_interact 首个消费者 (恢复 v67 手动触发语义): KeyTriggerRegistry.init() 挂 LmaRegistrar.init, handler = 引擎级任务分发 (TaskRegistry + TaskSignalListener instanceof, 语义与旧包 handle 逐字一致)
+- 测试 KeyTriggerRegistryTest 4 用例 (注册/重复抛/未注册 null/独立存储; 匿名类防 MC 类加载)
+- 验证: 双编译 --no-build-cache + 单测 (主会话统一执行)
+
+## 0.9.49 (2026-08-10) — v79.49 补测 (ThrottleMath/Signals/BlueprintReader/FestivalLoader)
+
+- ThrottleMath 抽离 (ThrottleUtil 判定委托纯函数, 零行为变化) + ThrottleMathTest 6 用例 (首放/节流/过期/时钟回退/剩余/interval=0)
+- SignalsTest 5 用例 (envOf 往返/parseEnv 往返 29 枚举/非 env 前缀/未知值/null)
+- BlueprintReaderTest 6 用例 — **抓出真 bug: 空块列表 maxX-minX 整数溢出尺寸假正 → describe 空列表特判修复**
+- FestivalLoader 重构: FESTIVAL_FILE 静态字段 → festivalFile() 方法内取 (类加载零 MC 引用) + loadFromFile(Path) 路径注入纯方法 (LOGGER 移 load() 侧) — 原审计"可测"误判 (静态字段触发 LittleMaidMoreAction 类加载炸, 项目铁律同族); FestivalLoaderTest 5 用例
+- ARCHITECTURE §10: 27 → 34 测试文件
+- 验证: 单测 178+ 全绿 / 双编译
+
+## 0.9.48 (2026-08-10) — v79.48 死代码清理 + 文档合并修复 + 饰品自动修复 + Bug 修复 (#10)
+
+### Bug 修复 (#10)
+
+- 🔴 TorchLight 三层闭环: onSignal 补 submitPassive (in_progress 才有 GMPM tick 驱动 — 否则火把永久插副手); tick 恢复完成补 cancelPassive (闭环, 下次 DARKNESS 再触发); 亮度硬编码 7 → ENV_DARKNESS_THRESHOLD 配置
+- ArmTransferPipeline: 取货容器消失 (handler null) → fail + 气泡 (防无限囤货死循环)
+- BlockInteractPipeline.validate: pos 读取 null (NBT 损坏) → failed (原 null 通过 = 无目标空转)
+- HaqiPipeline 开关核查: 双开关已合并一行 (HAQI_ENABLED || HAQI_ENABLED_TO_OWNER, 无缺)
+
+### 死代码清理 (批次 2, 12 文件)
+
+- ItemResolver (传递死 — 引用方全删) / AltarExecute / ContainerExecute / PlaceBlockExecute / ToolSelectExecute / EntitySearch / OutputCollector / EntityOutput / SubmitTaskAction / BlockInteractKeyMapping / TimerBasedCreatePipeline (@deprecated 自标) / CheatManager (无注册点)
+- ItemSelectTest 注释同步 (miningScore 逻辑已删)
+
+### 饰品自动修复 (v79.48 并入, 好感度消耗模型现成复用)
+
+- AutoRepairBehavior (MaidCheckRateTask, core 全 activity, 优先级 5, 100t ≈ 5 秒修 1 点) — 非 idle 慢慢回, 无打断 (只改 ItemStack+经验)
+- MaidStateWriter.repairOneWithXp: 主手 → 其余 (副手/4甲/饰品/背包 findRepairable 复用); 1 点/cost = max(1, 4 × 好感度消耗乘区) — 原版 Mending 2 XP, LMA 基数 4 (2 倍), Lv3 0.5 → 2 = 原版水平
+- repairCostFor 纯函数 + RepairCostTest 3 用例 (Lv3 → 2 / 中间态 / 下限 1)
+- REPAIR_AUTO_ENABLED 配置 (默认 true, ActiveTaskConfig maid_favorability 组 + Cloth GUI "自动修复" 行)
+- 验证: 双编译 (MaidCheckRateTask 双平台签名 javap 实证一致) / 单测全绿
+
+- 删 6 文件: ParamExtractor / ItemMover / WeaponAnimationMapper / MaidEditorRegistry 链 (api/maideditor ×2 + vanilla/maideditor/BuiltinMaidEditorRegistration, VanillaCompat 调用删)
+- MoreActionAPI 瘦身 128→54: 12 委托 + findMaidById 删 (0 引用实证); 3 活方法 (loadServerDurations/registerCustomAnimations/scanCustomAnimations) 调用方改直调 AnimationDurationManager / AnimationResourceRegistrar (LittleMaidMoreAction / LmaNeoForgeEntry / LittleMaidMoreActionExtension)
+- DataKey CLEAR_ALL_KEYS 注释位置校正 (死键字面量实证在 FlowTaskData.cleanupLegacy, 非 clearAll)
+- 文档: tlm-api-external (RuleEngine/MoreActionAnimationMessage/MoreActionAPI 行号引用全清, RuleEvent 引言删, 事件表保留), tlm-api-lma (使用矩阵 6→3 列 + RuleEngine 使用处标历史), task-registration (MoreActionAPI.reload 死行删)
+- 验证: 双编译 / 单测全绿 / grep 死类 0 残留 / 部署 .bak-0810b
+
+## 0.9.47 (2026-08-10) — v79.47 环境信号补全 + 3 新被动能力 + 女仆图鉴
+
+### 审查修复 (2026-08-10 同日)
+
+- 🔴 TorchLightPipeline 守卫写反修复: `!isLightItem(off)` 在副手空时恒真 → DARKNESS 点火死代码; 改 `!off.isEmpty() && !isLightItem(off)` (空副手/已是灯 → 放行)
+- 🔵 TorchLight tick 放回改循环各槽 (insertItem 同堆叠合并语义), 修复固定末槽不合并/误判背包满
+- 🟡 农历节日: cn.6tail:lunar 1.7.7 (libs 本地 jar, 平台 build.gradle implementation) — festival.json schema 加 `lunar` 标志 (缺省 false 向后兼容); FestivalTable.lookup 农历条目经库换算 (2026 实测映射: 春节 2/17 / 端午 6/19 / 七夕 8/19 / 中秋 9/25; 2025 中秋 10/6); 原公历 8/15 中秋条目删转农历
+- 🔴 节日信号重设计 (用户裁定, 替代边沿方案): **stateless 状态广播** — Broadcaster 每轮查表非空 → FESTIVAL_ENTER 全女仆 emit, 删 lastDate 静态基线 (错过广播的女仆上线首收即触发); **删 FESTIVAL_LEAVE** (EnvSignal/Signals 29→28, 广播分支删); 消费端 FestivalPipeline **per-maid 当天首收去重** — PD 存 EpochDay long (**禁 month/day** — 跨年同日月误判同天永久静默), 同天静默/跨天/跨年再触发 (shouldAnnounce 纯函数 + FestivalPipelineTest 4 用例含跨年)
+- 🟡 MaidCodexScreen 3 处硬编码中文 → lang key (gui.littlemaidmoreaction.maid_codex.*, zh/en 双文件)
+- 版本 4 处 → 0.9.47 (gradle.properties ×2 + mods.toml ×2)
+- 验证: 双编译 / 单测全绿 (含农历映射用例) / jar 验 / 部署 .bak-0810 (含 lunar-1.7.7.jar 入 mods)
+
+- 信号层: EnvSignal 21→29 (FRIENDLY_CLEAR/MAID_CLEAR/DARKNESS_CLEAR 对称边沿 + VILLAGE/MINESHAFT/OUTPOST_LEAVE + FESTIVAL_ENTER/LEAVE), Signals 补齐 29 常量与枚举一一对应
+- 结构 LEAVE: STRUCT_FOUND 反向差集 (上次有/本轮无 → LEAVE)
+- 节日日历检测: 静态 lastDate + LocalDate.now() 现实日期口径 → FESTIVAL_ENTER/LEAVE 全女仆 emit; FestivalTable 纯函数 (JVM 测) + festival.json config 可编辑 (6 内置节日, 复制自 jar)
+- 新被动管线 3: torch_light (DARKNESS → 副手火把/提灯, tick 亮度恢复或 5 格有怪换回 — 不依赖 CLEAR) / structure_sense (8 结构信号 → showTrigger 气泡 100t 节流) / festival (节日文案气泡, 管线自查 FestivalTable)
+- 女仆图鉴: MaidCodexKillListener (独立订阅类, 凶手=女仆 → PD lma_codex 计数, 判定模式照抄 TLM EntityDeathEvent) + 图鉴书物品 (右键合并玩家全部女仆计数 → S2C 开 MaidCodexScreen, forge ID 14 / neoforge payload)
+- 验证: 双编译 (--no-build-cache) / 单测 149 (含 FestivalTableTest + EnvEdgeDetectorTest CLEAR 用例) / gametest 7/7
+
+## 0.9.46 (2026-08-10) — v79.46 版本注释降噪 (682 → 类级史 137)
+
+- 全项目 vXX 注释分层降噪: 方法/字段/行内 vXX 前缀去除 (保留语义内容), 类级 javadoc 历史段保留 (知识资产), 3+ 版本叠层演化史收敛为终态语义 + "(演化史见 changelog)"
+- 5+1 路 agent 并行 ~190 文件: 去前缀 ~630 处 (vanilla 110+6收敛 / task-pipeline 120+3 / task-其余 174+1 / adapter-api-network 61+1 / compat-screen-config 166+1 / 主类+ai 补漏 23)
+- 保留: 错题 #N 引用、★ 标记、stonecutter 指令、tooltip 字符串 (代码行)、Lv 等级缩写 (非版本)
+- 验证: 双编译 / 行内 vXX 0 残留
+
+## 0.9.46b (2026-08-10) — v79.46b 管线模板防呆 (用户模板审查裁定)
+
+- WorkStationPipeline.isTargetBlock 抽象化 — 接口默认 false 忘覆写 = 目标恒失效 → 擦记忆→重搜无限循环 (编译不报); abstract 编译期强制
+- needsGameTick 字段删除 — 实证: 主动管线全 true + 被动 tickPassiveFor 不查字段 (LightControl/MonsterLog 的 false 是装饰) → 字段无分支价值; GMPM 驱动所有 in_progress 主动管线 (防新管线忘声明 = 静默死任务); 删接口 default + GMPM 条件 + 16 处覆写 (含 forge 平台 CannonLoadPipeline)
+- countSuccess 删 max=0 一次性分支 (基类恒 isLongRunning=true → 永假; 工作站 max=0 = 永续任务)
+- 验证: 双编译 / 145 单测
+
+## 0.9.45 (2026-08-09) — v79.45 双驱动终局: Brain 纯导航 + WorkStationPipeline 基类
+
+- TaskPipeline 删 execute + 加 executeInterval (默认 10); 工作站覆写 30 (原 Brain EXECUTE_INTERVAL)
+- LmaFlowCoordinationBehavior 纯导航化: 删 doExecute/completeTask/心跳/冷却 — 只留导航 + 切换检测 + 目标失效重搜; 心跳归 GMPM (20t)
+- 新建 WorkStationPipeline 基类 (needsGameTick/workPointTask/isLongRunning final true): GMPM 驱动 tick (到达 → 节拍 → executeOne → SUCCESS 计数/完成 / FAILED 气泡), countSuccess 迁入 Brain 原计数链 + erase/setTask(idle) (TaskDispatcher.complete 不含导航记忆清理)
+- 4 工作站管线 (Furnace/CraftChain/Jukebox/BellRing) 改继承, execute→executeOne; Jukebox isLongRunning false→true (GMPM 心跳豁免, 安全); 移动型 4 管线删防御性 execute 覆写
+- **顺带修 v79.32 回归**: AiControlGate.enable 唯一路径 (execute) 被 Brain L162 needsGameTick 挡 → 生产从不开启 → 移入 tick (幂等) + gametest lmaAiControlGate 改 tick 验证
+- 验证: 双编译 / 145 单测
+
+## 0.9.44 (2026-08-09) — v79.44 enableLookAndRandomWalk 语义反转修复
+
+- LmaFlowTaskBase.enableLookAndRandomWalk return true → false — TLM javadoc "@return 是否禁用" 写反 (MaidBrain:145/194 谓词 + MaidRunOne.tryStart 实证: true=启用), LMA 注释按错误 javadoc 抄 → 任务期间实际启用随机闲逛与意图相反; 修复后所有主动任务任务期间禁用四处张望+随机走动 (同 TaskGunAttack/MaidAssemblyTask)
+- 验证: 双编译 / 单测
+
+## 0.9.43 (2026-08-09) — v79.43 三缺陷修复 (用户审计)
+
+- 事件信号链死链修复: flushPending 不再要求扫描快照 (快照被 per-maid 死门饿死 → 队列信号曾全丢弃; emit 唯一调用方 = SenseApi); 无快照也分发 (snap=null), LightControl/MonsterLog 管线加 null 守卫防 NPE
+- 多维度广播饥饿修复: TaskTickHandler nextBroadcastTick 静态单值 → per-dimension Map (维度 A 广播后 B/C 曾被压 200t+ 轮替饥饿)
+- 空 PL 落盘修复: MaidData flushPl/flushAllPl 空 tag → remove (pl() 首调缓存空 tag 无条件 put = 跨 session 空键累积)
+- 文档: ARCHITECTURE 桥接层/event: 段更正 (事件桥 4 类 v77.4 已删)
+- 验证: 双编译 / 单测
+
+## 0.9.42 (2026-08-09) — v79.42 全项目审计修复 P0-P4
+
+- P0 ANIM 键残留闭环: HaqiPipeline.onCleanup 清 ANIM_RUNTIME_KEYS 全键 (含 SEQ — 残留 seq 是跨 session 重播源; 被动终结不调 clearAll) + TlmEventAdapter 跨 session 分支同清
+- P1 编译警告根因: VisualOutput 粒子 PARTICLE_TYPE 平台条件化 (1.20.1 ForgeRegistries) + MaidData get/put @SuppressWarnings (unchecked)
+- P2 死代码: 删死方法 7 (freezeAi×2/dropHandItem×2/playWeaponAnim/resetAnimation/bleed) + 死键 9 (RETRY_COUNT/SAVED_HOME/SAVED_PICKUP/JUKEBOX_LAST/WEAPON_ANIM/LAST_EMOJI_TICK/FREEZE_TICKS/BLEED_TICKS/BLEED_DMG — TaskKeys+DataKey+CLEAR_ALL_KEYS 同步删, clearAll 字面量清理面兜底) + Signals 20 死常量 (event: 5 + env: 14, 保留 7 活) + MaidEmojiApi 死字段 + VisualOutput 死分支扁平化
+- P3 文档: api-guide.md 寻路段重写 (当前 PathingApi.navigate/NavOutcome) + ARCHITECTURE RetryPolicy/MaidPanelStyle 残留清除 + pipeline-task/task-system-reference 同步
+- P4: EnvSenseBroadcaster per-maid 死门注释标注 (保留现状, 用户裁定)
+- 验证: 双编译 / 单测
+
+## 0.9.41 (2026-08-09) — v79.41 死常量清理收尾
+
+- 实证 9 死常量 (STATE_STOPPED/STATE_QUEUED/ANIM_ID/TASK_ENABLED_PREFIX/FSM_PREFIX/AUTOCROP_ENABLED/TICK_LAST/OWNER_TARGET_TICK/DYNAMIC_ANIMATIONS) 在 LMA-MAIN 全项目 0 引用, 常量定义已删
+- 修正预存 diff 误伤: ANIM_RUNTIME_KEYS/ANIM_CLEANUP_KEYS 恢复 4 活键 (ANIM_MODE/ANIM_TICK/ANIM_DUR/ANIM_NAME — AnimExecute 写/Provider 读), 只删 ANIM_ID — 防 v67 类动画键跨 session 残留回归
+- 残留清理: VisualOutput.resetAnimation 删死字面量 "lma_anim_id"; TaskKeys 空注释节 (任务开关/事件桥/主人目标节流/动态动画开关); TaskStateMachine javadoc 更正 (lma_fsm_ NBT → v79.31 MaidData.pl 内存态)
+- 文档同步: passive-task-system.md 删 lma_task_enabled_ 过时示例; data-management.md 动态键清单去 TASK_ENABLED_PREFIX
+- 验证: 双编译 / 单测
+
+## 0.9.40 (2026-08-09) — v79.40 全局节流工具 + 食物消耗乘区
+
+- 新建 ThrottleUtil (vanilla/input/maid): shouldFire/cooldownRemaining, 当 CD 间隔用一个数字
+- 收编 4 处手写节流: MaidEmojiApi(表情)/BellRingPipeline(敲钟)/EnvSenseBroadcaster(结构探测, 内存 map 删)/ChainHarvestExecute(气泡, BUBBLE_TICK map 删)
+- WorkEatBehavior 好感度消耗线 (等级高吃得省, 检查间隔 = 100/cost, 原 switch 收编)
+- 验证: 双编译 / 145 单测 / gametest 7/7 ×2 / 打包 0.9.40
+
+## 0.9.39 (2026-08-09) — v79.39 女仆好感度双乘区
+
+- 新建 MaidFavorability service (TLM 等级 0-3 读取 + 效率/消耗双乘区, 管线自己乘)
+- 全局设置 maid_favorability 组 (开关 + 每级递增可配) + Cloth GUI 7 项
+- 收编分散好感度 switch: TimerBased/Mix/Press workTicks + MaidAssemblyService.getDuration → 乘区
+- 应用: 采集蓄力间隔缩短 (效率) + 工具耐久消耗降低 (消耗)
+- 验证: 双编译 / 145 单测 / gametest 7/7 ×2 / 打包 0.9.39
+
 ## 0.9.38 (2026-08-09) — v79.38.2 全局右键门面
 
 - BlockInteractService 提升为全局右键门面 (距离检查 FakePlayerInteract.rightClick)
@@ -613,3 +878,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - ⚠️ 旧 config/rules 目录不再加载 (自然退役, 文件不动)
 ### Fixed
 - 节流时间戳防溢出 (PD 跨 session 锁死) / 脚本游标启动缺失补偿 / 信号路由顺序
+

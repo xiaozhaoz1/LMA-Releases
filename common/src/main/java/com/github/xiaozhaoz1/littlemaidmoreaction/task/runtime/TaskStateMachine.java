@@ -10,6 +10,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.WorkStationPipeline;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 
@@ -119,6 +120,14 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
     @Override
     public boolean isLongRunning() { return true; }
 
+    /**
+     * 工作站式门 (到达 + 节拍 + 目标失效) — v79.61x 方案 A: FSM 引擎共用
+     * {@link WorkStationPipeline#gate} 单一实现, 迁移后的工作站状态机 (furnace/jukebox)
+     * 覆写返回 true 获得与原 WorkStationPipeline.tick 相同的门控语义。
+     * 默认 false = 每 tick 直接派发 FSM (导航型状态机 crank/power/… 保持现状)。
+     */
+    protected boolean workStationGated() { return false; }
+
     @Override
     public void interrupt(EntityMaid maid) {
         onExit(readState(maid), maid);
@@ -218,6 +227,11 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
         // 1. 取消检测
         if (TaskKeys.STATE_CANCELLED.equals(FlowTaskData.getState(maid))) {
             interrupt(maid);
+            return;
+        }
+
+        // 1.5 工作站式门 (到达 + 节拍 + 目标失效) — furnace/jukebox 迁移用; 默认关
+        if (workStationGated() && WorkStationPipeline.gate(world, maid, this) == null) {
             return;
         }
 

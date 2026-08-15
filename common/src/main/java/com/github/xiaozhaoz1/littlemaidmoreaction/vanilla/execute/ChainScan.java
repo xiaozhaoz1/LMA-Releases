@@ -7,11 +7,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.PathingApi;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.sense.SenseApi;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.HarvestTarget;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ItemFilters;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ToolStateReader;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.core.BlockPos;
@@ -22,7 +18,6 @@ import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 import java.util.LinkedHashSet;
-import java.util.List;
 
 /**
  * 连锁采集扫描域 (v79.61x execute 瘦身样本 4 抽取) — 原 ChainHarvestExecute 扫描决策域:
@@ -141,7 +136,7 @@ final class ChainScan {
         skip.removeIf(l -> st.expire(l, now, SKIP_TTL));
         // 泛化最近搜索提升到 API 面 (SenseApi.findNearestBlock — BlockScanner + skip 集)
         return SenseApi.findNearestBlock(maid,
-                radius, ChainHarvestExecute.vRange(target), s -> target.matches(s) && allowed(maid, s) && target.canHarvest(tool, s),
+                radius, ChainHarvestExecute.vRange(target), s -> target.matches(s) && ChainHarvestExecute.allowed(maid, s) && target.canHarvest(tool, s),
                 skip, ChainHarvestMath.scanBudget(radius));
     }
 
@@ -173,7 +168,7 @@ final class ChainScan {
                     BlockPos p = foot.offset(dx, dy, dz);
                     if (skip.contains(p.asLong())) continue;
                     BlockState state = world.getBlockState(p);
-                    if (!target.matches(state) || !allowed(maid, state) || !target.canHarvest(tool, state)) continue;
+                    if (!target.matches(state) || !ChainHarvestExecute.allowed(maid, state) || !target.canHarvest(tool, state)) continue;
                     if (d < bestDist) {
                         bestDist = d;
                         best = p;
@@ -203,22 +198,6 @@ final class ChainScan {
                                   HarvestTarget target, ItemStack tool) {
         addSkip(st, pos.asLong(), world.getGameTime());
         return idleScan(world, maid, data, target, tool, true);
-    }
-
-    /** 采集方块黑白名单 (方块id); per-maid pipelineConfig 非空覆盖全局 */
-    static boolean allowed(EntityMaid maid, BlockState state) {
-        // 防御 — 任务已终结 (超时 clearAll, 错题 #124) 时 getTask 为空 → get 为 null;
-        // maidList 对 null cfg 也 NPE — 空任务走全局默认名单 (主修: GameTickPipelineManager 超时 return)
-        String task = FlowTaskData.getTask(maid);
-        var h = task.isEmpty() ? null : TaskRegistry.get(task);
-        // 配置维度拆分 — 未实现 TaskConfigurable 的管线走全局默认名单
-        CompoundTag cfg = h == null || !(h.pipeline() instanceof TaskConfigurable c)
-                ? null : c.pipelineConfig(maid);
-        List<String> black = ItemFilters.effective(cfg == null ? List.of() : ItemFilters.maidList(cfg, ItemFilters.KEY_BLACKLIST),
-                ActiveTaskConfig.COLLECT_BLACKLIST.get());
-        List<String> white = ItemFilters.effective(cfg == null ? List.of() : ItemFilters.maidList(cfg, ItemFilters.KEY_WHITELIST),
-                ActiveTaskConfig.COLLECT_WHITELIST.get());
-        return ItemFilters.isAllowed(state, black, white);
     }
 
     private static int searchRadius(EntityMaid maid) {

@@ -32,6 +32,13 @@ public final class LmaSounds {
 
     private static final float RANGE = 16.0F;
 
+    /** 野生酒狐奶无敌音乐 (v79.6x; 素材 dogmilk.ogg, 时长=无敌时长 30s) */
+//? if 1.20.1 {
+    public static net.minecraftforge.registries.RegistryObject<SoundEvent> DOGMILK;
+//?} else {
+    public static java.util.function.Supplier<SoundEvent> DOGMILK;
+//?}
+
     /** 注册便捷 — 双平台 ResourceLocation */
     private static void reg(String name) {
 //? if 1.20.1 {
@@ -58,6 +65,14 @@ public final class LmaSounds {
         reg("laowu_3");
         reg("laowu_4");
         reg("laowu_5");
+        // 野生酒狐奶无敌音乐 — 注册为独立引用 (reg() 只注册不返回句柄; 播放需静态句柄)
+        DOGMILK = SOUNDS.register("dogmilk",
+                () -> SoundEvent.createFixedRangeEvent(
+//? if 1.20.1 {
+                        new ResourceLocation(LittleMaidMoreAction.MOD_ID, "dogmilk"), RANGE));
+//?} else {
+                        ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, "dogmilk"), RANGE));
+//?}
     }
 
     private LmaSounds() {}

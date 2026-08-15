@@ -6,7 +6,7 @@
 
 **依赖方向**: 只依赖 MC + TLM 实体; 被 service/execute/pipeline 依赖。
 
-**代表**: ItemStackHelper (纯比较) / ToolStateReader / MaidStateReader / BlockScanner 族 / ScanScheduler / HandSwap (通用复合原语) / ThrottleUtil
+**代表**: ItemStackHelper (纯比较) / ToolStateReader / MaidStateReader / BlockScanner 族 / ScanScheduler / HandSwap (通用复合原语) / ThrottleUtil / MaidSwing (节拍挥臂)
 
 **修改注意**:
 1. 纯逻辑抽纯类 (ThrottleMath/RingSpiral/ScanBudget) — 纯 JVM 可测
