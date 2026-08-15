@@ -326,7 +326,7 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
             index = compound.getInt("Index");
             beltLength = compound.getInt("Length");
 //?} else {
-    /** v75.1: Create 1.21 SmartBlockEntity.saveAdditional final — NBT 钩子 = write/read 3参 (Provider, boolean) */
+    /** Create 1.21 SmartBlockEntity.saveAdditional final — NBT 钩子 = write/read 3参 (Provider, boolean) */
     @Override
     protected void write(CompoundTag compound, net.minecraft.core.HolderLookup.Provider registries, boolean clientPacket) {
         super.write(compound, registries, clientPacket);

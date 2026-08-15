@@ -1,9 +1,8 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.gui;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.RequestTaskConfigPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.network.TaskConfigActionPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ItemFilters;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -34,7 +33,7 @@ public class ItemListConfigScreen extends LmaTaskConfigScreen<ItemListConfigMenu
         this.taskType = taskType;
     }
 
-    /** v67.10: MenuScreens 3 参工厂注册用 — taskType 从标题 lang key 推导 (task.littlemaidmoreaction.&lt;taskType&gt;) */
+    /** MenuScreens 3 参工厂注册用 — taskType 从标题 lang key 推导 (task.littlemaidmoreaction.&lt;taskType&gt;) */
     public ItemListConfigScreen(ItemListConfigMenu menu, Inventory playerInv, Component title) {
         this(menu, playerInv, title, taskTypeFromTitle(title));
     }
@@ -55,22 +54,15 @@ public class ItemListConfigScreen extends LmaTaskConfigScreen<ItemListConfigMenu
         return taskType;
     }
 
-    // ── renderBg: TLM 基类渲染完整框架 ──
-
-    @Override
-    protected void renderBg(GuiGraphics g, float partialTick, int x, int y) {
-        super.renderBg(g, partialTick, x, y);
-    }
-
-    // ── initAdditionWidgets: 请求配置 + EditBox + 应用按钮 ──
+    // ── initAdditionWidgets: 请求配置 + EditBox + 应用按钮 (renderBg 基类默认委托) ──
 
     @Override
     protected void initAdditionWidgets() {
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), taskType);
 
-        int cx = leftPos + 88;
-        // v67.14: 整体下移 (标题框 7-28 之下), 标签置框上方
+        int cx = contentX();
+        // 整体下移 (标题框 7-28 之下), 标签置框上方
         int y = topPos + 46;
 
         blackBox = new EditBox(font, cx, y, 140, 20, Component.literal("黑名单"));
@@ -98,8 +90,8 @@ public class ItemListConfigScreen extends LmaTaskConfigScreen<ItemListConfigMenu
             whiteBox.setValue(join(ItemFilters.maidList(cfg, ItemFilters.KEY_WHITELIST)));
             synced = true;
         }
-        // v67.14: 中文标签 (黑名单框 topPos+46, 白名单框 +74; 标签置框上方 12px)
-        int cx = leftPos + 88;
+        // 中文标签 (黑名单框 topPos+46, 白名单框 +74; 标签置框上方 12px)
+        int cx = contentX();
         g.drawString(font, Component.literal("黑名单"), cx, topPos + 34, 0xFFFFFF);
         g.drawString(font, Component.literal("白名单"), cx, topPos + 62, 0xFFFFFF);
     }
@@ -117,10 +109,7 @@ public class ItemListConfigScreen extends LmaTaskConfigScreen<ItemListConfigMenu
     }
 
     private void sendList(EntityMaid maid, String key, String value) {
-        CompoundTag payload = new CompoundTag();
-        payload.putString("key", key);
-        payload.putString("value", value);
-        TaskConfigActionPacket.send(maid.getId(), taskType, TaskPipeline.ACTION_SET_LIST, payload);
+        sendSetList(key, value);
     }
 
     /** EditBox 逗号文本 → NBT ListTag */

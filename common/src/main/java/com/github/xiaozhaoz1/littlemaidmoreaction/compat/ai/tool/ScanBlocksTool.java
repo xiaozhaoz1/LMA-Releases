@@ -27,7 +27,7 @@ import java.util.List;
  * (vanilla 三重循环, TempAdaptPipeline.findHeatSource 同款模式)。
  * 权限: AI 操控任务开启。
  */
-public final class ScanBlocksTool implements ITool<ScanBlocksTool.Result> {
+public final class ScanBlocksTool implements GatedMaidTool<ScanBlocksTool.Result> {
 
     private static final String BLOCK_ID = "block_id";
     private static final String RADIUS = "radius";
@@ -88,12 +88,6 @@ public final class ScanBlocksTool implements ITool<ScanBlocksTool.Result> {
                 ? "No %s found within %d blocks".formatted(result.blockId(), radius)
                 : "Found %d %s: %s".formatted(found.size(), result.blockId(), String.join(", ", found)),
                 toolCallId);
-    }
-
-    @Override
-    public boolean trigger(EntityMaid maid,
-                           com.github.tartaricacid.touhoulittlemaid.ai.service.llm.openai.request.ChatCompletion chatCompletion) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AiControlGate.isEnabled(maid);
     }
 
     public record Result(String blockId, int radius) {}

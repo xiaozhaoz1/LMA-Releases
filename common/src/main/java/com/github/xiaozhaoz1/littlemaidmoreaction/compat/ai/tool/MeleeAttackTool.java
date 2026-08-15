@@ -17,7 +17,7 @@ import net.minecraft.world.entity.ai.memory.MemoryModuleType;
  * AI 工具: 近战攻击 (v73) — 设 ATTACK_TARGET 记忆 (女仆 AI 持续追击, SwitchWorkTaskTool
  * 同款模式) + 立即一击 (CombatOutput.damage)。权限: AI 操控任务开启。
  */
-public final class MeleeAttackTool implements ITool<MeleeAttackTool.Result> {
+public final class MeleeAttackTool implements GatedMaidTool<MeleeAttackTool.Result> {
 
     private static final String ENTITY_ID = "entity_id";
     private static final Codec<Result> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -46,17 +46,21 @@ public final class MeleeAttackTool implements ITool<MeleeAttackTool.Result> {
         if (!(level.getEntity(result.entityId()) instanceof LivingEntity target) || !target.isAlive()) {
             return callback.addToolResult("Entity %d not found or dead".formatted(result.entityId()), toolCallId);
         }
+        // 校验链 (审计 H1 — 防 LLM 传任意 entity_id 自伤/伤主/远程结算)
+        if (target == maid) {
+            return callback.addToolResult("Failed: cannot attack self", toolCallId);
+        }
+        if (target == maid.getOwner()) {
+            return callback.addToolResult("Failed: cannot attack owner", toolCallId);
+        }
+        if (maid.distanceTo(target) > 4.0D) {
+            return callback.addToolResult("Failed: target too far (%.1f blocks)".formatted(maid.distanceTo(target)), toolCallId);
+        }
         maid.getBrain().setMemory(MemoryModuleType.ATTACK_TARGET, target);
         // 立即一击 — 伤害取女仆攻击力属性 (与面板一致, 非硬编码)
         float dmg = (float) maid.getAttributeValue(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE);
         CombatOutput.damage(target, maid, Math.max(1.0F, dmg));
         return callback.addToolResult("Attacking %s".formatted(target.getName().getString()), toolCallId);
-    }
-
-    @Override
-    public boolean trigger(EntityMaid maid,
-                           com.github.tartaricacid.touhoulittlemaid.ai.service.llm.openai.request.ChatCompletion chatCompletion) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AiControlGate.isEnabled(maid);
     }
 
     public record Result(int entityId) {}

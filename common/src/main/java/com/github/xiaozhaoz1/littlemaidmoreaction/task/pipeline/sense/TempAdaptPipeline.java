@@ -1,6 +1,9 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskSignalListener;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.PassiveSignalSkeleton;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
@@ -26,15 +29,14 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
  *
  * <p>所有状态存 pipelineData (lma_pl_temp_adapt) — clearPipelineData 自动清理。
  */
-public final class TempAdaptPipeline implements TaskPipeline {
+public final class TempAdaptPipeline implements PassiveSignalSkeleton, TaskConfigurable {
 
     @Override public String taskType() { return "temp_adapt"; }
     @Override public boolean isLongRunning() { return true; }
-    @Override public boolean needsGameTick() { return true; }
 
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
-        return PipelineResult.ok("", Set.of(Signals.ENV_TEMP_COLD, Signals.ENV_TEMP_HOT, Signals.ENV_TEMP_NORMAL));
+        return okSignals(Set.of(Signals.ENV_TEMP_COLD, Signals.ENV_TEMP_HOT, Signals.ENV_TEMP_NORMAL));
     }
 
     @Override
@@ -78,7 +80,7 @@ public final class TempAdaptPipeline implements TaskPipeline {
             pd.putInt("Cd", 600);
         }
     }
-    // onCleanup 用接口默认 (clearPipelineData) — v67.3 删除冗余覆写
+    // onCleanup 用接口默认 (clearPipelineData) — 删除冗余覆写
 
     private static BlockPos findHeatSource(ServerLevel world, BlockPos center, int radius) {
         int vert = 4;
@@ -90,9 +92,11 @@ public final class TempAdaptPipeline implements TaskPipeline {
                 for (int z = -radius; z <= radius; z++) {
                     mp.set(cx + x, cy + y, cz + z);
                     var s = world.getBlockState(mp);
+                    // 2026-08-11c 冗余清理 (全景 #13): 原裸 CAMPFIRE 匹配覆盖 LIT 分支 —
+                    // 修 LIT-only (灭的篝火不热, 行为修正)
                     if (s.is(Blocks.FIRE) || s.is(Blocks.SOUL_FIRE)
-                            || s.is(Blocks.CAMPFIRE) || s.is(Blocks.SOUL_CAMPFIRE)
                             || (s.is(Blocks.CAMPFIRE) && s.getValue(CampfireBlock.LIT))
+                            || (s.is(Blocks.SOUL_CAMPFIRE) && s.getValue(CampfireBlock.LIT))
                             || s.is(Blocks.LAVA) || s.is(Blocks.MAGMA_BLOCK)) {
                         candidates.add(mp.immutable());
                     }

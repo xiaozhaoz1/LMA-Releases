@@ -46,10 +46,17 @@ import net.neoforged.fml.event.lifecycle.InterModEnqueueEvent;
 //?}
 public final class CompatRegistry {
 
-    /** v35.5: 防止 scanAllCompatEarly() + onEnqueue() 双重初始化 */
+    /** 防止 scanAllCompatEarly() + onEnqueue() 双重初始化 */
     private static volatile boolean earlyScanned = false;
 
-    /** v77: 可开关兼容模块表 (显式注册 — 注解扫描路径未启用, TaskConditionRegistration 先例) */
+    /**
+     * 可开关兼容模块表 (显式注册 — 注解扫描路径未启用, TaskConditionRegistration 先例)。
+     * 本表 = GUI (CompatConfigScreen) + CompatToggle 开关的单一事实源。
+     * 2026-08-11c 裁定 (最小版): 门控消费方 (TaskRegistry static 块 / addMaidTask / YsmCompat)
+     * 暂留各点并注释指向本表 — 全量 CompatModule 统一门控 (注册回调) 因双时序上下文
+     * (TaskRegistry 类加载 vs TLM addMaidTask 契约) + stonecutter 分支 (createbigcannons)
+     * 重构面过大, 已驳 (详见 fix-registry-d-2026-08-11c.md)。
+     */
     public record CompatModule(String id, String name, String description, String modId) {}
 
     private static final java.util.List<CompatModule> MODULES = new java.util.ArrayList<>();
@@ -63,6 +70,11 @@ public final class CompatRegistry {
         registerModule("createbigcannons", "Create Big Cannons",
                 "速射炮闩装填任务 (cannon_load) — 1.20.1 专属", "createbigcannons");
 //?}
+        // 2026-08-11c: ysm 并入模块表 (R-16) — 消费方 = YsmCompat.isInstalled() (+CompatToggle 门控,
+        // 经 isPipelineReady 影响假人桥 TRANSFORM_ACTIVATOR / ai_control 前置提示)。modId 单串限制:
+        // neoforge 仅装 OpenYSM 时 GUI 灰显 (实际 isInstalled 双 id 检测, 纯显示瑕疵)。
+        registerModule("ysm", "Yes Steve Model",
+                "石板化假人变身依赖 — 假人桥双门控 (Numen + YSM; neoforge 含 OpenYSM)", "yes_steve_model");
     }
 
     public static void registerModule(String id, String name, String description, String modId) {
@@ -86,7 +98,7 @@ public final class CompatRegistry {
     @SubscribeEvent
     public static void onEnqueue(final InterModEnqueueEvent event) {
         event.enqueueWork(() -> {
-            // ★ v35.5: 若 scanAllCompatEarly() 已扫描则跳过，避免双重初始化
+            // ★ 若 scanAllCompatEarly() 已扫描则跳过，避免双重初始化
             if (earlyScanned) return;
             earlyScanned = true;
             doScan();
@@ -95,7 +107,7 @@ public final class CompatRegistry {
 
     /** 执行 compat 初始化 (原版功能无条件; 未来 compat 在此加 checkModLoad) */
     private static void doScan() {
-        // v77: 兼容模块开关 — 构造期显式加载 (TaskRegistry static 块门控依赖此时序: 本行早于一切门控点)
+        // 兼容模块开关 — 构造期显式加载 (TaskRegistry static 块门控依赖此时序: 本行早于一切门控点)
         CompatToggle.load();
         VanillaCompat.init();
     }

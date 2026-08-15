@@ -50,13 +50,13 @@ public final class MaidGuiRegistry {
     private static final String SIDE_ID_PREFIX = LittleMaidMoreAction.MOD_ID + ":side_";
     private static final String TOP_ID_PREFIX = LittleMaidMoreAction.MOD_ID + ":top_";
 
-    /** LMA 默认注册: 模组主界面 (侧栏 index 2, TLM 0/1 已占) — 外部女仆向 GUI 再 register* 追加 */
+    /** LMA 默认注册: 模组主界面 (侧栏 index 2, TLM 0/1 已占) — 外部女仆向 GUI 再 register* 追加。
+     *  v79.51 (批次 B1): 打开入口收敛 {@link ScreenRegistry#open} (注册表 "lma_config")。 */
     static {
         registerSideButton(2,
                 Component.translatable("gui.littlemaidmoreaction.main.button"),
                 Component.translatable("gui.littlemaidmoreaction.main.button.desc"),
-                (button, maid) -> Minecraft.getInstance().setScreen(
-                        new LMAConfigScreen(Minecraft.getInstance().screen)));
+                (button, maid) -> ScreenRegistry.open("lma_config", Minecraft.getInstance().screen));
     }
 
     private MaidGuiRegistry() {
@@ -76,7 +76,7 @@ public final class MaidGuiRegistry {
 
     /** 注册任务配置 GUI (TLM 任务设置 tab 内容) — 委托 {@link TaskConfigGuiFactory#register}。
      *  <p>注册优先, 既有 Pipeline 覆写 getConfigGuiProvider 兜底; 注册表按 taskType 查,
-     *  不依赖 lma_flow_task 写入时序 (v67.12 语义)。</p> */
+     *  不依赖 lma_flow_task 写入时序 (语义)。</p> */
     public static void registerTaskConfig(String taskType,
                                           Function<EntityMaid, MenuProvider> provider) {
         TaskConfigGuiFactory.register(taskType, provider);

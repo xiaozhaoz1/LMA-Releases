@@ -64,7 +64,7 @@ public final class ClothSettingsScreen {
                         ActiveTaskConfig.CHAIN_SCAN_INTERVAL.get())
                 .setDefaultValue(ActiveTaskConfig.CHAIN_SCAN_INTERVAL.getDefault())
                 .setMin(20).setMax(1200)
-                .setTooltip(Component.literal("无目标扫描频率, 60 = 3 秒"))
+                .setTooltip(Component.literal("无目标扫描频率, 20 = 1 秒"))
                 .setSaveConsumer(ActiveTaskConfig.CHAIN_SCAN_INTERVAL::set).build());
         chain.addEntry(eb.startIntField(Component.literal("最大采集距离 (格)"),
                         ActiveTaskConfig.CHAIN_MAX_DISTANCE.get())
@@ -72,14 +72,14 @@ public final class ClothSettingsScreen {
                 .setMin(4).setMax(128)
                 .setTooltip(Component.literal("连锁 BFS 搜索与整脉破坏距离上限"))
                 .setSaveConsumer(ActiveTaskConfig.CHAIN_MAX_DISTANCE::set).build());
-        // v79.26.6: 挖矿兜底行为参数 (原行内魔法数/类内常量 → 配置)
+        // 挖矿兜底行为参数 (原行内魔法数/类内常量 → 配置)
         chain.addEntry(eb.startIntField(Component.literal("垂直挖穿深度 (格)"),
                         ActiveTaskConfig.CHAIN_DIG_DOWN_DEPTH.get())
                 .setDefaultValue(ActiveTaskConfig.CHAIN_DIG_DOWN_DEPTH.getDefault())
                 .setMin(1).setMax(8)
-                .setTooltip(Component.literal("目标矿在脚下≤此深度时向下挖穿, 头顶≤同深度时向上挖穿矿正下方整列 (默认 6)"))
+                .setTooltip(Component.literal("头顶≤此深度的裸露矿 TLM 不可达时向上挖穿矿正下方整列 (默认 6)"))
                 .setSaveConsumer(ActiveTaskConfig.CHAIN_DIG_DOWN_DEPTH::set).build());
-        // v79.26.8e: 垫柱触发高度/面前挖穿距离 GUI 删除 — 垫柱链/面前挖穿退役
+        // 垫柱触发高度/面前挖穿距离 GUI 删除 — 垫柱链/面前挖穿退役
         // (用户裁定 "不用垫方块了, 只要挖上下能挖到的就行了"), 桥/阶梯固定逻辑无配置
         chain.addEntry(eb.startIntField(Component.literal("导航看门狗超时 (tick)"),
                         ActiveTaskConfig.CHAIN_NAV_TIMEOUT.get())
@@ -87,12 +87,7 @@ public final class ClothSettingsScreen {
                 .setMin(40).setMax(2400)
                 .setTooltip(Component.literal("寻路超时未达目标则跳过重试, 240=12秒 (默认 240)"))
                 .setSaveConsumer(ActiveTaskConfig.CHAIN_NAV_TIMEOUT::set).build());
-        chain.addEntry(eb.startBooleanToggle(Component.literal("卡方块自救"),
-                        ActiveTaskConfig.CHAIN_SELF_RESCUE.get())
-                .setDefaultValue(ActiveTaskConfig.CHAIN_SELF_RESCUE.getDefault())
-                .setTooltip(Component.literal("女仆被埋/卡住时自动瞬破窒息方块脱困 (v79.26.8d 参考 maid_useful_task)"))
-                .setSaveConsumer(ActiveTaskConfig.CHAIN_SELF_RESCUE::set).build());
-        // v79.26.7: 跳过集有效期 GUI 删除 — 分档死值 (TLM 60t / 激进 1s, 用户裁定)
+        // 跳过集有效期 GUI 删除 — 分档死值 (TLM 60t / 激进 1s, 用户裁定)
 
         // ── 环境感知 ──
         ConfigCategory env = root.getOrCreateCategory(Component.literal("环境感知"));
@@ -101,6 +96,11 @@ public final class ClothSettingsScreen {
                 .setDefaultValue(PassiveTaskConfig.ENVSENSE_ENABLED.getDefault())
                 .setTooltip(Component.literal("false=女仆不接收任何环境信号 (v63)"))
                 .setSaveConsumer(PassiveTaskConfig.ENVSENSE_ENABLED::set).build());
+        env.addEntry(eb.startBooleanToggle(Component.literal("自救"),
+                        PassiveTaskConfig.SELF_RESCUE_ENABLED.get())
+                .setDefaultValue(PassiveTaskConfig.SELF_RESCUE_ENABLED.getDefault())
+                .setTooltip(Component.literal("女仆掉血时触发自救被动任务, 被埋/卡住时自动瞬破窒息方块脱困"))
+                .setSaveConsumer(PassiveTaskConfig.SELF_RESCUE_ENABLED::set).build());
         env.addEntry(eb.startIntField(Component.literal("扫描间隔 (tick)"),
                         PassiveTaskConfig.ENV_SCAN_INTERVAL.get())
                 .setDefaultValue(PassiveTaskConfig.ENV_SCAN_INTERVAL.getDefault())
@@ -152,7 +152,7 @@ public final class ClothSettingsScreen {
                         PassiveTaskConfig.ENV_STRUCTURE_INTERVAL.get())
                 .setDefaultValue(PassiveTaskConfig.ENV_STRUCTURE_INTERVAL.getDefault())
                 .setMin(1200).setMax(168000)
-                .setTooltip(Component.literal("默认 24000 = 1 MC 天"))
+                .setTooltip(Component.literal("默认 1200 = 1 分钟"))
                 .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_INTERVAL::set).build());
         env.addEntry(eb.startIntField(Component.literal("结构探测半径 (区块)"),
                         PassiveTaskConfig.ENV_STRUCTURE_RADIUS.get())
@@ -160,8 +160,53 @@ public final class ClothSettingsScreen {
                 .setMin(1).setMax(32)
                 .setTooltip(Component.literal("越大越慢"))
                 .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_RADIUS::set).build());
+        env.addEntry(eb.startIntField(Component.literal("结构信号半径 (格)"),
+                        PassiveTaskConfig.ENV_STRUCTURE_SIGNAL_RADIUS.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_STRUCTURE_SIGNAL_RADIUS.getDefault())
+                .setMin(1).setMax(64)
+                .setTooltip(Component.literal("玩家附近此范围内的主人女仆才接收结构信号 (v79.60 per-player)"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_SIGNAL_RADIUS::set).build());
+        env.addEntry(eb.startStrList(Component.literal("结构信号白名单"),
+                        new ArrayList<>(PassiveTaskConfig.ENV_STRUCTURE_WHITELIST.get()))
+                .setDefaultValue(new ArrayList<>(PassiveTaskConfig.ENV_STRUCTURE_WHITELIST.getDefault()))
+                .setTooltip(Component.literal("只发名单内结构的信号 (registry id, 支持 minecraft:village_* 通配, 空=全部)"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_WHITELIST::set).build());
+        env.addEntry(eb.startBooleanToggle(Component.literal("只发最近结构信号"),
+                        PassiveTaskConfig.ENV_STRUCTURE_NEAREST_ONLY.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_STRUCTURE_NEAREST_ONLY.getDefault())
+                .setTooltip(Component.literal("开=白名单结果内只取距离最近 1 个结构发信号"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_NEAREST_ONLY::set).build());
+        env.addEntry(eb.startBooleanToggle(Component.literal("随机选择女仆接收信号"),
+                        PassiveTaskConfig.ENV_STRUCTURE_RANDOM_MAID.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_STRUCTURE_RANDOM_MAID.getDefault())
+                .setTooltip(Component.literal("开=玩家附近主人女仆中随机选 1 个, 关=选最近"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_RANDOM_MAID::set).build());
+        env.addEntry(eb.startIntField(Component.literal("进入结构判定距离(格)"),
+                        PassiveTaskConfig.ENV_STRUCTURE_ENTER_DIST.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_STRUCTURE_ENTER_DIST.getDefault())
+                .setMin(1).setMax(100)
+                .setTooltip(Component.literal("主人距结构中心≤此值=在结构内(enter信号,不气泡)"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_ENTER_DIST::set).build());
+        env.addEntry(eb.startIntField(Component.literal("离开结构判定距离(格)"),
+                        PassiveTaskConfig.ENV_STRUCTURE_LEAVE_DIST.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_STRUCTURE_LEAVE_DIST.getDefault())
+                .setMin(2).setMax(256)
+                .setTooltip(Component.literal("主人距结构中心>此值=离开(leave信号,不气泡)"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_LEAVE_DIST::set).build());
+        env.addEntry(eb.startIntField(Component.literal("结构提醒重发间隔(tick)"),
+                        PassiveTaskConfig.ENV_STRUCTURE_REFRESH_TICKS.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_STRUCTURE_REFRESH_TICKS.getDefault())
+                .setMin(1200).setMax(168000)
+                .setTooltip(Component.literal("主人在结构外每此间隔重发方向气泡(默认2400=2分钟)"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_REFRESH_TICKS::set).build());
+        env.addEntry(eb.startIntField(Component.literal("结构提醒次数上限"),
+                        PassiveTaskConfig.ENV_STRUCTURE_REFRESH_MAX.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_STRUCTURE_REFRESH_MAX.getDefault())
+                .setMin(1).setMax(10)
+                .setTooltip(Component.literal("每次进入结构外围的提醒总数(含首次发现)"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_REFRESH_MAX::set).build());
 
-        // ── 右键交互 (v67.2 全局直列) ──
+        // ── 右键交互 (全局直列) ──
         ConfigCategory bi = root.getOrCreateCategory(Component.literal("右键交互"));
         bi.addEntry(eb.startTextField(Component.literal("标记物品 (右键方块)"),
                         ActiveTaskConfig.BI_MARK_ITEM.get())
@@ -192,7 +237,7 @@ public final class ClothSettingsScreen {
                 .setTooltip(Component.literal("定时器默认间隔, 200 = 10秒"))
                 .setSaveConsumer(ActiveTaskConfig.BI_TIMER_DEFAULT_INTERVAL::set).build());
 
-        // ── v79.9: 哈气 ──
+        // ── 哈气 ──
         ConfigCategory haqi = root.getOrCreateCategory(Component.literal("哈气"));
         haqi.addEntry(eb.startBooleanToggle(Component.literal("哈气任务总开关"),
                         PassiveTaskConfig.HAQI_ENABLED.get())
@@ -229,7 +274,7 @@ public final class ClothSettingsScreen {
                 .setMin(0.0).setMax(100.0)
                 .setTooltip(Component.literal("挥击伤害, 默认 1.0 = 一点血"))
                 .setSaveConsumer(PassiveTaskConfig.HAQI_HIT_DAMAGE::set).build());
-        // ── v79.20: 哈气对主人变体 (独立二级开关 + 独立配置) ──
+        // ── 哈气对主人变体 (独立二级开关 + 独立配置) ──
         haqi.addEntry(eb.startBooleanToggle(Component.literal("哈气对主人开关"),
                         PassiveTaskConfig.HAQI_ENABLED_TO_OWNER.get())
                 .setDefaultValue(PassiveTaskConfig.HAQI_ENABLED_TO_OWNER.getDefault())
@@ -266,8 +311,8 @@ public final class ClothSettingsScreen {
                 .setTooltip(Component.literal("挥击伤害, 默认 1.0 = 一点血; 主人不反击"))
                 .setSaveConsumer(PassiveTaskConfig.HAQI_HIT_DAMAGE_TO_OWNER::set).build());
 
-        // ── v79.26.8e: 寻路设置退役 (用户裁定 "寻路全用TLM... 那个寻路全局设置就没用了, 子任务的寻路设置也没用了")
-        // ── 任务自定义 (v67.2: 每任务一个按钮 → TaskSettingsScreen 子屏) ──
+        // ── 寻路设置退役 (用户裁定 "寻路全用TLM... 那个寻路全局设置就没用了, 子任务的寻路设置也没用了")
+        // ── 任务自定义 (每任务一个按钮 → TaskSettingsScreen 子屏) ──
         ConfigCategory tasks = root.getOrCreateCategory(Component.literal("任务自定义"));
         var taskTypes = new ArrayList<>(TaskRegistry.taskTypes());
         taskTypes.sort(Comparator.naturalOrder());
@@ -279,6 +324,45 @@ public final class ClothSettingsScreen {
                         mc.setScreen(TaskSettingsScreen.create(mc.screen, taskType));
                     }));
         }
+
+        // ── 女仆好感度双乘区 ──
+        ConfigCategory fav = root.getOrCreateCategory(Component.literal("女仆好感度乘区"));
+        fav.addEntry(eb.startBooleanToggle(Component.literal("总开关"),
+                        ActiveTaskConfig.MAID_FAVORABILITY_ENABLED.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("效率 (等级越高工作越快) + 消耗 (等级越高消耗越低)"))
+                .setSaveConsumer(ActiveTaskConfig.MAID_FAVORABILITY_ENABLED::set).build());
+        fav.addEntry(eb.startBooleanToggle(Component.literal("自动修复"),
+                        ActiveTaskConfig.REPAIR_AUTO_ENABLED.get())
+                .setDefaultValue(true)
+                .setTooltip(Component.literal("女仆随时间用经验慢慢修装备 (1 点/约 5 秒, 消耗 = 4 XP × 好感度消耗乘区)"))
+                .setSaveConsumer(ActiveTaskConfig.REPAIR_AUTO_ENABLED::set).build());
+        fav.addEntry(eb.startDoubleField(Component.literal("效率 Lv1 倍率"),
+                        ActiveTaskConfig.FAVOR_SPEED_L1.get())
+                .setDefaultValue(1.1).setMin(1.0).setMax(5.0)
+                .setTooltip(Component.literal("工作间隔 = 基准 / 倍率"))
+                .setSaveConsumer(ActiveTaskConfig.FAVOR_SPEED_L1::set).build());
+        fav.addEntry(eb.startDoubleField(Component.literal("效率 Lv2 倍率"),
+                        ActiveTaskConfig.FAVOR_SPEED_L2.get())
+                .setDefaultValue(1.25).setMin(1.0).setMax(5.0)
+                .setSaveConsumer(ActiveTaskConfig.FAVOR_SPEED_L2::set).build());
+        fav.addEntry(eb.startDoubleField(Component.literal("效率 Lv3 倍率"),
+                        ActiveTaskConfig.FAVOR_SPEED_L3.get())
+                .setDefaultValue(1.5).setMin(1.0).setMax(5.0)
+                .setSaveConsumer(ActiveTaskConfig.FAVOR_SPEED_L3::set).build());
+        fav.addEntry(eb.startDoubleField(Component.literal("消耗 Lv1 倍率"),
+                        ActiveTaskConfig.FAVOR_COST_L1.get())
+                .setDefaultValue(0.9).setMin(0.1).setMax(1.0)
+                .setTooltip(Component.literal("消耗 = 基准 × 倍率 (越低越省)"))
+                .setSaveConsumer(ActiveTaskConfig.FAVOR_COST_L1::set).build());
+        fav.addEntry(eb.startDoubleField(Component.literal("消耗 Lv2 倍率"),
+                        ActiveTaskConfig.FAVOR_COST_L2.get())
+                .setDefaultValue(0.75).setMin(0.1).setMax(1.0)
+                .setSaveConsumer(ActiveTaskConfig.FAVOR_COST_L2::set).build());
+        fav.addEntry(eb.startDoubleField(Component.literal("消耗 Lv3 倍率"),
+                        ActiveTaskConfig.FAVOR_COST_L3.get())
+                .setDefaultValue(0.5).setMin(0.1).setMax(1.0)
+                .setSaveConsumer(ActiveTaskConfig.FAVOR_COST_L3::set).build());
 
         root.setSavingRunnable(() -> {
             MoreActionConfig.saveAll();

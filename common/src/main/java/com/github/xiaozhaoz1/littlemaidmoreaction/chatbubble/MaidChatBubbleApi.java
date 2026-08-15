@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleManager;
 import com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.IChatBubbleData;
@@ -40,7 +41,7 @@ public final class MaidChatBubbleApi {
     /** 进度气泡持续时间 (5秒, 替换式刷新) */
     public static final int PROGRESS_TICK = 100;
 
-    /** 失败气泡节流 (tick, 30秒) — 沿用 v67.3 TaskDispatcher.FAIL_BUBBLE_INTERVAL */
+    /** 失败气泡节流 (tick, 30秒) — 沿用 TaskDispatcher.FAIL_BUBBLE_INTERVAL */
     public static final int FAIL_THROTTLE_TICKS = 600;
 
     /** 触发气泡节流 (tick, 5秒) — 镜像 MaidEmojiApi.EMOJI_THROTTLE_TICKS 防刷屏 */
@@ -51,10 +52,10 @@ public final class MaidChatBubbleApi {
     private static final int BAR_FG = 0xFF4CAF50;
 
     /** 失败气泡节流键 (maid PersistentData 根) — 仅最后一次时间戳, 残留无害 (超时自动失效) */
-    private static final String KEY_LAST_FAIL_TICK = "lma_bubble_fail_tick";
+    private static final String KEY_LAST_FAIL_TICK = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.BUBBLE_FAIL_TICK;
 
     /** 触发气泡节流键 — 同上 */
-    private static final String KEY_LAST_TRIGGER_TICK = "lma_bubble_trigger_tick";
+    private static final String KEY_LAST_TRIGGER_TICK = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.BUBBLE_TRIGGER_TICK;
 
     /** 进度气泡替换跟踪 — 每女仆仅保留最新进度气泡 id (弱引用, 实体卸载自动回收) */
     private static final java.util.Map<EntityMaid, Long> LAST_PROGRESS_BUBBLE =
@@ -102,7 +103,7 @@ public final class MaidChatBubbleApi {
         if (!(maid.level() instanceof ServerLevel)) {
             return -1;
         }
-        // v79.26.4: progress<=0 无进度概念 → 文本气泡 (实测黑条: TLM ProgressChatBubbleData
+        // progress<=0 无进度概念 → 文本气泡 (实测黑条: TLM ProgressChatBubbleData
         // progress=0 渲染黑底空进度条 BAR_BG 0xFF333333)
         if (progress01 <= 0) {
             showInfo(maid, msg);
@@ -111,7 +112,7 @@ public final class MaidChatBubbleApi {
         ChatBubbleManager cbm = maid.getChatBubbleManager();
         Long prev = LAST_PROGRESS_BUBBLE.get(maid);
         if (prev != null && prev >= 0) {
-            // 已过期气泡 remove 为空操作 — 语义同 WorldOutput.sendBubbleReplacing
+            // 已过期气泡 remove 为空操作
             cbm.removeChatBubble(prev);
         }
         long key = cbm.addChatBubble(ProgressChatBubbleData.create(

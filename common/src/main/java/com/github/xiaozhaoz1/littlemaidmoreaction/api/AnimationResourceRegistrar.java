@@ -30,7 +30,7 @@ import java.io.InputStream;
  */
 public final class AnimationResourceRegistrar {
 
-    /** v79.18: 缓存 ISS AnimationFile 引用 (mutable) — S2C 文件同步后热合并入口 */
+    /** 缓存 ISS AnimationFile 引用 (mutable) — S2C 文件同步后热合并入口 */
     @OnlyIn(Dist.CLIENT)
     private static AnimationFile cachedIISSFile;
 
@@ -61,18 +61,18 @@ public final class AnimationResourceRegistrar {
     }
 
     /**
-     * v79.18: 热重合并 — 新收到的动画文件已重载进资源管理器后,
+     * 热重合并 — 新收到的动画文件已重载进资源管理器后,
      * 重新合并全部动画文件进启动时缓存的 ISS AnimationFile (与启动注册同一路径)。
      * geckolib 解析失败逐文件捕获, 不影响其余动画。
      */
-    /** v79.26.2: ISS 未缓存 WARN 只打一次 — 后续重复 reload 静默 (日志风暴防护) */
+    /** ISS 未缓存 WARN 只打一次 — 后续重复 reload 静默 (日志风暴防护) */
     @OnlyIn(Dist.CLIENT)
     private static boolean warnedIssUncached = false;
 
     @OnlyIn(Dist.CLIENT)
     public static void remergeAll() {
         if (cachedIISSFile == null) {
-            // v79.18 实证: neoforge 事件链路不可靠 → 启动时可能一直未缓存, 每包 WARN 刷屏 (日志实证 7 次)
+            // 实证: neoforge 事件链路不可靠 → 启动时可能一直未缓存, 每包 WARN 刷屏 (日志实证 7 次)
             if (!warnedIssUncached) {
                 warnedIssUncached = true;
                 LittleMaidMoreAction.LOGGER.warn("[LMA/Registrar] ISS AnimationFile 未缓存, 跳过热合并");

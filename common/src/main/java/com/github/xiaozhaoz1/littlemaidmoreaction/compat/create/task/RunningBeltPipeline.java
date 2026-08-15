@@ -1,14 +1,15 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.belt.BeltBlock;
 import com.simibubi.create.content.kinetics.belt.BeltSlope;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.BlockTargetNavigation;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.navigation.NavigationMemory;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.navigation.NavigationUtil;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.TaskResult;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
-import com.github.xiaozhaoz1.littlemaidmoreaction.api.io.IExecutor;
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.block.MaidPowerBeltBlock;
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.block.MaidPowerBeltBlockEntity;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
@@ -26,9 +27,8 @@ import java.util.List;
 /**
  * 女仆跑步发电管线 v62 — pipelineData 管理私有状态.
  */
-public final class RunningBeltPipeline implements TaskPipeline {
+public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable {
     @Override public boolean isLongRunning() { return true; }
-    @Override public boolean needsGameTick() { return true; }
     @Override public void onCleanup(EntityMaid maid) { cleanup(maid); TaskPipeline.super.onCleanup(maid); }
     @Override public void interrupt(EntityMaid maid) {
         maid.setSprinting(false);
@@ -44,10 +44,7 @@ public final class RunningBeltPipeline implements TaskPipeline {
     @Override public List<TaskStep> steps() { return List.of(new TaskStep("run", "跑步发电", StepType.INTERACT, List.of())); }
     @Override public PipelineResult validate(ServerLevel l, EntityMaid m, PipelineContext c) { return PipelineResult.ok(""); }
 
-    public IExecutor executor() {
-        // v75.4: 样板壳 → IExecutor.ticker (语义不变)
-        return IExecutor.ticker(this::tick);
-    }
+    // executor/execute 删除 (v79.45) — 执行全归 GMPM tick 驱动
 
     // ── Tick ──
 
@@ -85,7 +82,7 @@ public final class RunningBeltPipeline implements TaskPipeline {
     }
 
     private static void tickRunning(ServerLevel world, EntityMaid maid, CompoundTag pd) {
-        BlockPos target = readPos(pd.getString("target"));
+        BlockPos target = BlockTargetNavigation.parseTarget(pd.getString("target"));
         if (target == null) { revertAndClear(world, maid, pd); return; }
 
         if (!RunningBeltService.isMaidOnBelt(maid, target)) {
@@ -109,14 +106,14 @@ public final class RunningBeltPipeline implements TaskPipeline {
         MaidPowerBeltBlockEntity be = MaidPowerBeltBlock.getControllerBE(world, target);
         if (be != null) be.addSurfaceMovement(SPRINT_SPEED);
 
-        // v79.11: 原地锚定 — 防随机走动 (WALK_TARGET 原地) + home 模式 (防跟玩家; 用户裁定不做 restrictTo 范围)
-        // v79.13: 强锚定 — 停导航 + 杀遗留 LMA 路径 (PathExecutor.sweep 无任务门控, 旧路径会驱动女仆走出)
+        // 原地锚定 — 防随机走动 (WALK_TARGET 原地) + home 模式 (防跟玩家; 用户裁定不做 restrictTo 范围)
+        // 强锚定 — 停导航 + 杀遗留 LMA 路径 (PathExecutor.sweep 无任务门控, 旧路径会驱动女仆走出)
         NavigationUtil.keepAlive(world, maid);
         maid.getNavigation().stop();
         com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.PathingApi.clearNav(maid);
         maid.setHomeModeEnable(true);
 
-        // v79.10: 顺带摇周围 2 格内曲柄 (最多 2 个 — 跑步不移动, 就近摇; 发电上报式不中断)
+        // 顺带摇周围 2 格内曲柄 (最多 2 个 — 跑步不移动, 就近摇; 发电上报式不中断)
         var cranks = CrankService.findCranks(world, maid.blockPosition(), 2, 2);
         if (!cranks.isEmpty() && world.getGameTime() % 20 == 0) {
             maid.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -130,7 +127,7 @@ public final class RunningBeltPipeline implements TaskPipeline {
 
     public void cleanup(EntityMaid maid) {
         maid.setSprinting(false);
-        maid.setHomeModeEnable(false);   // v79.11: 恢复 home 模式 (跑步时强制开启)
+        maid.setHomeModeEnable(false);   // 恢复 home 模式 (跑步时强制开启)
         if (!(maid.level() instanceof ServerLevel world)) return;
         revertAndClear(world, maid, pipelineData(maid));
         NavigationMemory.clearAllNav(maid);
@@ -138,19 +135,11 @@ public final class RunningBeltPipeline implements TaskPipeline {
 
     private static void revertAndClear(ServerLevel world, EntityMaid maid, CompoundTag pd) {
         maid.setSprinting(false);
-        BlockPos target = readPos(pd.getString("target"));
+        BlockPos target = BlockTargetNavigation.parseTarget(pd.getString("target"));
         if (target != null) RunningBeltService.revertToRegularBelt(world, target);
         pd.putString("converted", "false");
         pd.remove("target"); pd.remove("idle"); pd.remove("foodTimer");
         pd.putInt("cooldown", COOLDOWN_TICKS);
-    }
-
-    private static BlockPos readPos(String s) {
-        if (s == null || s.isEmpty()) return null;
-        try {
-            String[] p = s.split(",");
-            return new BlockPos(Integer.parseInt(p[0].trim()), Integer.parseInt(p[1].trim()), Integer.parseInt(p[2].trim()));
-        } catch (Exception e) { return null; }
     }
 
     private static boolean isHorizontalBelt(BlockState state) {

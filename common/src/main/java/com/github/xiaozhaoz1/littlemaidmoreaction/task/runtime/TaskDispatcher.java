@@ -1,4 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.DataKey;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
@@ -34,7 +36,7 @@ public final class TaskDispatcher {
      * @return true 表示任务已启动
      */
     /**
-     * 提交任务 — 验证 → 冲突检测 → 写入状态 (v43.1 fix: 先验证再取消, 防止验证失败导致旧任务丢失)
+     * 提交任务 — 验证 → 冲突检测 → 写入状态 (先验证再取消, 防止验证失败导致旧任务丢失)
      */
     public static boolean submit(EntityMaid maid, String taskType, String target, int count) {
         if (!(maid.level() instanceof ServerLevel)) return false;
@@ -43,21 +45,21 @@ public final class TaskDispatcher {
         PipelineResult result = TaskRegistry.validate(maid, taskType,
             "", target != null ? target : "", count);
         if (!result.completed()) {
-            // v79.21: 失败气泡 (红色 ✘, API 内置 30 秒节流防无限重试刷屏)
+            // 失败气泡 (红色 ✘, API 内置 30 秒节流防无限重试刷屏)
             if (!result.feedback().isEmpty()) {
                 MaidChatBubbleApi.showFail(maid, result.feedback());
             }
             return false;
         }
 
-        // v79.9: 哈气互斥 — 哈气运行中拒绝主动任务
+        // 哈气互斥 — 哈气运行中拒绝主动任务
         if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData()
                 .getString(TaskKeys.passiveKey("haqi")))) {
             return false;
         }
 
         // 2. 冲突检测: 验证通过后再取消旧任务
-        // v79: 优先级策略 — 新任务严格更低 → 拒绝 (失败气泡节流); 等/高 → 抢占 (既有行为)
+        // 优先级策略 — 新任务严格更低 → 拒绝 (失败气泡节流); 等/高 → 抢占 (既有行为)
         String current = FlowTaskData.getTask(maid);
         if (!current.isEmpty() && !current.equals(taskType)) {
             if (!shouldPreempt(priorityOf(current), priorityOf(taskType))) {
@@ -70,17 +72,16 @@ public final class TaskDispatcher {
         // 3. 统一写入
         long now = maid.level().getGameTime();
         TaskStateManager.init(maid, taskType, now);
-        // v44: 存储 target 到 NBT
+        // 存储 target 到 NBT
         if (target != null && !target.isEmpty()) {
-            maid.getPersistentData().putString(TaskKeys.TASK_TARGET, target);
+            MaidData.put(maid, DataKey.TASK_TARGET, target);
         }
-        // v64: 存储数量 — 0=无限, >0=指定数量
+        // 存储数量 — 0=无限, >0=指定数量
         if (count > 0) {
-            maid.getPersistentData().putInt(TaskKeys.FLOW_MAX_COUNT, count);
+            MaidData.put(maid, DataKey.FLOW_MAX_COUNT, (long) count);
         }
-        // v53: 新任务启动时重置重试计数
-        maid.getPersistentData().remove(TaskKeys.RETRY_COUNT);
-        // v79.21: 任务开始气泡 (信息型, 无节流 — 任务生命周期天然限频)
+        // 重试机制删除 (RetryPolicy) — 主动任务靠 TLM 任务栏自动重启, 被动靠信号重触发
+        // 任务开始气泡 (信息型, 无节流 — 任务生命周期天然限频)
         LmaTaskProgressDisplay.showTaskStart(maid, taskType);
         LittleMaidMoreAction.LOGGER.info("[LMA/Task] submit maid={} task={} target={} count={}",
             maid.getStringUUID(), taskType, target, count);
@@ -89,14 +90,14 @@ public final class TaskDispatcher {
 
     /** 取消任务 — 通知管线中断 (→onCleanup) + 设取消标记 + 清理 */
     public static void cancel(EntityMaid maid) {
-        // v79.27: 堆栈日志降级 debug — cancel 高频路径 (任务切换/取消), 生产每次抓 5 层
+        // 堆栈日志降级 debug — cancel 高频路径 (任务切换/取消), 生产每次抓 5 层
         // 堆栈 = 开销 + 日志噪音; 调试需求保留在 debug 层
         if (LittleMaidMoreAction.LOGGER.isDebugEnabled()) {
             LittleMaidMoreAction.LOGGER.debug("[LMA/Task] cancel CALLED from: {}",
                 java.util.Arrays.stream(Thread.currentThread().getStackTrace()).skip(1).limit(5)
                     .map(StackTraceElement::toString).reduce((a,b) -> a + "\n  <- " + b).orElse("?"));
         }
-        // v62: interrupt→onCleanup
+        // interrupt→onCleanup
         String task = FlowTaskData.getTask(maid);
         if (!task.isEmpty()) {
             var h = TaskRegistry.get(task);
@@ -105,34 +106,25 @@ public final class TaskDispatcher {
             }
         }
         FlowTaskData.setState(maid, TaskKeys.STATE_CANCELLED);
-        TaskStateManager.clearAll(maid); // v53: cancel 后清除残留 NBT (同 complete/fail)
+        TaskStateManager.clearAll(maid); // cancel 后清除残留 NBT (同 complete/fail)
         LittleMaidMoreAction.LOGGER.info("[LMA/Task] cancel maid={} task={}",
             maid.getStringUUID(), task);
     }
 
-    /** 超时 — 由 TaskTickHandler 超时看门狗调用 (v64 迁入)。编排 onTimeout→interrupt(→onCleanup)→retry */
+    /** 超时 — 由 TaskTickHandler 超时看门狗调用。编排 onTimeout→interrupt(→onCleanup)→retry */
     public static void timeout(EntityMaid maid) {
         String task = FlowTaskData.getTask(maid);
         var h = getHandler(task);
         if (h != null) {
-            // v79.21: 统一失败气泡 (红色 ✘ + API 内置 600t 节流 — 补超时气泡缺失的节流, 错题: 同类刷屏 bug)
+            // 统一失败气泡 (红色 ✘ + API 内置 600t 节流 — 补超时气泡缺失的节流, 错题: 同类刷屏 bug)
             MaidChatBubbleApi.showFail(maid, task + " 超时");
-            h.pipeline().interrupt(maid);  // v62: interrupt→onCleanup
+            h.pipeline().interrupt(maid);  // interrupt→onCleanup
         }
         FlowTaskData.setState(maid, TaskKeys.STATE_FAILED);
         TaskStateManager.clearAll(maid);
         LittleMaidMoreAction.LOGGER.warn("[LMA/Task] timeout maid={} task={}",
             maid.getStringUUID(), task);
-        // v53: 重试策略 — NBT 计数器防止 fixed(N) 无限重试
-        if (h != null) {
-            int retryCount = maid.getPersistentData().getInt(TaskKeys.RETRY_COUNT);
-            if (h.pipeline().retryPolicy().shouldRetry(retryCount)) {
-                maid.getPersistentData().putInt(TaskKeys.RETRY_COUNT, retryCount + 1);
-                LittleMaidMoreAction.LOGGER.info("[LMA/Task] retry #{}/{} maid={} task={}",
-                    retryCount + 1, h.pipeline().retryPolicy().maxRetries(), maid.getStringUUID(), task);
-                submit(maid, task, null, 0);
-            }
-        }
+        // 重试机制删除 — 主动任务 TLM 任务栏自动重启, 被动信号重触发
     }
 
     /** 标记任务完成 — onCleanup→STATE_COMPLETED→clearAll */
@@ -142,9 +134,9 @@ public final class TaskDispatcher {
         if (h != null) {
             h.pipeline().onCleanup(maid);
         }
-        // v79.21: 完成气泡 (绿色 ✔) — clearAll 前读 counter/max (clearAll 清 FLOW_COUNTER/FLOW_MAX_COUNT)
-        int counter = maid.getPersistentData().getInt(TaskKeys.FLOW_COUNTER);
-        int maxCount = maid.getPersistentData().getInt(TaskKeys.FLOW_MAX_COUNT);
+        // 完成气泡 (绿色 ✔) — clearAll 前读 counter/max (clearAll 清 FLOW_COUNTER/FLOW_MAX_COUNT)
+        int counter = (int) (long) MaidData.get(maid, DataKey.FLOW_COUNTER);
+        int maxCount = (int) (long) MaidData.get(maid, DataKey.FLOW_MAX_COUNT);
         FlowTaskData.setState(maid, TaskKeys.STATE_COMPLETED);
         TaskStateManager.clearAll(maid);
         if (!task.isEmpty()) {
@@ -156,26 +148,16 @@ public final class TaskDispatcher {
 
     /** 标记任务失败 — interrupt(→onCleanup)→STATE_FAILED→clearAll→retry? */
     public static void fail(EntityMaid maid, String reason) {
-        maid.getPersistentData().putString(TaskKeys.FAIL_REASON, reason);
+        // FAIL_REASON 死写已删 (v79.55, 错题 #181): put 后同方法 clearAll 立即删, 零读方 — reason 仅用于日志
         String task = FlowTaskData.getTask(maid);
         var h = getHandler(task);
         if (h != null) {
-            h.pipeline().interrupt(maid);  // v62: interrupt→onCleanup
+            h.pipeline().interrupt(maid);  // interrupt→onCleanup
         }
         FlowTaskData.setState(maid, TaskKeys.STATE_FAILED);
         TaskStateManager.clearAll(maid);
         LittleMaidMoreAction.LOGGER.warn("[LMA/Task] fail maid={} task={} reason={}",
             maid.getStringUUID(), task, reason);
-        // v53: 重试策略 — NBT 计数器防止 fixed(N) 无限重试
-        if (h != null) {
-            int retryCount = maid.getPersistentData().getInt(TaskKeys.RETRY_COUNT);
-            if (h.pipeline().retryPolicy().shouldRetry(retryCount)) {
-                maid.getPersistentData().putInt(TaskKeys.RETRY_COUNT, retryCount + 1);
-                LittleMaidMoreAction.LOGGER.info("[LMA/Task] retry #{}/{} maid={} task={}",
-                    retryCount + 1, h.pipeline().retryPolicy().maxRetries(), maid.getStringUUID(), task);
-                submit(maid, task, null, 0);
-            }
-        }
     }
 
     private static TaskRegistry.TaskHandler getHandler(String taskType) {
@@ -183,7 +165,7 @@ public final class TaskDispatcher {
     }
 
     /**
-     * v79: 优先级抢占策略 (纯函数, 可 JVM 测) — 等优先级 = 抢占.
+     * 优先级抢占策略 (纯函数, 可 JVM 测) — 等优先级 = 抢占.
      * 裁定依据: 树内 12 任务全默认 0; GUI_INIT/TLM_SWITCH/绑定提交均依赖"等优先级可抢占",
      * "保持"语义会破坏既有切换 — 仅严格更低拒绝.
      */
@@ -196,13 +178,13 @@ public final class TaskDispatcher {
         return h == null ? 0 : h.pipeline().priority();
     }
 
-    // ── 被动任务 (v61) — 与主动任务隔离, 可并行运行 ──
+    // ── 被动任务 — 与主动任务隔离, 可并行运行 ──
 
-    /** 提交被动任务 (与 lma_flow_task 不冲突) — v79.9: 哈气运行中拒绝其他被动 (互斥) */
+    /** 提交被动任务 (与 lma_flow_task 不冲突) — 哈气运行中拒绝其他被动 (互斥) */
     public static void submitPassive(EntityMaid maid, String taskType) {
         if (TaskRegistry.get(taskType) == null) return;
         if (!TaskToggle.isEnabled(taskType)) return;
-        // v79.9: 哈气互斥 — 哈气运行中其他被动不启动 (哈气自身防重复在 onSignal)
+        // 哈气互斥 — 哈气运行中其他被动不启动 (哈气自身防重复在 onSignal)
         if (!"haqi".equals(taskType) && TaskKeys.STATE_IN_PROGRESS.equals(
                 maid.getPersistentData().getString(TaskKeys.passiveKey("haqi")))) {
             return;
@@ -216,6 +198,8 @@ public final class TaskDispatcher {
         var h = TaskRegistry.get(taskType);
         if (h != null) h.pipeline().onCleanup(maid);
         maid.getPersistentData().remove(TaskKeys.passiveKey(taskType));
+        // GMPM 被动掩码缓存失效 — 否则 10t 缓存窗口内缓存掩码仍含该管线 → 仍驱动 1 次 (AUDIT LOW #4)
+        GameTickPipelineManager.clearMaidCaches(maid);
         LittleMaidMoreAction.LOGGER.info("[LMA/Task] cancelPassive maid={} task={}", maid.getStringUUID(), taskType);
     }
 }

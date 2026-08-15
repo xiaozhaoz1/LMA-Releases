@@ -34,6 +34,8 @@ import java.util.UUID;
  */
 public class LmaFakePlayer extends FakePlayer {
     private final EntityMaid maid;
+    /** 构造时女仆主手引用 (非拷贝) — syncHandToMaid 判定主手是否被外部替换 (回归扫描 B3) */
+    private final ItemStack sourceHand;
     private BlockPos breakingPos;
     private float breakingProgress;
 
@@ -45,6 +47,9 @@ public class LmaFakePlayer extends FakePlayer {
     public LmaFakePlayer(ServerLevel world, EntityMaid maid, BlockPos pos) {
         super(world, buildProfile(maid));
         this.maid = maid;
+        // 先记录来源引用再拷贝 — 主手槽对象引用稳定 (EntityMaid 未覆写手槽 getter,
+        // 活引用直到 setItemInHand 替换); sync 时 identity 对比判定外部替换
+        this.sourceHand = maid.getMainHandItem();
         setPos(pos.getX() + 0.5, pos.getY(), pos.getZ() + 0.5);
 
         // 同步女仆手上物品为假玩家主手
@@ -109,6 +114,9 @@ public class LmaFakePlayer extends FakePlayer {
     // ── 女仆拥有者 ──
 
     public EntityMaid getMaid() { return maid; }
+
+    /** 构造时女仆主手引用 — 与同步时 getMaid().getMainHandItem() 做 identity 比较 (判定外部替换) */
+    public ItemStack getSourceHand() { return sourceHand; }
 
     @Nullable
     public UUID getOwnerUUID() { return maid.getOwnerUUID(); }

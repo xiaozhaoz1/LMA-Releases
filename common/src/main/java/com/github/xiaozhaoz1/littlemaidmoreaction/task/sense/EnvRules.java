@@ -29,7 +29,7 @@ public final class EnvRules {
         return CAT_WARM;
     }
 
-    /** v37.2 时间段划分 */
+    /** 时间段划分 */
     public static String timeSegment(long dayTime) {
         if (dayTime < 12000) return SEG_DAY;
         if (dayTime < 13800) return SEG_DUSK;

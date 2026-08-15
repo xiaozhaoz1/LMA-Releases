@@ -3,8 +3,6 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.LmaNetwork;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -23,27 +21,30 @@ import java.util.function.Supplier;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
 
 /**
- * 任务手动触发包 (C→S) — 引擎级按键触发。
+ * 通用按键触发包 (C→S, v79.51 KeyTrigger 线路) — 客户端按键 → 携带 keyId 发本包 →
+ * 服务端查 {@link KeyTriggerRegistry} → 对玩家周围 owned 女仆 (范围见
+ * {@link ActiveTaskConfig#BI_TRIGGER_RANGE}) 逐一回调 handler。
  *
- * <p>客户端按键 → 发送本包 → 服务端扫描玩家周围女仆 (范围见
- * {@link MoreActionConfig#BI_TRIGGER_RANGE}) → 按当前任务分发到
- * {@link com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline#onPlayerTrigger}。
- * 任何任务覆写 onPlayerTrigger 即可响应按键, 无需改本包。
+ * <p>首个消费者 block_interact (恢复 v67 手动触发语义)。任意任务/系统用
+ * {@link KeyTriggerRegistry#register(String, KeyTriggerHandler)} 注册即可响应按键, 无需改本包。
+ * <p>NET-H1 (v79.50): C2S 服务端挂 per-player 20t 节流 ({@link C2SThrottle}) — 连发按键超频直接丢弃。
  */
 //? if 1.20.1 {
-public final class InteractTriggerPacket {
+public record InteractTriggerPacket(String keyId) {
 //?} else {
-public final class InteractTriggerPacket implements CustomPacketPayload {
+public record InteractTriggerPacket(String keyId) implements CustomPacketPayload {
 //?}
 
-    private InteractTriggerPacket() {}
+    /** NET-H1 防刷: 同 player 每 20t (1 秒) 最多放行 1 次按键触发 (AABB 扫描不可高频) */
+    private static final long THROTTLE_TICKS = 20L;
+    private static final String THROTTLE_KEY = "key_trigger";
 
     public static void encode(InteractTriggerPacket msg, FriendlyByteBuf buf) {
-        // 无字段 — player 从 NetworkEvent.Context 获取
+        buf.writeUtf(msg.keyId());
     }
 
     public static InteractTriggerPacket decode(FriendlyByteBuf buf) {
-        return new InteractTriggerPacket();
+        return new InteractTriggerPacket(buf.readUtf());
     }
 
 //? if 1.20.1 {
@@ -51,15 +52,7 @@ public final class InteractTriggerPacket implements CustomPacketPayload {
         ctx.get().enqueueWork(() -> {
             ServerPlayer player = ctx.get().getSender();
             if (player == null) return;
-            ServerLevel world = player.serverLevel();
-
-            // v67.2: 扫描范围 Cloth Config 配置 (默认 10 格)
-            AABB aabb = player.getBoundingBox().inflate(ActiveTaskConfig.BI_TRIGGER_RANGE.get());
-            for (EntityMaid maid : world.getEntitiesOfClass(EntityMaid.class, aabb,
-                m -> m.isAlive() && m.isOwnedBy(player))) {
-                TaskRegistry.TaskHandler handler = TaskRegistry.get(FlowTaskData.getTask(maid));
-                if (handler != null) handler.pipeline().onPlayerTrigger(maid, player);
-            }
+            dispatch(player, msg.keyId());
         });
         ctx.get().setPacketHandled(true);
     }
@@ -71,26 +64,37 @@ public final class InteractTriggerPacket implements CustomPacketPayload {
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public static final StreamCodec<ByteBuf, InteractTriggerPacket> STREAM_CODEC = StreamCodec.of(
-        (ByteBuf buf, InteractTriggerPacket msg) -> encode(msg, (FriendlyByteBuf) buf),
-        (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, InteractTriggerPacket> STREAM_CODEC =
+        PacketCodecs.wrap(InteractTriggerPacket::encode, InteractTriggerPacket::decode);
 
     public static void handlePayload(InteractTriggerPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer player)) return;
-            ServerLevel world = player.serverLevel();
-            AABB aabb = player.getBoundingBox().inflate(ActiveTaskConfig.BI_TRIGGER_RANGE.get());
-            for (EntityMaid maid : world.getEntitiesOfClass(EntityMaid.class, aabb,
-                m -> m.isAlive() && m.isOwnedBy(player))) {
-                TaskRegistry.TaskHandler handler = TaskRegistry.get(FlowTaskData.getTask(maid));
-                if (handler != null) handler.pipeline().onPlayerTrigger(maid, player);
-            }
+            dispatch(player, msg.keyId());
         });
     }
 //?}
 
-    /** 客户端发送触发请求 */
-    public static void sendToServer() {
-        LmaNetwork.sender.sendToServer(new InteractTriggerPacket());
+    /** 服务端分发 (双平台共用): 节流 → 查注册表 (未注册 id 静默) → 范围扫描 owned 女仆逐一回调 */
+    private static void dispatch(ServerPlayer player, String keyId) {
+        if (!C2SThrottle.allow(player, THROTTLE_KEY, THROTTLE_TICKS)) {
+            return;
+        }
+        KeyTriggerHandler handler = KeyTriggerRegistry.get(keyId);
+        if (handler == null) {
+            return;
+        }
+        ServerLevel world = player.serverLevel();
+        // 扫描范围 Cloth Config 配置 (默认 10 格)
+        AABB aabb = player.getBoundingBox().inflate(ActiveTaskConfig.BI_TRIGGER_RANGE.get());
+        for (EntityMaid maid : world.getEntitiesOfClass(EntityMaid.class, aabb,
+                m -> m.isAlive() && m.isOwnedBy(player))) {
+            handler.handle(maid, player);
+        }
+    }
+
+    /** 客户端发送触发请求 (keyId = KeyTriggerRegistry 注册 id) */
+    public static void sendToServer(String keyId) {
+        LmaNetwork.sender.sendToServer(new InteractTriggerPacket(keyId));
     }
 }

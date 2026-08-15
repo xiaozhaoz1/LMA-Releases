@@ -1,16 +1,14 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.xiaozhaoz1.littlemaidmoreaction.api.navigation.NavigationMemory;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.MoveToBlockStateMachine;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskStateMachine;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -24,14 +22,13 @@ import java.util.Set;
  * SEARCHING → NAVIGATING → CRANKING → SEARCHING → ...
  * </pre>
  */
-public final class CrankPipeline extends TaskStateMachine<CrankPipeline.State> {
+public final class CrankPipeline extends MoveToBlockStateMachine<CrankPipeline.State> {
 
     enum State { SEARCHING, NAVIGATING, CRANKING }
 
     @Override protected Class<State> stateClass() { return State.class; }
     @Override protected State initialState() { return State.SEARCHING; }
     @Override public String taskType() { return "crank"; }
-    @Override public boolean needsGameTick() { return true; }
 
     @Override
     protected Map<State, Set<State>> transitions() {
@@ -50,12 +47,6 @@ public final class CrankPipeline extends TaskStateMachine<CrankPipeline.State> {
     @Override
     public PipelineResult validate(ServerLevel l, EntityMaid m, PipelineContext c) {
         return PipelineResult.ok("");
-    }
-
-    @Override
-    protected void cleanup(EntityMaid maid) {
-        super.cleanup(maid);
-        NavigationMemory.clearAllNav(maid);
     }
 
     // ── 状态业务逻辑 ──
@@ -85,16 +76,4 @@ public final class CrankPipeline extends TaskStateMachine<CrankPipeline.State> {
                 yield null;
             }
         };
-    }
-
-    // ── 辅助 ──
-
-    private static void navigateTo(EntityMaid maid, BlockPos target) {
-        NavigationMemory.setNavTarget(maid, target);
-        BehaviorUtils.setWalkAndLookTargetMemories(maid, target, 1.0F, 2);
-    }
-
-    private static boolean arrived(EntityMaid m, BlockPos p) {
-        return p.distToCenterSqr(m.position()) < 9.0;
-    }
-}
+    }}

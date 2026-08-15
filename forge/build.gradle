@@ -17,6 +17,7 @@ repositories {
     maven { url = uri(rootProject.file('libs-maven').toURI()) }
 }
 
+// 2026-08-11c: lunar jar-in-jar 内置 (forge JarInJar 机制)
 dependencies {
     // TLM 1.20.1 (本地 maven repo, modImplementation 自动重映射)
     modImplementation 'com.github.tartaricacid:touhoulittlemaid:1.5.3'
@@ -24,6 +25,8 @@ dependencies {
     modImplementation 'me.shedaniel.cloth:cloth-config-forge:11.1.136'
     // ClassGraph (mod 运行时依赖 — dev runClient 类路径可见)
     modImplementation 'io.github.classgraph:classgraph:4.8.168'
+    // v79.47 农历节日: 农历换算库 — 2026-08-11c jar-in-jar 内置 (Maven Central, 部署零额外 jar)
+    jarJar(implementation('cn.6tail:lunar:1.7.7'))
 
     if (useTeaKit && minecraftVersion != '1.16.5' && !useLegacyForgeRunPath) {
         runtimeOnly library(libs, 'teakit-forge')

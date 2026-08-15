@@ -38,6 +38,9 @@ public final class LmaTaskTypeRegistry {
     /** 简单任务类型 — 无需参数即可执行 */
     private static final Set<String> SIMPLE_TASKS = ConcurrentHashMap.newKeySet();
 
+    /** 任务专属图标 (LMAT.registerTask 聚合注册) — getIcon 优先于此表 */
+    private static final Map<String, Item> TASK_ICONS = new ConcurrentHashMap<>();
+
     /** 图标映射: 关键词 → Item */
     private static final Map<String, Item> ICON_MAP = Map.ofEntries(
         Map.entry("craft",     Items.CRAFTING_TABLE),
@@ -75,6 +78,9 @@ public final class LmaTaskTypeRegistry {
     /** 使用自定义 IMaidTask 的任务类型 — scanAndRegister 跳过 */
     private static final Set<String> CUSTOM_TASK_TYPES = Set.of("maid_assembly");
 
+    /** 最近一次 scanAndRegister 的 TaskManager — 迟注册钩子 onTaskRegistered 补注册目标 */
+    private static volatile TaskManager lastManager;
+
     /** 已知简单任务类型 (启动时初始化 + 可运行时注册) */
     static {
         SIMPLE_TASKS.add("bell_ring");
@@ -92,8 +98,11 @@ public final class LmaTaskTypeRegistry {
      * 注册纯 TaskRegistry 驱动 — 规则引擎 task_type 动态注册已随事件链裁撤移除。
      */
     public static void scanAndRegister(TaskManager manager) {
+        lastManager = manager; // 记录供迟注册钩子 — 外部 Mod 晚于 LMA 注册时即时补注册
         for (String known : getKnownTaskTypes()) {
-            if ("brewing".equals(known)) continue;
+            // brewing 跳过特例已删 (2026-08-11c): 旧口径 farm/brewing 已删任务残留 —
+            // LMA-MAIN 零注册 "brewing" (grep 实证), TLM 1.20.1 无 brewing 任务 (仅 MAID_BREWING 音效),
+            // 守卫永不命中; 外部 mod 真注册 brewing 反而会被静默吞掉 (TaskManager 无 uid 冲突)
             if (CUSTOM_TASK_TYPES.contains(known)) continue; // 使用自定义 IMaidTask
             // TaskRegistry.showInBar 控制 TLM 任务栏可见性
             if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.isShowInBar(known)) continue;
@@ -113,6 +122,40 @@ public final class LmaTaskTypeRegistry {
         LittleMaidMoreAction.LOGGER.info("[LMA] Registered {} typed flow tasks + 1 fallback to TLM", count);
     }
 
+    /**
+     * 迟注册钩子 — 经 LMAT 门面注册的主动任务 (register/registerTask) 调用。
+     *
+     * <p>时机问题: {@link #scanAndRegister(TaskManager)} 只在 LMA 的 {@code addMaidTask}
+     * 运行一次, 外部 Mod 的注册顺序不保证 — 晚于 LMA 注册的任务类型不在扫描快照内,
+     * TLM 任务栏将缺失其 typed IMaidTask。本钩子在 manager 已知后即时补注册,
+     * 消除顺序依赖; 早于 LMA 注册的任务走扫描路径 (taskTypes() 已含), 钩子幂等跳过。
+     *
+     * <p>被动任务不注册 (showInBar=false 不进任务栏, 与扫描口径一致)。
+     *
+     * <p>fail-soft: TLM TaskManager.init 末尾把 TASK_MAP/TASK_INDEX 冻结为
+     * ImmutableMap/ImmutableList (TLM 源码实证), 注册晚于 init 时 add 抛
+     * UnsupportedOperationException — 捕获降 WARN, 任务仍可经 LMAT.submit 驱动。
+     */
+    public static void onTaskRegistered(String taskType) {
+        TaskManager manager = lastManager;
+        if (manager == null) return; // scanAndRegister 尚未运行 — 后续扫描会覆盖
+        if (CUSTOM_TASK_TYPES.contains(taskType)) return;
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.isShowInBar(taskType)) return;
+        if (TYPED.containsKey(taskType)) return; // 扫描期已注册 — 防 TLM 重复 add
+        registerIfNew(taskType);
+        IMaidTask task = TYPED.get(taskType);
+        if (task != null) {
+            try {
+                manager.add(task);
+                LittleMaidMoreAction.LOGGER.info("[LMA] Late-registered typed task to TLM: {}", task.getUid());
+            } catch (RuntimeException e) {
+                LittleMaidMoreAction.LOGGER.warn(
+                    "[LMA] TLM TaskManager 已冻结, 任务栏注册过晚 ({}): 请在 TLM addMaidTask 阶段注册 — {}",
+                    taskType, e.toString());
+            }
+        }
+    }
+
     private static void registerIfNew(String taskType) {
         if (taskType == null || taskType.isEmpty() || TYPED.containsKey(taskType)) return;
         if (CUSTOM_TASK_TYPES.contains(taskType)) return; // 双防护
@@ -123,39 +166,33 @@ public final class LmaTaskTypeRegistry {
 
     // ── 查询 ──
 
-    /** TLM-native 任务已删除，全部走 TYPED map (LmaTypedFlowTask) 回退 */
-    public static IMaidTask findByTaskType(String taskType) {
-        if (taskType == null || taskType.isEmpty()) return LmaFlowTask.get();
-        return TYPED.getOrDefault(taskType, LmaFlowTask.get());
-    }
-
-    /** 是否为简单任务 (无需 AI 内容即可执行) */
+    /** 是否为简单任务 (无需 AI 内容即可执行) — LmaTaskGuiHandler GUI 启用条件判定 */
     public static boolean isSimple(String taskType) {
         return taskType != null && SIMPLE_TASKS.contains(taskType);
     }
 
-    /** 运行时注册简单任务类型 (供 compat 模块使用) */
-    public static void registerSimple(String taskType) {
-        SIMPLE_TASKS.add(taskType);
-    }
-
-    /** 从 ResourceLocation 路径提取 task_type (如 lma:task/craft_chain → craft_chain) */
+    /** 从 ResourceLocation 路径提取 task_type — 委托纯类 {@link TaskTypeUid} (同包, 纯 JVM 可测) */
     public static String extractTaskType(String uidPath) {
-        if (uidPath == null) return null;
-        String prefix = "task/";
-        int idx = uidPath.indexOf(prefix);
-        if (idx >= 0) {
-            return uidPath.substring(idx + prefix.length());
-        }
-        if (uidPath.equals("flow_task")) return "flow_task";
-        return null;
+        return TaskTypeUid.extractTaskType(uidPath);
     }
 
     // ── 图标 ──
 
-    /** 根据 task_type 获取图标 */
+    /**
+     * 注册任务专属图标 (LMAT.registerTask 聚合调用) — keyword 经 ICON_MAP 关键词表解析
+     * (如 "craft"/"bell"/"arm", 大小写不敏感); 未命中 → 不注册, getIcon 回退默认/关键词包含匹配。
+     */
+    public static void registerIcon(String taskType, String iconKeyword) {
+        if (taskType == null || taskType.isEmpty() || iconKeyword == null) return;
+        Item icon = ICON_MAP.get(iconKeyword.toLowerCase(Locale.ROOT));
+        if (icon != null) TASK_ICONS.put(taskType, icon);
+    }
+
+    /** 根据 task_type 获取图标 (专属表优先 → 硬编码特例 → 关键词包含匹配 → 默认) */
     public static ItemStack getIcon(String taskType) {
         if (taskType == null || taskType.isEmpty()) return DEFAULT_ICON;
+        Item custom = TASK_ICONS.get(taskType);
+        if (custom != null) return custom.getDefaultInstance();
         switch (taskType) {
             case "collect_wood": return Items.IRON_AXE.getDefaultInstance();
             case "collect_ore": return Items.IRON_PICKAXE.getDefaultInstance();
@@ -170,38 +207,4 @@ public final class LmaTaskTypeRegistry {
         return DEFAULT_ICON;
     }
 
-    /** 获取已注册的 typed task 数量 */
-    public static int typedCount() {
-        return TYPED.size();
-    }
-
-    // ── 任务关键词统一映射 (单一真相源) ──
-
-    public static final Map<String, String> TASK_KEYWORD_MAP = Map.ofEntries(
-        Map.entry("craft", "craft_chain"),
-        Map.entry("make", "craft_chain"),
-        Map.entry("smelt", "furnace"),
-        Map.entry("cook", "furnace"),
-        Map.entry("烧", "furnace"),
-        Map.entry("bell", "bell_ring"),
-        Map.entry("ring", "bell_ring"),
-        Map.entry("敲钟", "bell_ring"),
-        Map.entry("music", "jukebox"),
-        Map.entry("record", "jukebox"),
-        Map.entry("唱片", "jukebox"),
-        Map.entry("farm", "farm"),
-        Map.entry("harvest", "farm"),
-        Map.entry("种地", "farm")
-    );
-
-    /** 生成任务关键词 AI prompt 文本 */
-    public static String buildTaskKeywordPrompt() {
-        StringBuilder sb = new StringBuilder();
-        sb.append("ALL crafting table work = craft_chain with item_id in data. ");
-        sb.append("target_count: 0=craft ALL, >0=specific. ");
-        sb.append("Other: furnace/smelt→furnace, ");
-        sb.append("brew→brewing, bell→bell_ring, music→jukebox, farm→farm. ");
-        sb.append("Do NOT query inventory — just assign task directly.");
-        return sb.toString();
-    }
 }

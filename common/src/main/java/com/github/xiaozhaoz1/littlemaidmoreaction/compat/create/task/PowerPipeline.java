@@ -1,14 +1,13 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.xiaozhaoz1.littlemaidmoreaction.api.navigation.NavigationMemory;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskStateMachine;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.MoveToBlockStateMachine;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.StepType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
-import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 
 import java.util.List;
 import java.util.Map;
@@ -17,14 +16,13 @@ import java.util.Set;
 /**
  * 动力齿轮 (v62: pipelineData 管理私有状态).
  */
-public final class PowerPipeline extends TaskStateMachine<PowerPipeline.State> {
+public final class PowerPipeline extends MoveToBlockStateMachine<PowerPipeline.State> implements TaskConfigurable {
 
     enum State { SEARCHING, NAVIGATING, POWERING }
 
     @Override protected Class<State> stateClass() { return State.class; }
     @Override protected State initialState() { return State.SEARCHING; }
     @Override public String taskType() { return "power"; }
-    @Override public boolean needsGameTick() { return true; }
 
     @Override
     protected Map<State, Set<State>> transitions() {
@@ -43,9 +41,11 @@ public final class PowerPipeline extends TaskStateMachine<PowerPipeline.State> {
     @Override
     protected void cleanup(EntityMaid maid) {
         stopPower(maid);
-        super.cleanup(maid);
-        NavigationMemory.clearAllNav(maid);
+        super.cleanup(maid);   // 基类 cleanup 含 NavigationMemory.clearAllNav
     }
+
+    @Override
+    public String targetKey() { return "pos"; }   // Power 历史键名 "pos" (非 "target")
 
     @Override
     protected void onExit(State state, EntityMaid maid) {
@@ -60,12 +60,12 @@ public final class PowerPipeline extends TaskStateMachine<PowerPipeline.State> {
             case SEARCHING -> {
                 BlockPos target = PowerService.findTarget(world, maid.blockPosition());
                 if (target == null) yield null;
-                pipelineData(maid).putString("pos", target.toShortString());
+                writeTarget(maid, target);
                 navigateTo(maid, target);
                 yield State.NAVIGATING;
             }
             case NAVIGATING -> {
-                BlockPos target = readPos(maid);
+                BlockPos target = readTarget(maid);
                 if (target == null) yield State.SEARCHING;
                 if (!PowerService.isTargetBlock(world.getBlockState(target).getBlock()))
                     yield State.SEARCHING;
@@ -77,7 +77,7 @@ public final class PowerPipeline extends TaskStateMachine<PowerPipeline.State> {
                 yield null;
             }
             case POWERING -> {
-                BlockPos target = readPos(maid);
+                BlockPos target = readTarget(maid);
                 if (target == null) { stopPower(maid); yield State.SEARCHING; }
                 if (!PowerService.isTargetBlock(world.getBlockState(target).getBlock())) {
                     stopPower(maid); yield State.SEARCHING;
@@ -95,29 +95,8 @@ public final class PowerPipeline extends TaskStateMachine<PowerPipeline.State> {
             ? pipelineData(maid).getFloat("rpm") : PowerService.DEFAULT_RPM;
     }
 
-    private BlockPos readPos(EntityMaid maid) {
-        String s = pipelineData(maid).getString("pos");
-        if (s.isEmpty()) return null;
-        try {
-            String[] p = s.split(",");
-            return new BlockPos(
-                Integer.parseInt(p[0].trim()),
-                Integer.parseInt(p[1].trim()),
-                Integer.parseInt(p[2].trim()));
-        } catch (Exception e) { return null; }
-    }
-
     private void stopPower(EntityMaid maid) {
-        BlockPos pos = readPos(maid);
+        BlockPos pos = readTarget(maid);
         if (pos != null) PowerService.stopPower((ServerLevel) maid.level(), pos);
-    }
-
-    private static void navigateTo(EntityMaid maid, BlockPos target) {
-        NavigationMemory.setNavTarget(maid, target);
-        BehaviorUtils.setWalkAndLookTargetMemories(maid, target, 1.0F, 2);
-    }
-
-    private static boolean arrived(EntityMaid m, BlockPos p) {
-        return p.distToCenterSqr(m.position()) < 9.0;
     }
 }

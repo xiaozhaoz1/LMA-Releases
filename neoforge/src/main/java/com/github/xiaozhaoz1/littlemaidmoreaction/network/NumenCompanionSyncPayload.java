@@ -60,7 +60,10 @@ public final class NumenCompanionSyncPayload implements CustomPacketPayload {
 
     private static NumenCompanionSyncPayload decode(FriendlyByteBuf buf) {
         int n = buf.readInt();
-        List<Binding> list = new ArrayList<>();
+        if (n < 0 || n > 2048) {   // S2C 信任边界 (审计 H2 — 三件套补漏)
+            return new NumenCompanionSyncPayload(List.of());
+        }
+        List<Binding> list = new ArrayList<>(Math.min(n, 2048));
         for (int i = 0; i < n; i++) {
             list.add(new Binding(buf.readUUID(), buf.readUtf(), buf.readUtf()));
         }

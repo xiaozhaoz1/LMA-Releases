@@ -20,6 +20,7 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 //?}
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
@@ -42,6 +43,11 @@ public final class ConfigSyncPacket implements CustomPacketPayload {
     private static final byte TYPE_DOUBLE = 2;
     private static final byte TYPE_STRING = 3;
     private static final byte TYPE_LIST = 4;
+
+    /** 单包条目上限 — 双向包客户端信任边界 (恶意服务器超大计数致 OOM) */
+    private static final int MAX_ENTRIES = 2048;
+    /** 纯 JDK 日志 — decode 路径可被纯 JVM 测试触发 (错题 #174) */
+    private static final System.Logger LOG = System.getLogger("LMA-Net-ConfigSync");
 
     private final List<MoreActionConfig.ConfigValueEntry> entries;
 
@@ -79,18 +85,24 @@ public final class ConfigSyncPacket implements CustomPacketPayload {
     }
 
     public static ConfigSyncPacket decode(FriendlyByteBuf buf) {
-        List<MoreActionConfig.ConfigValueEntry> list = buf.readList(b -> {
-            String path = b.readUtf();
-            Object v = switch (b.readByte()) {
-                case TYPE_BOOL -> b.readBoolean();
-                case TYPE_INT -> b.readInt();
-                case TYPE_DOUBLE -> b.readDouble();
-                case TYPE_STRING -> b.readUtf();
-                case TYPE_LIST -> b.readList(FriendlyByteBuf::readUtf);
-                default -> throw new IllegalStateException("[LMA] 配置同步未知类型标记 @ " + path);
-            };
-            return new MoreActionConfig.ConfigValueEntry(path, v);
-        });
+        int n = buf.readVarInt();
+        if (n < 0 || n > MAX_ENTRIES) {
+            LOG.log(System.Logger.Level.WARNING, "[LMA] 配置同步包条目数异常 ({0}), 丢弃", n);
+            return new ConfigSyncPacket(List.of());
+        }
+        List<MoreActionConfig.ConfigValueEntry> list = new ArrayList<>(n);
+        for (int i = 0; i < n; i++) {
+            String path = buf.readUtf();
+            byte type = buf.readByte();
+            switch (type) {
+                case TYPE_BOOL -> list.add(new MoreActionConfig.ConfigValueEntry(path, buf.readBoolean()));
+                case TYPE_INT -> list.add(new MoreActionConfig.ConfigValueEntry(path, buf.readInt()));
+                case TYPE_DOUBLE -> list.add(new MoreActionConfig.ConfigValueEntry(path, buf.readDouble()));
+                case TYPE_STRING -> list.add(new MoreActionConfig.ConfigValueEntry(path, buf.readUtf()));
+                case TYPE_LIST -> list.add(new MoreActionConfig.ConfigValueEntry(path, buf.readList(FriendlyByteBuf::readUtf)));
+                default -> LOG.log(System.Logger.Level.WARNING, "[LMA] 配置同步未知类型标记 {0} @ {1} — 跳过该条目", type, path);
+            }
+        }
         return new ConfigSyncPacket(list);
     }
 
@@ -100,7 +112,7 @@ public final class ConfigSyncPacket implements CustomPacketPayload {
         if (context.getDirection().getReceptionSide().isServer()) {
             context.enqueueWork(() -> {
                 ServerPlayer sender = context.getSender();
-                // v67.11: 仅 OP (权限 ≥2) 可改服务端配置 — 防任意客户端篡改
+                // 仅 OP (权限 ≥2) 可改服务端配置 — 防任意客户端篡改
                 if (sender == null || !sender.hasPermissions(2)) {
                     LittleMaidMoreAction.LOGGER.warn("[LMA] 配置同步被拒绝 (非 OP): {}",
                             sender == null ? "?" : sender.getGameProfile().getName());
@@ -142,9 +154,8 @@ public final class ConfigSyncPacket implements CustomPacketPayload {
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return outboundType; }
 
-    public static final StreamCodec<ByteBuf, ConfigSyncPacket> STREAM_CODEC = StreamCodec.of(
-        (ByteBuf buf, ConfigSyncPacket msg) -> encode(msg, (FriendlyByteBuf) buf),
-        (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, ConfigSyncPacket> STREAM_CODEC =
+        PacketCodecs.wrap(ConfigSyncPacket::encode, ConfigSyncPacket::decode);
 
     public static void handlePayload(ConfigSyncPacket msg, IPayloadContext ctx) {
         if (ctx.flow().isServerbound()) {
@@ -153,7 +164,7 @@ public final class ConfigSyncPacket implements CustomPacketPayload {
                     LittleMaidMoreAction.LOGGER.warn("[LMA] 配置同步被拒绝 (非玩家)");
                     return;
                 }
-                // v67.11: 仅 OP (权限 ≥2) 可改服务端配置 — 防任意客户端篡改
+                // 仅 OP (权限 ≥2) 可改服务端配置 — 防任意客户端篡改
                 if (!sender.hasPermissions(2)) {
                     LittleMaidMoreAction.LOGGER.warn("[LMA] 配置同步被拒绝 (非 OP): {}",
                             sender.getGameProfile().getName());

@@ -4,7 +4,6 @@ import com.github.tartaricacid.touhoulittlemaid.ai.agent.context.GameContextRegi
 import com.github.tartaricacid.touhoulittlemaid.ai.agent.tool.ToolRegister;
 import com.github.tartaricacid.touhoulittlemaid.api.ILittleMaid;
 import com.github.tartaricacid.touhoulittlemaid.api.LittleMaidExtension;
-import com.github.tartaricacid.touhoulittlemaid.api.event.client.DefaultGeckoAnimationEvent;
 import com.github.tartaricacid.touhoulittlemaid.client.animation.gecko.magic.MagicCastingAnimationManager;
 import com.github.tartaricacid.touhoulittlemaid.api.entity.ai.IExtraMaidBrain;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.ExtraMaidBrainManager;
@@ -75,9 +74,12 @@ import net.neoforged.fml.event.lifecycle.FMLClientSetupEvent;
 /**
  * TLM 扩展入口。
  *
- * 动画注册双通道：
- * - FORGE 总线: 注册 jar 内置动画到 TLM (DefaultGeckoAnimationEvent)
- * - MOD 总线:  生成 config 预设 → 扫描自定义 → 加载时长 → 注册 AnimationState
+ * 动画注册 (DefaultGeckoAnimationEvent) 在平台入口构造器手动注册
+ * (forge: {@code LittleMaidMoreAction} / neoforge: {@code LmaNeoForgeClientEntry}) —
+ * TLM javadoc 要求手动注册 ("事件早于 LittleMaidExtension 注解识别"), v79.18 实证注解
+ * auto-scan 对该事件失效; 2026-08-11c 删本类原 @EventBusSubscriber 注解路径 (双注册清理)。
+ * - 平台入口 (FORGE/GAME 总线): 注册 jar 内置动画到 TLM (DefaultGeckoAnimationEvent)
+ * - MOD 总线 (本类 ModClientEvents): 生成 config 预设 → 扫描自定义 → 加载时长
  *
  * 所有配置统一在 config/littlemaidmoreaction/ 下管理。
  */
@@ -101,7 +103,8 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
     @Override
     public void addMaidTask(TaskManager manager) {
         LmaTaskTypeRegistry.scanAndRegister(manager);
-        // v56: 便携装配 (Create门控); v77: CompatToggle 开关 (可 GUI 关闭)
+        // 便携装配 (Create门控); CompatToggle 开关 (可 GUI 关闭)
+        // ★ 门控镜像 CompatRegistry.MODULES 模块表 (GUI/开关单一事实源) — 2026-08-11c
 //? if 1.20.1 {
         if (com.github.xiaozhaoz1.littlemaidmoreaction.compat.CompatToggle.isModuleEnabled("create")
                 && net.minecraftforge.fml.ModList.get().isLoaded("create")) {
@@ -123,27 +126,27 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         LittleMaidMoreAction.LOGGER.info("[LMA] 耕种白名单处理器已注册");
     }
 
-    // ── v10: AI 整合扩展点 (TLM >= 1.5.1) ──
+    // ── AI 整合扩展点 (TLM >= 1.5.1) ──
 
     @Override
     public void registerAITool(ToolRegister register) {
-        // v73: AI 世界操作工具 (TLM AI 环 — 移动/挖掘/交互/战斗/切任务, 委托 LMA IO+fakeplayer)
+        // AI 世界操作工具 (TLM AI 环 — 移动/挖掘/交互/战斗/切任务, 委托 LMA IO+fakeplayer)
         com.github.xiaozhaoz1.littlemaidmoreaction.compat.ai.AiToolRegistration.registerAll(register);
     }
 
     @Override
     public void registerAIMaidContext(GameContextRegister register) {
-        // v10: 周围方块感知 + LMA 状态摘要 (LmaStatusContext 暂挂)
+        // 周围方块感知 + LMA 状态摘要 (LmaStatusContext 暂挂)
         com.github.xiaozhaoz1.littlemaidmoreaction.ai.context.LmaBlocksContext.registerAll(register);
         com.github.xiaozhaoz1.littlemaidmoreaction.ai.context.LmaDetailContext.registerAll(register);
-        // v63: 环境感知上下文
+        // 环境感知上下文
         com.github.xiaozhaoz1.littlemaidmoreaction.ai.context.LmaEnvSenseContext.registerAll(register);
-        // v64: 任务状态上下文
+        // 任务状态上下文
         com.github.xiaozhaoz1.littlemaidmoreaction.ai.context.MaidTaskContext.registerAll(register);
         LittleMaidMoreAction.LOGGER.info("[LMA] AI Context 已注册 (nearby_blocks + lma_status + lma_details + envsense + lma_task)");
     }
 
-    // ── v79.20: 哈气表情气泡自定义类型 ──
+    // ── 哈气表情气泡自定义类型 ──
 
     @Override
     public void registerChatBubble(com.github.tartaricacid.touhoulittlemaid.entity.chatbubble.ChatBubbleRegister register) {
@@ -152,7 +155,7 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         LittleMaidMoreAction.LOGGER.info("[LMA] 哈气表情气泡已注册 (haqi_emoji)");
     }
 
-    // ── v12.5: 预留扩展钩子 (待实现) ──
+    // ── 预留扩展钩子 (待实现) ──
 
     /** [预留] 注册女仆背包类型 */
     @Override
@@ -188,23 +191,6 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         LittleMaidMoreAction.LOGGER.info("[LMA] ExtraMaidBrain 已注册 (NAV_TARGET, NAV_START_TICK + default behaviors)");
     }
 
-    /**
-     * FORGE 总线：读取 startup.json 动画清单，注册到 TLM 动画索引。
-     * FORGE 总线：读取 startup.json 动画清单，注册到 TLM 动画索引。
-     * 包含预设 + 自定义动画，单一来源。
-     */
-//? if 1.20.1 {
-    @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
-//?} else {
-    @EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID, bus = EventBusSubscriber.Bus.GAME, value = Dist.CLIENT)
-//?}
-    public static final class AnimationEvents {
-        @SubscribeEvent
-        public static void onDefaultGeckoAnimation(DefaultGeckoAnimationEvent event) {
-            MoreActionAPI.registerCustomAnimations(event);
-        }
-    }
-
     /** MOD 总线：客户端初始化 */
 //? if 1.20.1 {
     @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID, bus = Mod.EventBusSubscriber.Bus.MOD, value = Dist.CLIENT)
@@ -215,7 +201,7 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         @SubscribeEvent
         public static void onClientSetup(FMLClientSetupEvent event) {
             event.enqueueWork(() -> {
-                MoreActionAPI.scanCustomAnimations();
+                AnimationResourceRegistrar.scanCustomAnimations();
                 // ★ loadClientDurations() 已移至 onClientReload — 此时 GeckoLibCache 尚未加载自定义动画，
                 // 提前调用会导致 DURATIONS 为空、兜底动画误报"不存在"
                 // 动画播放已迁移到 magic_casting 控制器 (LmaMagicCastingProvider)
@@ -252,30 +238,6 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
 //?}
             event.addRepositorySource(c -> c.accept(animPack));
             LittleMaidMoreAction.LOGGER.info("[LMA] 动画资源包已注册 ({} 个)", animRes.getAnimationFiles().size());
-        }
-    }
-
-    /** FORGE 总线：监听女仆卸载事件，清理耕种白名单缓存 */
-//? if 1.20.1 {
-    @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID, bus = Mod.EventBusSubscriber.Bus.FORGE)
-//?} else {
-    @EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID, bus = EventBusSubscriber.Bus.GAME)
-//?}
-    public static final class ServerEvents {
-        @SubscribeEvent
-        public static void onEntityLeaveLevel(EntityLeaveLevelEvent event) {
-            if (event.getEntity() instanceof EntityMaid maid) {
-                AutoCropHandler.onMaidUnload(maid.getUUID());
-                // v63: 环境感知缓存清理（key 闭环）
-                com.github.xiaozhaoz1.littlemaidmoreaction.task.sense
-                    .EnvSenseBroadcaster.onMaidUnload(maid.getId());
-                // v64: TlmTaskMonitor HashMap key 闭环
-                com.github.xiaozhaoz1.littlemaidmoreaction.adapter
-                    .TlmTaskMonitor.onMaidLeave(maid.getId());
-                // v38: FakePlayer 持续挖掘清理
-                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.fakeplayer
-                    .FakePlayerManager.onMaidUnload(maid.getId());
-            }
         }
     }
 }

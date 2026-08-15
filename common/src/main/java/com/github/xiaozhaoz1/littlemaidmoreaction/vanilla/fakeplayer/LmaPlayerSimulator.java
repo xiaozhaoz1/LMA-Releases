@@ -68,9 +68,6 @@ public final class LmaPlayerSimulator {
         LEFT_CLICK_CONTINUOUS
     }
 
-    /** 射线追踪起点偏移 (模拟玩家眼睛高度) */
-    private static final double EYE_OFFSET = 1.0;
-
     private LmaPlayerSimulator() {}
 
     // ── 主入口 ──
@@ -95,7 +92,7 @@ public final class LmaPlayerSimulator {
     // ── 右键 ──
 
     /**
-     * 实体交互原语 (v76 Phase 4) — 自 simulateRightClick 提取, 行为不变。
+     * 实体交互原语 — 自 simulateRightClick 提取, 行为不变。
      * 交互 AABB(targetPos) 内随机首个非 fakeplayer 实体: entity.interact →
      * (LivingEntity) stack.interactLivingEntity → 掉落物入女仆背包。
      * 不触碰方块/物品 use 链。交互失败返回 false (调用方继续方块链)。
@@ -134,7 +131,7 @@ public final class LmaPlayerSimulator {
         InteractionHand hand = InteractionHand.MAIN_HAND;
         ItemStack stack = player.getItemInHand(hand);
 
-        // 1. 实体交互优先 (v76 Phase 4: 提取自 interactEntity, 行为不变)
+        // 1. 实体交互优先 (提取自 interactEntity, 行为不变)
         if (interactEntity(player, world, targetPos)) return true;
 
         // 2. 方块交互事件
@@ -189,7 +186,7 @@ public final class LmaPlayerSimulator {
     }
 
     /**
-     * 纯块放置 (v79.19c) — 仿 maid_useful_task {@code MaidUtils.placeBlock} 链:
+     * 纯块放置 — 仿 maid_useful_task {@code MaidUtils.placeBlock} 链:
      * 手工 BlockHitResult → UseOnContext → onItemUseFirst → PASS → useOn。
      * <b>无实体交互扫描 / 无 RightClickBlock 事件</b> — 参考源码 (maid_useful_task / Baritone
      * processRightClickBlock) 放置均走纯块链; interactEntity 扫描 target 格会抢占女仆
@@ -383,9 +380,24 @@ public final class LmaPlayerSimulator {
 
     // ── 女仆数据同步 ──
 
-    /** 将假玩家手持物品同步回女仆主手 */
+    /**
+     * 将假玩家手持物品同步回女仆主手。
+     * <p>加固 (回归扫描 B3): 假人主手 = 构造时女仆主手副本, 模拟期间女仆主手可能被
+     * 其他系统替换 (换手/空手入食物等) → 无条件覆盖会吞掉当前主手且旧物无落点。
+     * 同步前 identity 对比构造时来源引用 (非 equals — 内容相同也判定为替换):
+     * 被替换过 → 当前主手先入背包 (不含手槽, 溢出落地), 再同步。
+     */
     public static void syncHandToMaid(LmaFakePlayer player) {
-        player.getMaid().setItemInHand(InteractionHand.MAIN_HAND,
+        EntityMaid maid = player.getMaid();
+        ItemStack current = maid.getMainHandItem();
+        if (!current.isEmpty() && current != player.getSourceHand()) {
+            // 主手在假人生命周期内被替换 — 旧物必入背包 (溢出落地), 不凭空消失
+            ItemStack remainder = ItemHandlerHelper.insertItemStacked(maid.getAvailableBackpackInv(), current, false);
+            if (!remainder.isEmpty()) {
+                maid.spawnAtLocation(remainder);
+            }
+        }
+        maid.setItemInHand(InteractionHand.MAIN_HAND,
             player.getItemInHand(InteractionHand.MAIN_HAND));
     }
 

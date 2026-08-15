@@ -57,6 +57,7 @@ public final class TaskConfigActionPacket implements CustomPacketPayload {
     }
 
     public static TaskConfigActionPacket decode(FriendlyByteBuf buf) {
+        // 读序与 encode 严格对称 (字节级 round-trip 契约); null NBT 判空在 handle/handlePayload (空 payload 守卫)
         return new TaskConfigActionPacket(buf.readInt(), buf.readUtf(), buf.readByte(), buf.readNbt());
     }
 
@@ -67,12 +68,17 @@ public final class TaskConfigActionPacket implements CustomPacketPayload {
             if (player == null) return;
             Entity e = player.serverLevel().getEntity(msg.maidId);
             if (!(e instanceof EntityMaid maid)) return;
-            // 权限: 仅女仆所有者可修改配置 (对齐 BlockInteractConfigMenu.stillValid)
-            if (!maid.isOwnedBy(player)) return;
+            // 鉴权 (M-2, 对齐 OpenMaidListPacket 四连): UUID 级比较 (错题 #130 isOwnedBy 引用比较陷阱) + 距离 ≤8 格
+            if (maid.getOwnerUUID() == null || !maid.getOwnerUUID().equals(player.getUUID())) return;
+            if (maid.distanceToSqr(player) > 64.0D) return;
 
             TaskRegistry.TaskHandler handler = TaskRegistry.get(msg.taskType);
             if (handler == null) return;
-            handler.pipeline().handleConfigAction(maid, msg.action, msg.payload);
+            // 配置维度拆分 — 未实现 TaskConfigurable 的管线忽略配置动作
+            if (handler.pipeline() instanceof com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable tc) {
+                if (msg.payload == null) return;   // 双保险 (decode 已兜底, 防其余构造路径)
+                tc.handleConfigAction(maid, msg.action, msg.payload);
+            }
         });
         ctx.get().setPacketHandled(true);
     }
@@ -84,21 +90,25 @@ public final class TaskConfigActionPacket implements CustomPacketPayload {
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public static final StreamCodec<ByteBuf, TaskConfigActionPacket> STREAM_CODEC = StreamCodec.of(
-        (ByteBuf buf, TaskConfigActionPacket msg) -> encode(msg, (FriendlyByteBuf) buf),
-        (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, TaskConfigActionPacket> STREAM_CODEC =
+        PacketCodecs.wrap(TaskConfigActionPacket::encode, TaskConfigActionPacket::decode);
 
     public static void handlePayload(TaskConfigActionPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer player)) return;
             Entity e = player.serverLevel().getEntity(msg.maidId);
             if (!(e instanceof EntityMaid maid)) return;
-            // 权限: 仅女仆所有者可修改配置 (对齐 BlockInteractConfigMenu.stillValid)
-            if (!maid.isOwnedBy(player)) return;
+            // 鉴权 (M-2, 对齐 OpenMaidListPacket 四连): UUID 级比较 (错题 #130 isOwnedBy 引用比较陷阱) + 距离 ≤8 格
+            if (maid.getOwnerUUID() == null || !maid.getOwnerUUID().equals(player.getUUID())) return;
+            if (maid.distanceToSqr(player) > 64.0D) return;
 
             TaskRegistry.TaskHandler handler = TaskRegistry.get(msg.taskType);
             if (handler == null) return;
-            handler.pipeline().handleConfigAction(maid, msg.action, msg.payload);
+            // 配置维度拆分 — 未实现 TaskConfigurable 的管线忽略配置动作
+            if (handler.pipeline() instanceof com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable tc) {
+                if (msg.payload == null) return;   // 双保险 (decode 已兜底, 防其余构造路径)
+                tc.handleConfigAction(maid, msg.action, msg.payload);
+            }
         });
     }
 //?}

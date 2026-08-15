@@ -1,4 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.assembly;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.DataKey;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ItemStackHelper;
 
@@ -27,7 +29,10 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 public final class MaidAssemblyInventory extends ItemStackHandler {
 
-    private static final Map<UUID, MaidAssemblyInventory> CACHE = new ConcurrentHashMap<>();
+    // 声明式清理 (v79.61 批 3c): 构造期登记卸载清理, 替代 MaidUnloadRegistry 显式行
+    private static final Map<UUID, MaidAssemblyInventory> CACHE =
+            com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.MaidUnloadRegistry.registerCache(
+                    new ConcurrentHashMap<>(), EntityMaid::getUUID);
 
     public static final int MACHINE_SLOTS = 8;
     public static final int MATERIAL_SLOT = 8;
@@ -121,7 +126,8 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
 
     private void loadFromNBT() {
         setSize(TOTAL_SLOTS); // 先分配数组, deserializeNBT 再填充
-        CompoundTag root = maid.getPersistentData().getCompound(NBT_KEY);
+        // 门面收编 (getCompound 语义 = MaidData.get COMPOUND 返回引用)
+        CompoundTag root = MaidData.get(maid, DataKey.ASSEMBLY_INV);
         if (root.contains(INV_KEY, Tag.TAG_COMPOUND)) {
             CompoundTag invTag = root.getCompound(INV_KEY);
 //? if 1.20.1 {
@@ -142,7 +148,7 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
 
     public void saveToNBT() {
         if (!serverSide) return;
-        CompoundTag root = maid.getPersistentData().getCompound(NBT_KEY);
+        CompoundTag root = MaidData.get(maid, DataKey.ASSEMBLY_INV);
 //? if 1.20.1 {
         root.put(INV_KEY, serializeNBT());
 //?} else {
@@ -154,7 +160,8 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
         root.putByteArray(BLOCKED_KEY, bl);
         if (isMaterialLocked()) root.put(MAT_LOCK_KEY, saveItem(materialLock, maid.level().registryAccess()));
         else root.remove(MAT_LOCK_KEY);
-        maid.getPersistentData().put(NBT_KEY, root);
+        // 门面收编 (root 是 MaidData.get 返回的引用 — put 回写语义等价)
+        MaidData.put(maid, DataKey.ASSEMBLY_INV, root);
         LittleMaidMoreAction.LOGGER.info("[AssemblyInv] saved slots: 0={} 8={} 10={}",
             getStackInSlot(0).isEmpty() ? "-" : getStackInSlot(0).getDisplayName().getString(),
             getStackInSlot(8).isEmpty() ? "-" : getStackInSlot(8).getDisplayName().getString(),
@@ -179,10 +186,10 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
         return stack;
     }
 
-    // ── v75.1 双平台工具 (1.21: isSameItemSameTags→isSameItemSameComponents, ItemStack.of 需 Provider) ──
+    // ── 双平台工具 (1.21: isSameItemSameTags→isSameItemSameComponents, ItemStack.of 需 Provider) ──
 
     private static net.minecraft.nbt.Tag saveItem(ItemStack stack, net.minecraft.core.HolderLookup.Provider provider) {
-        if (stack.isEmpty()) return new CompoundTag();   // v75.2: 1.21 ItemStack.save 禁编码空物品 (崩溃实证: Cannot encode empty ItemStack)
+        if (stack.isEmpty()) return new CompoundTag();   // 1.21 ItemStack.save 禁编码空物品 (崩溃实证: Cannot encode empty ItemStack)
 //? if 1.20.1 {
         return stack.save(new CompoundTag());
 //?} else {

@@ -1,6 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction;
 
-import com.github.xiaozhaoz1.littlemaidmoreaction.screen.LMAConfigScreen;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigScreen;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BellRingConfigMenu;
@@ -30,11 +29,12 @@ import net.minecraftforge.fml.event.lifecycle.FMLCommonSetupEvent;
 public final class LmaForgeClientEntry {
 
     static {
-        // 配置屏工厂 — 客户端类加载期注册 (服务器不加载本类)
+        // 配置屏工厂 — 客户端类加载期注册 (服务器不加载本类); v79.51: 打开入口收敛 ScreenRegistry "lma_config"
         ModLoadingContext.get().registerExtensionPoint(
             ConfigScreenHandler.ConfigScreenFactory.class,
             () -> new ConfigScreenHandler.ConfigScreenFactory(
-                    (mc, parent) -> new LMAConfigScreen(parent)));
+                    (mc, parent) -> com.github.xiaozhaoz1.littlemaidmoreaction.screen.ScreenRegistry
+                            .create("lma_config", parent)));
     }
 
     /** 菜单屏注册 — commonSetup 期 (RegistryObject.get() 需注册冻结后) */
@@ -69,5 +69,21 @@ public final class LmaForgeClientEntry {
         net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(
                 (net.minecraftforge.event.TickEvent.ClientTickEvent ev) ->
                         com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmReloadListener.onClientTick());
+        // M-3: 客户端断开 → 清 MaidListResponsePacket 静态缓存 (防跨世界 stale 列表)
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(
+                (net.minecraftforge.client.event.ClientPlayerNetworkEvent.LoggingOut ev) ->
+                        com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidListResponsePacket.clearCache());
+        // v79.51 (KeyTrigger): 通用按键触发 — MOD bus 注册全部绑定 (选项→控制 可重绑) + GAME bus 检测
+        net.minecraftforge.fml.javafmlmod.FMLJavaModLoadingContext.get().getModEventBus().addListener(
+                (net.minecraftforge.client.event.RegisterKeyMappingsEvent ev) ->
+                        com.github.xiaozhaoz1.littlemaidmoreaction.client.MaidKeyTriggerClient
+                                .getAllBindings().forEach(ev::register));
+        net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(
+                (net.minecraftforge.client.event.InputEvent.Key ev) ->
+                        com.github.xiaozhaoz1.littlemaidmoreaction.client.MaidKeyTriggerClient.handleKeyInput());
+        // v79.50: 图鉴屏打开注入 (包字节码禁 Screen — DEDICATED_SERVER RuntimeDistCleaner 实证)
+        // v79.51: 赋值点保留 (boot 期就绪), 实现收敛 ScreenRegistry.openCodex
+        com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidCodexScreenPacket.opener =
+                com.github.xiaozhaoz1.littlemaidmoreaction.screen.ScreenRegistry::openCodex;
     }
 }

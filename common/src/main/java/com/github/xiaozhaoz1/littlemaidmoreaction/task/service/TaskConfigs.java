@@ -25,6 +25,8 @@ public final class TaskConfigs {
         if (handler == null) {
             throw new IllegalArgumentException("未知任务类型: " + taskType);
         }
-        return handler.pipeline().pipelineConfig(maid);
+        // 配置维度拆分 — 未实现 TaskConfigurable 的管线返回空配置
+        return handler.pipeline() instanceof com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable c
+                ? c.pipelineConfig(maid) : new net.minecraft.nbt.CompoundTag();
     }
 }

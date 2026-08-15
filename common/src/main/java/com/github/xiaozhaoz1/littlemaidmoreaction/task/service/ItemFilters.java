@@ -3,6 +3,8 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.task.service;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.state.BlockState;
 //? if 1.20.1 {
@@ -29,9 +31,9 @@ import java.util.List;
  */
 public final class ItemFilters {
 
-    /** pipelineConfig 黑名单键 (v67.3) */
+    /** pipelineConfig 黑名单键 */
     public static final String KEY_BLACKLIST = "blacklist";
-    /** pipelineConfig 白名单键 (v67.3) */
+    /** pipelineConfig 白名单键 */
     public static final String KEY_WHITELIST = "whitelist";
 
     private ItemFilters() {}
@@ -45,11 +47,25 @@ public final class ItemFilters {
     /** 黑白名单判定 (物品) */
     public static boolean isAllowed(ItemStack stack, List<? extends String> blacklist, List<? extends String> whitelist) {
         if (stack == null || stack.isEmpty()) return false;
+        return isAllowed(stack.getItem(), blacklist, whitelist);
+    }
+
+    /**
+     * 黑白名单判定 (物品对象) — 注册表取完整 id。
+     *
+     * <p>禁止用 {@code Item.toString()} 匹配 (错题 #191): 1.20.1 只返回 path
+     * ({@code getKey().getPath()}), 1.21.1 才返回完整注册名 ({@code getRegisteredName()}),
+     * 跨平台语义不一致, 名单匹配必须走注册表。
+     */
+    public static boolean isAllowed(Item item, List<? extends String> blacklist, List<? extends String> whitelist) {
+        if (item == null) return false;
 //? if 1.20.1 {
-        return isAllowed(ForgeRegistries.ITEMS.getKey(stack.getItem()).toString(), blacklist, whitelist);
+        ResourceLocation key = ForgeRegistries.ITEMS.getKey(item);
 //?} else {
-        return isAllowed(BuiltInRegistries.ITEM.getKey(stack.getItem()).toString(), blacklist, whitelist);
+        ResourceLocation key = BuiltInRegistries.ITEM.getKey(item);
 //?}
+        if (key == null) return false;
+        return isAllowed(key.toString(), blacklist, whitelist);
     }
 
     /** 黑白名单判定 (方块) */

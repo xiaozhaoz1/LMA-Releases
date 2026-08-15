@@ -5,9 +5,9 @@ import net.minecraft.world.item.ItemStack;
 /**
  * ItemStack 比较工具 (v75.4 标准化)。
  *
- * <p>原 4 份逐字节相同 helper + 7 处内联版本门控对 (AbstractFunctionalBlockInteraction /
- * MaidAssemblyInventory / MaidAssemblyPipeline / MaidAssemblyService / MaidInventorySpace /
- * WirelessChestSpace / JukeboxExecute / ArmTransferService) 收拢于此 — 双平台差异单点维护。
+ * <p>原 4 份逐字节相同 helper + 7 处内联版本门控对 (MaidAssemblyInventory /
+ * MaidAssemblyPipeline / MaidAssemblyService / MaidInventorySpace /
+ * WirelessChestSpace / JukeboxPipeline / ArmTransferService) 收拢于此 — 双平台差异单点维护。
  */
 public final class ItemStackHelper {
 

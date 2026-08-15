@@ -23,7 +23,7 @@ public final class MaidAssemblyNetwork {
 
     private MaidAssemblyNetwork() {}
 
-    /** 服务端打开装配GUI (v75.1: 1.21 用 vanilla openMenu — neoforge 无 NetworkHooks) */
+    /** 服务端打开装配GUI (1.21 用 vanilla openMenu — neoforge 无 NetworkHooks) */
     public static void openGui(ServerPlayer player, EntityMaid maid) {
 //? if 1.20.1 {
         NetworkHooks.openScreen(player, new MaidAssemblyMenuProvider(maid),

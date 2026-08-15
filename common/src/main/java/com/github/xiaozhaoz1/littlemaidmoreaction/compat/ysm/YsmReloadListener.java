@@ -49,34 +49,51 @@ import java.util.concurrent.ConcurrentHashMap;
 @OnlyIn(Dist.CLIENT)
 public final class YsmReloadListener extends SimplePreparableReloadListener<Void> {
 
-    /** tick 延迟补全已执行标志 (幂等 — 只补全一次) */
+    /** tick 延迟补全已执行标志 (幂等 — 只补全一次; 源文件指纹变化时重置 — P-19 运行时重合并) */
     private static boolean complemented = false;
 
     /**
-     * 源文件解析缓存 (v79.26 卡顿修复) — 每动画文件只磁盘读取 + JSON/Molang 解析一次。
+     * 源文件解析缓存 — 每动画文件只磁盘读取 + JSON/Molang 解析一次。
      * 原实现每模型文件每次全量重读重解析: GeckoLibCache 123 模型 × 8 动画 = 984 次磁盘 IO
      * 全在 Render thread 同步跑 4.3 秒 (进游戏卡顿日志风暴实证)。
      * 现: 磁盘 IO + 解析 984 → 8 次; 剩余为纯内存 putAnimation 合并。
+     * 缓存生命周期: 源文件指纹变化 (AnimSync 落盘/用户手改) → 清空重建 (P-19 —
+     * 原永不过期 → 运行时动画更新 TLM 通道不生效, F3+T 才生效)。
      */
     private static final Map<String, AnimationFile> PARSED_SOURCES = new ConcurrentHashMap<>();
 
+    /** 源文件指纹基线 (fileName+size+mtime, 复用 {@link YsmAnimInjector#sourceFingerprint}) */
+    private static String lastSourceFingerprint = null;
+
     /**
-     * 幂等去重 (v79.26) — 同 AnimationFile 实例的同源文件只合并一次。
+     * 幂等去重 — 同 AnimationFile 实例的同源文件只合并一次。
      * 用引用相等 (IdentityHashMap): 资源重载 (F3+T) 后 GeckoLibCache 重建 → 新实例 → 自动重合并;
      * 内容相等但实例不同不跳过 (record equals 值比较会误跳, 动画更新不生效 — 故不用值比较)。
      */
     private static final Map<AnimationFile, Set<String>> MERGED_SOURCES = new IdentityHashMap<>();
 
     /**
-     * v79.18: 客户端 tick 延迟补全 — TLM 模型加载是异步的 (ReloadResourceEvent →
+     * 客户端 tick 延迟补全 — TLM 模型加载是异步的 (ReloadResourceEvent →
      * CompletableFuture.supplyAsync, 实测首次启动晚于 reload listener 16 秒),
      * apply 阶段 GeckoLibCache 可能为空 (补全 0 个 → 首次启动不生效, F3+T 才生效)。
      * 检测到模型文件非空即补全一次 (幂等)。由入口注册 ClientTickEvent.Post 驱动。
      */
     @OnlyIn(Dist.CLIENT)
     public static void onClientTick() {
-        // v79.26.2: 动画文件包防抖刷新 — 每 tick 检查 (2 秒无新包才执行, 渲染线程不再卡包)
+        // 动画文件包防抖刷新 — 每 tick 检查 (2 秒无新包才执行, 渲染线程不再卡包)
         com.github.xiaozhaoz1.littlemaidmoreaction.network.AnimFileSyncPacket.flushPending();
+        if (complemented && sourceFilesChanged()) {
+            // 运行时动画更新 (AnimSync 落盘新文件/用户手改) — P-19: 原 PARSED_SOURCES
+            // 永不过期 + 补全只跑一次 → TLM geckolib 通道不更新 (YSM 磁盘注入通道会生效,
+            // 双通道不对称)。指纹变化 → 清解析/合并缓存 + 重开补全 → 本 tick 内对
+            // GeckoLibCache 现存模型实例重新合并 (运行时生效, 无需 F3+T)。
+            PARSED_SOURCES.clear();
+            synchronized (MERGED_SOURCES) {
+                MERGED_SOURCES.clear();
+            }
+            complemented = false;
+            LittleMaidMoreAction.LOGGER.info("[LMA/YsmReload] 源动画文件变化 — 清缓存, 运行时重合并");
+        }
         if (complemented) return;
         var files = GeckoLibCache.getInstance().getAnimations().values();
         if (files.isEmpty()) return;
@@ -87,8 +104,26 @@ public final class YsmReloadListener extends SimplePreparableReloadListener<Void
         }
     }
 
+    /**
+     * 源文件指纹变化检测 — 变化返回 true 并更新基线。
+     * 只 stat (8 次 lstat/tick, 与 YsmAnimInjector 注入指纹同量级 — 不读文件内容)。
+     */
+    private static boolean sourceFilesChanged() {
+        String fp = YsmAnimInjector.sourceFingerprint();
+        if (fp.equals(lastSourceFingerprint)) {
+            return false;
+        }
+        lastSourceFingerprint = fp;
+        return true;
+    }
+
     @Override
     protected Void prepare(ResourceManager resourceManager, ProfilerFiller profiler) {
+        // 源文件变化 → 清解析缓存 (防 F3+T 落在 AnimSync 防抖窗口内用陈旧解析合并;
+        // 首次调用顺带建立指纹基线)
+        if (sourceFilesChanged()) {
+            PARSED_SOURCES.clear();
+        }
         YsmAnimInjector.injectHaqiIfNeeded();
         // 绕过事件链路: 合并进 DEFAULT_MAID + DEFAULT_ISS (registerMaidAnimations 会把两者合进模型文件;
         // 1.5.3 magic casting 播放链查询类型未实证, 双类型双保险 — 用户提示 "MAIN 和 ISS 要区分")
@@ -109,7 +144,7 @@ public final class YsmReloadListener extends SimplePreparableReloadListener<Void
     }
 
     /**
-     * 合并全部 LMA 动画文件 (config/animations/*.animation.json — v79.25 通用化, 磁盘读取)
+     * 合并全部 LMA 动画文件 (config/animations/*.animation.json — 通用化, 磁盘读取)
      * 进目标 AnimationFile。haqi (对女仆) / maimeng (对主人) + 原版模型 vanilla 版等全部覆盖;
      * 自定义动画文件放 config 即自动进 TLM geckolib 渲染通道 (网络同步落盘同路径)。
      */

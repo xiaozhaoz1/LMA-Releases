@@ -25,9 +25,13 @@ public final class LmaRegistrar {
 
         // 启动加载器：创建目录 → 复制 jar 预设 → 扫描 config 目录
         StartupLoader.load();
+        // 节日表 (v79.47): jar 预设复制 → config 读取 → FestivalTable 注入 (日历检测器消费)
+        com.github.xiaozhaoz1.littlemaidmoreaction.storage.FestivalLoader.load();
+        // v79.51 (KeyTrigger): 通用按键触发注册表 — 首个消费者 block_interact (引擎级任务分发)
+        com.github.xiaozhaoz1.littlemaidmoreaction.network.KeyTriggerRegistry.init();
     }
 
-    /** 服务端初始化 (v79.6: DocGenerator 随条件栈删除 — 空实现保留签名) */
+    /** 服务端初始化 (DocGenerator 随条件栈删除 — 空实现保留签名) */
     public static void initServer() {
     }
 
@@ -41,17 +45,17 @@ public final class LmaRegistrar {
         com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaMemoryModuleRegistry.register(modBus);
     }
 
-    /** v40: 注册方块 DeferredRegister */
+    /** 注册方块 DeferredRegister */
     public static void registerBlocks(IEventBus modBus) {
         LmaBlocks.register(modBus);
     }
 
-    /** v40: 注册方块实体 DeferredRegister */
+    /** 注册方块实体 DeferredRegister */
     public static void registerBlockEntityTypes(IEventBus modBus) {
         LmaBlockEntityTypes.register(modBus);
     }
 
-    /** v79.22: 注册物品 DeferredRegister (LMA 首个物品注册点 — 女仆饰品) */
+    /** 注册物品 DeferredRegister (LMA 首个物品注册点 — 女仆饰品) */
     public static void registerItems(IEventBus modBus) {
         LmaItems.register(modBus);
     }

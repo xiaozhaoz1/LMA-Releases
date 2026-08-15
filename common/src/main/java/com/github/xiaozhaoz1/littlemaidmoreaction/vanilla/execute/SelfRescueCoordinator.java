@@ -1,7 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
+import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
@@ -22,6 +22,9 @@ import net.minecraft.world.phys.shapes.VoxelShape;
  * 自救优先于一切动作 (导航/垫柱/开脉); 挖掉后 AABB 不再相交, 自然收敛无需节流。
  * 挖掘链复用 ChainHarvestExecute 工具链 (ensureToolFor 按方块类型换合适工具 —
  * 被埋常见石头/泥土/沙 → 镐/铲; destroyBlock 瞬破 + hurtAndBreak 消耗, charge 同款)。
+ *
+ * <p>v79.61x 定级 (两轴表): 有状态 (SelfRescueState NBT, 无类内静态表) + 自救域语义 →
+ * execute 协调器 (轻量); 留 execute 族 (SelfRescuePipeline 每 tick 驱动)。
  */
 public final class SelfRescueCoordinator {
 
@@ -29,7 +32,7 @@ public final class SelfRescueCoordinator {
 
     /** 每 tick 自救检查 — 卡住 → 挖掉窒息块 → true (调用方跳过本 tick 其余逻辑) */
     public static boolean tick(ServerLevel world, EntityMaid maid) {
-        if (!ActiveTaskConfig.CHAIN_SELF_RESCUE.get()) return false;
+        if (!PassiveTaskConfig.SELF_RESCUE_ENABLED.get()) return false;
         BlockPos pos = maid.blockPosition();
         if (tryDig(world, maid, pos)) return true;
         return tryDig(world, maid, pos.above());

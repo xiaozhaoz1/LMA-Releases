@@ -1,4 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.assembly;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.DataKey;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ItemStackHelper;
 
@@ -67,7 +69,7 @@ public final class MaidAssemblyEventHandler {
         var inv = MaidAssemblyInventory.of(maid);
         inv.saveToNBT(); // 确保最新状态写入 PersistentData
         CompoundTag data = event.getData();
-        CompoundTag tag = maid.getPersistentData().getCompound(TaskKeys.ASSEMBLY_INV);
+        CompoundTag tag = MaidData.get(maid, DataKey.ASSEMBLY_INV);
         if (!tag.isEmpty()) {
             data.put(TaskKeys.ASSEMBLY_INV, tag);
         }
@@ -78,8 +80,15 @@ public final class MaidAssemblyEventHandler {
     public static void onMaidFromItem(MaidAndItemTransformEvent.ToMaid event) {
         CompoundTag data = event.getData();
         if (!data.contains(TaskKeys.ASSEMBLY_INV)) return;
+//? if 1.20.1 {
         CompoundTag forge = data.getCompound("ForgeData");
         forge.put(TaskKeys.ASSEMBLY_INV, data.getCompound(TaskKeys.ASSEMBLY_INV));
         data.put("ForgeData", forge);
+//?} else {
+        // H3 实证 (2026-08-15): NeoForge 1.21.1 Entity.saveWithoutId 无 ForgeData 包装 —
+        // 写 data["ForgeData"] 是无效键; ToMaid 事件带 maid 引用, 直写 PersistentData。
+        event.getMaid().getPersistentData().put(
+                TaskKeys.ASSEMBLY_INV, data.getCompound(TaskKeys.ASSEMBLY_INV));
+//?}
     }
 }

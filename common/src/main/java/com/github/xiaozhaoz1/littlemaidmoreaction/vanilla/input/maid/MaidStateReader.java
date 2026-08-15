@@ -1,7 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.xiaozhaoz1.littlemaidmoreaction.api.io.IReader;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.LivingEntity;
@@ -19,65 +18,11 @@ import net.minecraft.core.registries.BuiltInRegistries;
 //?}
 import java.util.StringJoiner;
 
+/** 女仆状态读取 (v79.50b: IReader SPI 死链删 — 接口零调用方, read()/readNumber() 分发面整删,
+ *  static 方法编目保留 — GetSelfStatusTool/SenseApi/CollectItemsTool 直接调用) */
 @SuppressWarnings("unused")
-public final class MaidStateReader implements IReader<EntityMaid> {
+public final class MaidStateReader {
     private MaidStateReader() {}
-
-    @Override public String category() { return "maid"; }
-    @Override public Class<EntityMaid> sourceType() { return EntityMaid.class; }
-    @Override public <T> T read(EntityMaid m, String property, Class<T> type) {
-        return switch (property) {
-            // 数值
-            case "health"        -> type.cast(getHealth(m));
-            case "max_health"    -> type.cast(getMaxHealth(m));
-            case "health_ratio"  -> type.cast(getHealthRatio(m));
-            case "hunger"        -> type.cast(getHunger(m));
-            case "favorability"  -> type.cast(getFavorability(m));
-            case "experience"    -> type.cast(getExperience(m));
-            case "luck"          -> type.cast(getLuck(m));
-            case "attack_damage" -> type.cast(getAttackDamage(m));
-            case "movement_speed"-> type.cast(getMovementSpeed(m));
-            case "armor"         -> type.cast(getArmor(m));
-            case "armor_toughness"-> type.cast(getArmorToughness(m));
-            case "restrict_radius"-> type.cast(getRestrictRadius(m));
-            // 布尔
-            case "is_on_fire"    -> type.cast(isOnFire(m));
-            case "is_in_water"   -> type.cast(isInWater(m));
-            case "is_sitting"    -> type.cast(isSitting(m));
-            case "is_sprinting"  -> type.cast(isSprinting(m));
-            case "is_swimming"   -> type.cast(isSwimming(m));
-            case "is_sleeping"   -> type.cast(isSleeping(m));
-            case "is_baby"       -> type.cast(isBaby(m));
-            case "is_tamed"      -> type.cast(isTamed(m));
-            case "has_target"    -> type.cast(hasTarget(m));
-            case "has_backpack"  -> type.cast(hasBackpack(m));
-            case "has_helmet"    -> type.cast(hasHelmet(m));
-            case "has_chestplate"-> type.cast(hasChestplate(m));
-            case "has_leggings"  -> type.cast(hasLeggings(m));
-            case "has_boots"     -> type.cast(hasBoots(m));
-            case "is_home_mode"  -> type.cast(isHomeMode(m));
-            case "is_pickup"     -> type.cast(isPickup(m));
-            case "is_riding"     -> type.cast(isRiding(m));
-            case "has_weapon"    -> type.cast(hasWeapon(m));
-            case "has_shield"    -> type.cast(hasShield(m));
-            // 字符串
-            case "task_uid"      -> type.cast(getTaskUid(m));
-            case "model_id"      -> type.cast(getModelId(m));
-            case "sound_pack_id" -> type.cast(getSoundPackId(m));
-            // 位置
-            case "block_pos"     -> type.cast(getBlockPos(m));
-            case "position"      -> type.cast(getPosition(m));
-            case "restrict_center"-> type.cast(getRestrictCenter(m));
-            default -> throw new IllegalArgumentException("Unknown property: " + property);
-        };
-    }
-    @Override public Number readNumber(EntityMaid m, String property) {
-        return switch (property) {
-            case "health" -> m.getHealth();
-            case "max_health" -> m.getMaxHealth();
-            default -> throw new IllegalArgumentException("Unknown property: " + property);
-        };
-    }
 
     // === 基础数值 ===
     public static float getHealth(EntityMaid m) { return m.getHealth(); }
@@ -367,7 +312,7 @@ public final class MaidStateReader implements IReader<EntityMaid> {
     /** 聊天气泡是否可见 */
     public static boolean isChatBubbleShow(EntityMaid m) { return m.getConfigManager().isChatBubbleShow(); }
 
-    // === v34: ConfigManager 补全 ===
+    // === ConfigManager 补全 ===
     public static boolean isShowBackItem(EntityMaid m) { return m.getConfigManager().isShowBackItem(); }
     public static float getSoundFreq(EntityMaid m) { return m.getConfigManager().getSoundFreq(); }
     public static String getPickupType(EntityMaid m) { return m.getConfigManager().getPickupType().name().toLowerCase(); }
@@ -375,15 +320,15 @@ public final class MaidStateReader implements IReader<EntityMaid> {
     public static boolean isOpenFenceGate(EntityMaid m) { return m.getConfigManager().isOpenFenceGate(); }
     public static boolean isActiveClimbing(EntityMaid m) { return m.getConfigManager().isActiveClimbing(); }
 
-    // === v34: AI Task 标志 ===
+    // === AI Task 标志 ===
     public static boolean isEnablePanic(EntityMaid m) { return m.getTask().enablePanic(m); }
     public static boolean isEnableEating(EntityMaid m) { return m.getTask().enableEating(m); }
     public static boolean isEnableLookAndRandomWalk(EntityMaid m) { return m.getTask().enableLookAndRandomWalk(m); }
 
-    // === v34: 导航补全 ===
+    // === 导航补全 ===
     public static String getSearchDimension(EntityMaid m) { return m.searchDimension().toString(); }
 
-    // === v34: Owner 补全 ===
+    // === Owner 补全 ===
     public static java.util.UUID getOwnerUUID(EntityMaid m) { return m.getOwnerUUID(); }
     public static String getOwnerName(EntityMaid m) {
         var o = m.getOwner(); return o != null ? o.getScoreboardName() : "";
@@ -391,7 +336,7 @@ public final class MaidStateReader implements IReader<EntityMaid> {
     public static net.minecraft.world.item.ItemStack getTamedItem(EntityMaid m) { return new net.minecraft.world.item.ItemStack(m.getTamedItem().getItems()[0].getItem()); }
     public static net.minecraft.world.item.ItemStack getTemptationItem(EntityMaid m) { return new net.minecraft.world.item.ItemStack(m.getTemptationItem().getItems()[0].getItem()); }
 
-    // === v34: TLM 自定义属性 ===
+    // === TLM 自定义属性 ===
 //? if 1.20.1 {
     public static double getUseItemSpeed(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_USE_ITEM_SPEED.get()); }
 //?} else {
@@ -428,7 +373,7 @@ public final class MaidStateReader implements IReader<EntityMaid> {
     public static double getPassiveUseShieldTick(EntityMaid m) { return m.getAttributeValue(com.github.tartaricacid.touhoulittlemaid.init.InitAttribute.MAID_PASSIVE_USE_SHIELD_TICK); }
 //?}
 
-    // === v34: NBT/PersistentData 读 ===
+    // === NBT/PersistentData 读 ===
     public static float getPersistentFloat(EntityMaid m, String key, float def) {
         var d = m.getPersistentData(); return d.contains(key) ? d.getFloat(key) : def;
     }
@@ -442,7 +387,7 @@ public final class MaidStateReader implements IReader<EntityMaid> {
         var d = m.getPersistentData(); return d.contains(key) ? d.getBoolean(key) : def;
     }
 
-    // === v34: 统计 ===
+    // === 统计 ===
     public static boolean hasKillRecord(EntityMaid m) { return m.getKillRecordManager() != null; }
     public static boolean hasGameRecord(EntityMaid m) { return m.getGameRecordManager() != null; }
 }

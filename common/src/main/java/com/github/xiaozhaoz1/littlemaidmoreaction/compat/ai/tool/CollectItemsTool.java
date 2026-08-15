@@ -17,7 +17,7 @@ import java.util.List;
  * (v1 感知版 — 返回数量+位置提示, 引导女仆拾取/移动)。
  * 权限: AI 操控任务开启。
  */
-public final class CollectItemsTool implements ITool<CollectItemsTool.Result> {
+public final class CollectItemsTool implements GatedMaidTool<CollectItemsTool.Result> {
 
     private static final String RADIUS = "radius";
     private static final Codec<Result> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -50,12 +50,6 @@ public final class CollectItemsTool implements ITool<CollectItemsTool.Result> {
         return callback.addToolResult("Found %d item drops (total %d items) within %d blocks. Maid pickup enabled: %s"
                 .formatted(items.size(), total, radius, com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidStateReader.isPickup(maid)),
                 toolCallId);
-    }
-
-    @Override
-    public boolean trigger(EntityMaid maid,
-                           com.github.tartaricacid.touhoulittlemaid.ai.service.llm.openai.request.ChatCompletion chatCompletion) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AiControlGate.isEnabled(maid);
     }
 
     public record Result(int radius) {}

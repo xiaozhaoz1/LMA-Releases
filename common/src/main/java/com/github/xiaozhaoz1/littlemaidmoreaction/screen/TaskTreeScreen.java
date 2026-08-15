@@ -82,7 +82,7 @@ public final class TaskTreeScreen extends Screen {
             boolean hov = mx >= lx && mx <= lx + LEFT_W && my >= ry && my <= ry + ROW_H;
             if (sel) g.fill(lx + 3, ry, lx + LEFT_W - 3, ry + ROW_H, 0x553355AA);
             else if (hov) g.fill(lx + 3, ry, lx + LEFT_W - 3, ry + ROW_H, 0x33333333);
-            // v74.5: 双 withStyle 颜色覆盖 (后者赢) - 合并为单次计算 (启用绿/禁用红, 隐藏降灰)
+            // 双 withStyle 颜色覆盖 (后者赢) - 合并为单次计算 (启用绿/禁用红, 隐藏降灰)
             int rowColor = !n.visible() ? 0x888888 : (n.enabled() ? 0x55FF55 : 0xFF5555);
             g.drawString(font, Component.literal("● " + n.taskType())
                     .withStyle(s -> s.withColor(rowColor)),
@@ -130,7 +130,7 @@ public final class TaskTreeScreen extends Screen {
         super.render(g, mx, my, pt);
     }
 
-    /** v79.26.3: 原版主菜单旋转全景背景 (统一 {@link PanoramaBackground}, 去 TLM 深棕渐变衬底)。
+    /** 原版主菜单旋转全景背景 (统一 {@link PanoramaBackground}, 去 TLM 深棕渐变衬底)。
      *  不调 super: 1.21 默认 renderBackground 含 renderBlurredBackground 模糊 (明确去模糊)。 */
 //? if 1.20.1 {
     @Override

@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidChatBubblePacket;
@@ -17,24 +18,19 @@ public final class MaidEmojiApi {
 
     private MaidEmojiApi() {}
 
-    /** 表情防刷屏间隔 (tick) — v79.20.4 用户裁定 "至少 5s 防刷屏" */
+    /** 表情防刷屏间隔 (tick) — 用户裁定 "至少 5s 防刷屏" */
     public static final int EMOJI_THROTTLE_TICKS = 100;
-
-    /** 时间戳键 (maid PersistentData 根) — 仅最后一次发送时间, 残留无害 (超时自动失效) */
-    private static final String KEY_LAST_EMOJI_TICK = "lma_last_emoji_tick";
 
     /** 按目标类型发送表情 (对女仆=MAID / 对主人=OWNER), 服务端调用; 5s 内已发过 → 跳过 */
     public static void send(EntityMaid maid, MaidEmojiType type) {
         if (!(maid.level() instanceof ServerLevel sl)) {
             return;
         }
-        // 防刷屏: 时间戳防残留 (0=未发过; last > now 时钟回退 → 视为过期)
-        long now = sl.getGameTime();
-        long last = maid.getPersistentData().getLong(KEY_LAST_EMOJI_TICK);
-        if (last != 0 && now >= last && now - last < EMOJI_THROTTLE_TICKS) {
+        // 统一节流工具 (原手写时间戳 + 防溢出)
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                .shouldFire(maid, "emoji", EMOJI_THROTTLE_TICKS)) {
             return;
         }
-        maid.getPersistentData().putLong(KEY_LAST_EMOJI_TICK, now);
         MaidChatBubblePacket.sendToTracking(maid, type);
     }
 

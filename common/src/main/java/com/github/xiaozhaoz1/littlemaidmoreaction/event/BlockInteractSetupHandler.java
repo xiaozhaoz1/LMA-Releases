@@ -118,8 +118,10 @@ CompoundTag tag = _cd.copyTag();
 //?}
 
         // 写入 pipelineConfig (跨任务持久)
+        // v79.55 (错题 #183): 原直调 NbtUtils.writeBlockPos — 1.21.1 存 IntArrayTag → 读侧 getCompound 空 → 绑定失效;
+        // 改走 NbtCodecs (双平台格式契约, 与读侧 BlockInteractPipeline.readPos 同款)
         CompoundTag cfg = TaskConfigs.get(maid, "block_interact");
-        cfg.put(BlockInteractPipeline.KEY_POS, NbtUtils.writeBlockPos(pos));
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs.writeBlockPos(cfg, BlockInteractPipeline.KEY_POS, pos);
 
         TaskDispatcher.submit(maid, "block_interact", null, 0);
 

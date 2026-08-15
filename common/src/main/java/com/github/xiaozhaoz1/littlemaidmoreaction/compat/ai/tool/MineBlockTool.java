@@ -18,7 +18,7 @@ import net.minecraft.core.Direction;
  * (LEFT_CLICK_CONTINUOUS, 方块被破坏后自动停止 — 生命周期实证)。
  * 权限: AI 操控任务开启。
  */
-public final class MineBlockTool implements ITool<MineBlockTool.Result> {
+public final class MineBlockTool implements GatedMaidTool<MineBlockTool.Result> {
 
     private static final String X = "x", Y = "y", Z = "z";
     private static final Codec<Result> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -50,12 +50,6 @@ public final class MineBlockTool implements ITool<MineBlockTool.Result> {
         FakePlayerManager.start(maid, pos, Direction.UP, LmaPlayerSimulator.Mode.LEFT_CLICK_CONTINUOUS);
         return callback.addToolResult("Mining started at (%d, %d, %d)".formatted(
                 result.x(), result.y(), result.z()), toolCallId);
-    }
-
-    @Override
-    public boolean trigger(EntityMaid maid,
-                           com.github.tartaricacid.touhoulittlemaid.ai.service.llm.openai.request.ChatCompletion chatCompletion) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AiControlGate.isEnabled(maid);
     }
 
     public record Result(int x, int y, int z) {}

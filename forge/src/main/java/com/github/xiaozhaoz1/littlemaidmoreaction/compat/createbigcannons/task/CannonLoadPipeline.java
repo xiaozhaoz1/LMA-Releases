@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.compat.createbigcannons.task;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
@@ -32,9 +33,14 @@ import java.util.Set;
 /**
  * 速射炮闩装填管线 — 多炮架+Worm清膛+装填顺序验证+目光跟踪+定期重扫。
  *
- * <p>loaded标记持久化防止重复装填; 每10秒全清loaded标记重扫以检测已发射的炮。
+ * <p>loaded标记持久化防止重复装填; 每3秒 (CLEAR_ALL_INTERVAL=60t) 全清loaded标记重扫
+ * 以检测已发射的炮 (2026-08-11c 修正: 原 javadoc "每 10 秒" 与实现不符)。
+ *
+ * <p>2026-08-11c 平台不对称文档化 (全景 #19): 本任务仅 forge 1.20.1 节点注册
+ * (createbigcannons 兼容模块 1.20.1 专属 — COMMON.md §10 隔离对 CBC↔forge),
+ * neoforge 1.21.1 玩家无装填任务。
  */
-public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipeline.State> {
+public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipeline.State> implements TaskConfigurable {
 
     enum State { SEARCHING, MOVING, OPENING, CLEARING, LOADING, CLOSING }
 
@@ -45,13 +51,13 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
     private static final String KEY_CLEAR_STEP = "clear_step";
     private static final String KEY_NAV_MODE = "nav_mode";
     private static final String KEY_LAST_CLEAR = "last_clear_all";
+    private static final String KEY_LAST_CLOSE = "last_close_tick";
     private static final int MAX_SUB = 3;
     private static final long CLEAR_ALL_INTERVAL = 60; // 每3秒全清loaded标记重扫
 
     @Override protected Class<State> stateClass() { return State.class; }
     @Override protected State initialState() { return State.SEARCHING; }
     @Override public String taskType() { return "cannon_load"; }
-    @Override public boolean needsGameTick() { return true; }
 
     @Override
     protected Map<State, Set<State>> transitions() {
@@ -96,9 +102,20 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
     @Override
     protected void cleanup(EntityMaid maid) {
         super.cleanup(maid);
+        // 键闭环: 实际读写均在 pipelineData (lma_pl_cannon_load) — 清 compound 键;
+        // KEY_LAST_CLEAR 刻意保留 (周期重置防强制重扫误清刚写的 loaded 标记; 终结路径由 clearPipelineData 整段清除)
+        CompoundTag pl = pipelineData(maid);
+        pl.remove(KEY_STEP);
+        pl.remove(KEY_MOUNT);
+        pl.remove(KEY_CLEAR_STEP);
+        pl.remove(KEY_CD_MOUNT);
+        pl.remove(KEY_NAV_MODE);
+        pl.remove(KEY_LAST_CLOSE);
+        // 兼容历史版本写入根 PersistentData 的残留 + loaded 标记闭环 (跨 session NBT 残留防线)
         maid.getPersistentData().remove(KEY_STEP);
         maid.getPersistentData().remove(KEY_MOUNT);
         maid.getPersistentData().remove(KEY_CLEAR_STEP);
+        maid.getPersistentData().remove(KEY_LOADED);
         NavigationMemory.clearAllNav(maid);
     }
 
@@ -126,7 +143,7 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
 
     private State tickSearching(ServerLevel world, EntityMaid maid) {
         CompoundTag data = pipelineData(maid);
-        long lastClose = data.getLong("last_close_tick");
+        long lastClose = data.getLong(KEY_LAST_CLOSE);
         long cdMount = data.getLong(KEY_CD_MOUNT);
         long lastClear = data.getLong(KEY_LAST_CLEAR);
         long now = world.getGameTime();
@@ -183,7 +200,7 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
         // 炮管已满 → mark loaded
         if (st.hasProjectile() && st.propellantCount() >= 1) {
             markLoaded(maid, mount);
-            pipelineData(maid).putLong("last_close_tick", world.getGameTime());
+            pipelineData(maid).putLong(KEY_LAST_CLOSE, world.getGameTime());
             pipelineData(maid).putLong(KEY_CD_MOUNT, mount.asLong());
             return State.SEARCHING;
         }
@@ -276,7 +293,7 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
         };
 
         var st = CannonLoadService.scanCannon(entity, breechInfo);
-        LittleMaidMoreAction.LOGGER.info("[LMA/CBC] step={} advanced={} p={} pp={} total={} canLoad={}",
+        LittleMaidMoreAction.LOGGER.debug("[LMA/CBC] step={} advanced={} p={} pp={} total={} canLoad={}",
             step, advanced, st.projectileCount(), st.propellantCount(), st.totalCharges(), st.canLoadAtBreech());
 
         if (advanced) {
@@ -293,11 +310,12 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
         if (breechInfo == null || entity == null) return State.SEARCHING;
         if (!CannonLoadService.isBreechOpen(breechInfo) && !CannonLoadService.isOnCooldown(breechInfo)) {
             BlockPos mount = loadMountPos(maid);
+            cleanup(maid);
+            // cleanup 已清 loaded/cd/last_close — 周期重置后重写跨周期标记 (防重复装填 + 冷却)
             markLoaded(maid, mount);
             CompoundTag pd = pipelineData(maid);
-            pd.putLong("last_close_tick", world.getGameTime());
+            pd.putLong(KEY_LAST_CLOSE, world.getGameTime());
             pd.putLong(KEY_CD_MOUNT, mount.asLong());
-            cleanup(maid);
             return State.SEARCHING;
         }
         if (CannonLoadService.isOnCooldown(breechInfo)) return null;
@@ -371,10 +389,16 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
                 if (toLoad.isEmpty()) continue;
                 boolean ok = CannonLoadService.loadMunition(entity, breechInfo, toLoad);
                 if (!ok) {
-                    IItemHandler bp = maid.getAvailableBackpackInv();
-                    for (int j = 0; j < bp.getSlots(); j++) {
-                        ItemStack remainder = bp.insertItem(j, toLoad, false);
-                        if (remainder.isEmpty()) break;
+                    // 退还链路: 源槽原位放回 (同种堆叠合并) → 背包任意槽 → 掉落兜底 (spawnAtLocation), 无静默丢弃
+                    ItemStack remainder = inv.insertItem(i, toLoad, false);
+                    if (!remainder.isEmpty()) {
+                        IItemHandler bp = maid.getAvailableBackpackInv();
+                        for (int j = 0; j < bp.getSlots() && !remainder.isEmpty(); j++) {
+                            remainder = bp.insertItem(j, remainder, false);
+                        }
+                    }
+                    if (!remainder.isEmpty()) {
+                        maid.spawnAtLocation(remainder);  // 全满 → 掉女仆脚下 (保底不丢)
                     }
                 }
                 return ok;

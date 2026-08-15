@@ -29,13 +29,21 @@ import java.util.Map;
  */
 public final class MaidAttributeScreen extends Screen {
 
-    /** v79.26 大方化: 480×360 (v79.26.4 起仅作内容区边界, 无面板底) */
+    /** 大方化: 480×360 (仅作内容区边界, 无面板底) */
     private static final int PANEL_W = 480;
     private static final int PANEL_H = 360;
     private static final int ROW_H = 22;
     private static final int GROUP_TITLE_H = 24;
-    /** category 固定顺序 (工作 → 战斗 → 生存 → 其他) */
+    /** category 固定顺序 (工作 → 战斗 → 生存 → 其他) — 分组键 = {@link MaidAttrRegistry} category
+     *  数据契约 (中文值), 不可改 lang key (computeIfAbsent(e.category()) 分组依赖), 渲染时经 CATEGORY_KEYS 翻译 */
     private static final String[] CATEGORIES = {"工作", "战斗", "生存", "其他"};
+
+    /** category 数据值 → lang key (仅显示层翻译, 分组键保持原值) */
+    private static final Map<String, String> CATEGORY_KEYS = Map.of(
+            "工作", "gui.littlemaidmoreaction.maid_attr.category.work",
+            "战斗", "gui.littlemaidmoreaction.maid_attr.category.combat",
+            "生存", "gui.littlemaidmoreaction.maid_attr.category.survival",
+            "其他", "gui.littlemaidmoreaction.maid_attr.category.other");
 
     /** 纸感色板 (MaidAttributeDisplay 画风扩展 — 金色标题层次) */
     private static final int COLOR_BORDER = 0xFF8A7F72;
@@ -81,7 +89,7 @@ public final class MaidAttributeScreen extends Screen {
 //?}
         int px = (this.width - PANEL_W) / 2;
         int py = (this.height - PANEL_H) / 2;
-        // v79.26.4: 去纸感卷大面板 — 标题屏顶, 内容直接浮全景 (行底半透明可读)
+        // 去纸感卷大面板 — 标题屏顶, 内容直接浮全景 (行底半透明可读)
         g.drawCenteredString(font, title, this.width / 2, 20, COLOR_TEXT);
         // 顶部: 女仆名金色 + 分隔线 (半透明 — 浮全景)
         g.drawString(font, maid.getName(), px + 20, py + 10, COLOR_GROUP);
@@ -90,7 +98,7 @@ public final class MaidAttributeScreen extends Screen {
         super.render(g, mx, my, pt);
     }
 
-    /** v79.26.3: 原版主菜单旋转全景背景 (统一 {@link PanoramaBackground}, 去 TLM 深棕渐变)。
+    /** 原版主菜单旋转全景背景 (统一 {@link PanoramaBackground}, 去 TLM 深棕渐变)。
      *  不调 super: 1.21 默认 renderBackground 含 renderBlurredBackground 模糊 (明确去模糊)。 */
 //? if 1.20.1 {
     @Override
@@ -115,10 +123,12 @@ public final class MaidAttributeScreen extends Screen {
                 continue;
             }
             if (y + GROUP_TITLE_H > ry) {
-                // v79.26: 组标题大字 + 装饰短横线; v79.26.4: 半透明米黄底 (浮全景可读)
+                // 组标题大字 + 装饰短横线; 半透明米黄底 (浮全景可读) — 分组键翻译后显示, 横线宽度随翻译文本
+                Component groupTitle = Component.translatable(
+                        CATEGORY_KEYS.getOrDefault(group.getKey(), group.getKey()));
                 g.fill(rx, y, rx + contentW, y + GROUP_TITLE_H, COLOR_ROW_BG);
-                g.drawString(font, group.getKey(), rx + 4, y + 4, COLOR_GROUP);
-                g.fill(rx + 4, y + GROUP_TITLE_H - 5, rx + 4 + font.width(group.getKey()), y + GROUP_TITLE_H - 4, 0xFFD9B380);
+                g.drawString(font, groupTitle, rx + 4, y + 4, COLOR_GROUP);
+                g.fill(rx + 4, y + GROUP_TITLE_H - 5, rx + 4 + font.width(groupTitle), y + GROUP_TITLE_H - 4, 0xFFD9B380);
             }
             y += GROUP_TITLE_H;
             for (MaidAttrRegistry.Entry e : group.getValue()) {
@@ -133,7 +143,7 @@ public final class MaidAttributeScreen extends Screen {
 
     private void drawRow(GuiGraphics g, int rx, int y, int w, MaidAttrRegistry.Entry e, int mx, int my) {
         boolean hovered = mx >= rx && mx < rx + w && my >= y && my < y + ROW_H;
-        // 边框 + 纸感背景 (hover 提亮) — v79.26 内高 18 上下留白 2
+        // 边框 + 纸感背景 (hover 提亮) — 内高 18 上下留白 2
         g.fill(rx, y, rx + w, y + ROW_H, COLOR_BORDER);
         g.fill(rx + 1, y + 1, rx + w - 1, y + ROW_H - 1, hovered ? COLOR_HOVER : COLOR_ROW_BG);
         g.drawString(font, e.display(), rx + 6, y + 4, COLOR_TEXT);

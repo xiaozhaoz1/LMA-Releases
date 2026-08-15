@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.service;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.DataKey;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 
@@ -11,22 +12,22 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
  */
 public final class AiControlGate {
 
-    private static final String KEY = "lma_ai_control";
+    private static final String KEY = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.AI_CONTROL;
 
     private AiControlGate() {}
 
     /** AI 操控权限是否开启 (任务 ai_control 运行中) */
     public static boolean isEnabled(EntityMaid maid) {
-        return maid.getPersistentData().getBoolean(KEY);
+        return com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.get(maid, DataKey.AI_CONTROL);
     }
 
-    /** 开启 (由 ai_control 任务 executor 首次调用写入) */
+    /** 开启 (由 ai_control 管线 tick 写入, 幂等) */
     public static void enable(EntityMaid maid) {
-        maid.getPersistentData().putBoolean(KEY, true);
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.put(maid, DataKey.AI_CONTROL, true);
     }
 
     /** 关闭 (由 ai_control 任务 onCleanup 调用, 键删除闭环) */
     public static void disable(EntityMaid maid) {
-        maid.getPersistentData().remove(KEY);
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.remove(maid, DataKey.AI_CONTROL);
     }
 }

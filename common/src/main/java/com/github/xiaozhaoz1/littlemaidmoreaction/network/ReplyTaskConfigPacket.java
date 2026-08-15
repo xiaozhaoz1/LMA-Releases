@@ -64,9 +64,8 @@ public record ReplyTaskConfigPacket(int maidId, String taskType, CompoundTag con
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public static final StreamCodec<ByteBuf, ReplyTaskConfigPacket> STREAM_CODEC = StreamCodec.of(
-        (ByteBuf buf, ReplyTaskConfigPacket msg) -> encode(msg, (FriendlyByteBuf) buf),
-        (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, ReplyTaskConfigPacket> STREAM_CODEC =
+        PacketCodecs.wrap(ReplyTaskConfigPacket::encode, ReplyTaskConfigPacket::decode);
 
     public static void handlePayload(ReplyTaskConfigPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {

@@ -34,6 +34,8 @@ dependencies {
     compileOnly files(rootProject.file('libs/openysm-neoforge-1.21.1-2.6.6-r5-neoforge+mc1.21.1.jar'))
 
     implementation 'io.github.classgraph:classgraph:4.8.168'
+    // v79.47 农历节日: 农历换算库 — 2026-08-11c 改 jar-in-jar 内置 (forge/neoforge 各节点 jarJar 声明,
+    // 部署不再手动拷 lunar jar 到 mods; 测试 classpath 由节点 implementation 继承)
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
     // 任务系统状态机单元测试 (mock EntityMaid — 纯 JVM, 不启动服务器)
     testImplementation 'org.mockito:mockito-core:5.11.0'

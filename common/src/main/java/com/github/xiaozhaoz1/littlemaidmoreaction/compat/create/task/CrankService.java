@@ -22,7 +22,7 @@ public final class CrankService {
     private CrankService() {}
 
     /**
-     * v79.10: 螺旋序收集 ≤max 个曲柄 (近→远) — 参数化 findCrank 逻辑。
+     * 螺旋序收集 ≤max 个曲柄 (近→远) — 参数化 findCrank 逻辑。
      * 用于 running_belt 顺带摇曲柄 (周围 2 格内, 最多 2 个)。
      */
     public static java.util.List<BlockPos> findCranks(Level level, BlockPos center, int range, int max) {

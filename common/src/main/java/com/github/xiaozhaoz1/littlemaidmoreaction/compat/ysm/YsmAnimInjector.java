@@ -55,10 +55,13 @@ public final class YsmAnimInjector {
     private static final String[] ANIM_TARGETS = {"extra.animation.json"};
 
     /**
-     * v79.26.2 卡顿修复: 源文件指纹 (fileName+size+mtime 串) — 注入结果只依赖源文件内容,
-     * 源只在 AnimSync 落盘/用户手改时变化。指纹不变 = 幂等注入必已完成 → 零磁盘 IO 跳过。
+     * 注入指纹 (源指纹 + 注入目标状态) — 源只在 AnimSync 落盘/用户手改时变化;
+     * 注入目标 (builtin 模型包 extra.animation.json/ysm.json) 只在 YSM 还原/重装时变化。
+     * 指纹不变 = 幂等注入必已完成 → 零磁盘 IO 跳过。
      * 实证: AnimFileSyncPacket 每包都调本方法, 旧实现每次全量注入 (22 模型包 × ~24 次
      * 文件读 + Gson 解析 ≈ 528 次磁盘 IO 在渲染线程 = 每包卡 5.5 秒, 7 包 40 秒 — 日志实证)。
+     * <p>v79.50b (P-20): 原仅源指纹 — YSM 还原后目标被重置, 源未变 → 不重注入 → 动画
+     * 静默丢失; 现含目标状态 (8 + 2×包数 lstat, 仍远低于内容读)。
      */
     private static String lastFingerprint = null;
 
@@ -66,7 +69,7 @@ public final class YsmAnimInjector {
 
     /**
      * 遍历 builtin 全部模型包注入 (幂等)。目标缺失 (YSM 未装/路径变) → 仅 warn。
-     * <p>容错 (v79.20.4c): mod construct 与 YSM 解压 builtin 包并行 — walk 中途目录可能被
+     * <p>容错: mod construct 与 YSM 解压 builtin 包并行 — walk 中途目录可能被
      * 并发删除 (实测 NoSuchFileException: wine_fox/13_matured)。Files.walk 迭代抛
      * {@link java.io.UncheckedIOException} (RuntimeException 子类) — 原 catch(IOException) 抓不到
      * → 逃出构造器 → FML mod loading 失败崩溃。现 catch RuntimeException + 逐包容错;
@@ -79,11 +82,19 @@ public final class YsmAnimInjector {
             LittleMaidMoreAction.LOGGER.warn("[LMA/YsmInject] YSM builtin 目录不存在: {}", builtin);
             return;
         }
-        // v79.26.2 卡顿修复: 指纹快检 — 源文件未变 (上次注入必已完成) → 零磁盘 IO 跳过。
+        // 指纹快检 — 源文件 + 注入目标状态未变 (上次注入必已完成) → 零磁盘 IO 跳过。
         // 旧实现每次资源重载全量注入: 22 模型包 × ~24 次文件读 + Gson 解析 ≈ 528 次磁盘 IO
         // 在渲染线程 (AnimSync 每包卡 5.5 秒 × 7 包 = 40 秒 — 加载世界卡很久日志实证)。
-        // 指纹在 builtin 就绪检查后计算 — 目录未就绪 (v79.20.4c 竞态) 时不缓存, 下次重试。
-        String fp = sourceFingerprint();
+        // 指纹在 builtin 就绪检查后计算 — 目录未就绪 (竞态) 时不缓存, 下次重试。
+        String fp;
+        try {
+            fp = injectionFingerprint();
+        } catch (IOException e) {
+            // 遍历竞态 (目录并发消失) — 不缓存指纹, 下次 reload 重试
+            lastFingerprint = null;
+            LittleMaidMoreAction.LOGGER.error("[LMA/YsmInject] 指纹计算失败, 下轮重试", e);
+            return;
+        }
         if (fp.equals(lastFingerprint)) {
             return;
         }
@@ -110,8 +121,9 @@ public final class YsmAnimInjector {
     /**
      * 源文件指纹 — 全部源文件 (fileName+size+mtime) 串。只 stat 不读内容 (8 次 lstat 远快于
      * 528 次内容读)。源文件仅在 AnimSync 落盘/用户手改时变化 — 指纹不变 = 注入结果不变。
+     * 包内可见 — YsmReloadListener 复用做解析缓存失效检测 (P-19 双通道对称)。
      */
-    private static String sourceFingerprint() {
+    static String sourceFingerprint() {
         StringBuilder sb = new StringBuilder();
         for (String file : StartupLoader.getAnimationFiles()) {
             Path p = StartupLoader.getAnimDir().resolve(file);
@@ -126,8 +138,45 @@ public final class YsmAnimInjector {
         return sb.toString();
     }
 
+    /**
+     * 注入指纹 — 源指纹 + 注入目标状态 (builtin 各模型包 extra.animation.json + ysm.json
+     * 的 size+mtime)。源文件变 → 重注入; <b>YSM 还原/重装 (目标文件被删/重置)</b> →
+     * 目标指纹变 → 重注入 (P-20: 原仅源指纹, 还原后动画静默丢失)。
+     * 收敛性: 注入写目标 → 目标 mtime 变 → 下轮指纹变 → 幂等注入 (已存在跳过, 零写) → 稳定。
+     * 遍历竞态 (目录并发消失) → IOException 传播, 调用方 catch 重置指纹下轮重试。
+     */
+    private static String injectionFingerprint() throws IOException {
+        StringBuilder sb = new StringBuilder(sourceFingerprint());
+        Path builtin = FMLPaths.CONFIGDIR.get().resolve("yes_steve_model/builtin");
+        if (!Files.isDirectory(builtin)) {
+            return sb.append("|builtin:missing").toString();
+        }
+        try (var stream = Files.walk(builtin, 3)) {
+            stream.filter(Files::isDirectory)
+                    .filter(p -> Files.isDirectory(p.resolve("animations")))
+                    // 排序保证遍历确定性 — 无序遍历同目录状态偶发顺序变化会致指纹逐轮变 → 重复注入 (质量门 B-3)
+                    .sorted()
+                    .forEach(p -> {
+                        sb.append('|').append(p.getFileName());
+                        appendTargetStat(sb, p.resolve("animations").resolve("extra.animation.json"));
+                        appendTargetStat(sb, p.resolve("ysm.json"));
+                    });
+        }
+        return sb.toString();
+    }
+
+    /** 目标文件指纹 — size+mtime; 不存在 = 合法状态 (注入前/YSM 还原后) */
+    private static void appendTargetStat(StringBuilder sb, Path p) {
+        try {
+            BasicFileAttributes a = Files.readAttributes(p, BasicFileAttributes.class);
+            sb.append(':').append(a.size()).append(':').append(a.lastModifiedTime().toMillis());
+        } catch (IOException e) {
+            sb.append(":missing");
+        }
+    }
+
     /** 注入单个模型包: 动画文件 (extra) + ysm.json 轮盘声明表
-     *  (v79.25: 遍历 config/animations/ 全部源文件 — 不再硬编码 haqi/maimeng) */
+     *  (遍历 config/animations/ 全部源文件 — 不再硬编码 haqi/maimeng) */
     @OnlyIn(Dist.CLIENT)
     private static void injectIntoModelPack(Path packDir) {
         for (String animFile : ANIM_TARGETS) {
@@ -139,7 +188,7 @@ public final class YsmAnimInjector {
     }
 
     /**
-     * v79.25: 动态解析 config/animations/ 全部源文件的动画 key 并集 — 轮盘声明表。
+     * 动态解析 config/animations/ 全部源文件的动画 key 并集 — 轮盘声明表。
      * 新动画文件放 config 即自动进轮盘表 (不再手改 EXTRA_KEYS)。
      */
     @OnlyIn(Dist.CLIENT)
@@ -198,14 +247,14 @@ public final class YsmAnimInjector {
             }
             String json = new GsonBuilder().setPrettyPrinting().create().toJson(root);
             Files.writeString(ysmJson, json, StandardCharsets.UTF_8);
-            // v79.26 卡顿修复: 逐模型逐文件 — DEBUG 级 (启动一次性, 179 行/轮的刷屏无诊断价值)
+            // 逐模型逐文件 — DEBUG 级 (启动一次性, 179 行/轮的刷屏无诊断价值)
             LittleMaidMoreAction.LOGGER.debug("[LMA/YsmInject] ysm.json extra_animation 已注册 {} 个: {}", added, ysmJson);
         } catch (IOException | RuntimeException e) {
             LittleMaidMoreAction.LOGGER.warn("[LMA/YsmInject] ysm.json 注入失败: {}", ysmJson, e);
         }
     }
 
-    /** 注入单个动画文件 (幂等) — v79.25: 源从 jar 资源改磁盘 config/animations/ (与网络同步落盘同路径) */
+    /** 注入单个动画文件 (幂等) — 源从 jar 资源改磁盘 config/animations/ (与网络同步落盘同路径) */
     @OnlyIn(Dist.CLIENT)
     private static void injectInto(Path target, String source) {
         if (!Files.isRegularFile(target)) {

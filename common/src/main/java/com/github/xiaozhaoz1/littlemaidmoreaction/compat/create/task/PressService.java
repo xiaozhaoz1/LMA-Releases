@@ -138,16 +138,24 @@ public final class PressService {
         held.shrink(1);
         if (held.isEmpty()) {
             depot.setHeldItem(results.get(0));
+        } else {
+            // 堆叠输入 (漏斗供料) 时原料堆叠仍在, 产物无法放回 — 落地兜底, 不吞产物 (丢物品族 #170)
+            spawnDrop(level, pos, results.get(0));
         }
         for (int i = 1; i < results.size(); i++) {
-            net.minecraft.world.entity.item.ItemEntity ie =
-                new net.minecraft.world.entity.item.ItemEntity(level,
-                    pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5,
-                    results.get(i).copy());
-            ie.setDefaultPickUpDelay();
-            level.addFreshEntity(ie);
+            spawnDrop(level, pos, results.get(i));
         }
         return true;
+    }
+
+    /** 产物落地 (Depot 上方, 默认拾取延迟) */
+    private static void spawnDrop(Level level, BlockPos pos, ItemStack stack) {
+        net.minecraft.world.entity.item.ItemEntity ie =
+            new net.minecraft.world.entity.item.ItemEntity(level,
+                pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5,
+                stack.copy());
+        ie.setDefaultPickUpDelay();
+        level.addFreshEntity(ie);
     }
 
     /** 执行 Basin 冲压: COMPACTING 优先, 其次 CraftingRecipe 压缩 */

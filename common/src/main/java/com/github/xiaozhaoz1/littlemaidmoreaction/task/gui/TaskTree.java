@@ -35,7 +35,7 @@ public final class TaskTree {
         return nodes;
     }
 
-    /** v63: 仅被动任务 (showInBar=false) */
+    /** 仅被动任务 (showInBar=false) */
     public static List<TaskNode> buildPassive() {
         List<TaskNode> nodes = new ArrayList<>();
         for (var n : build()) {
@@ -44,7 +44,7 @@ public final class TaskTree {
         return nodes;
     }
 
-    /** v63: 仅主动任务 (showInBar=true) */
+    /** 仅主动任务 (showInBar=true) */
     public static List<TaskNode> buildActive() {
         List<TaskNode> nodes = new ArrayList<>();
         for (var n : build()) {

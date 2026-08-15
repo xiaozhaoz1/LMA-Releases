@@ -27,12 +27,18 @@ import java.util.function.Supplier;
  * v79.25.2: 女仆列表查询包 (C→S) — 打开 MaidListScreen 时请求服务端全维度扫描玩家拥有的全部女仆
  * (用户裁定: "显示自己有的女仆不是搜索周围女仆" — 旧版 64 格 AABB 扫描只能看到附近女仆)。
  * 服务端遍历所有维度 getAllEntities 过滤 ownerUUID → 回 {@link MaidListResponsePacket} (按距离排序)。
+ * <p>NET-H1 (v79.50): 全维度扫描 O(实体数) 昂贵 — 服务端入口挂 per-player 20t 节流
+ * ({@link C2SThrottle}), 开屏 + 窗口 resize 重发等连发查询超频直接丢弃 (响应放大一并消除)。
  */
 //? if 1.20.1 {
 public final class MaidListQueryPacket {
 //?} else {
 public final class MaidListQueryPacket implements CustomPacketPayload {
 //?}
+
+    /** NET-H1 防刷: 同 player 每 20t (1 秒) 最多处理 1 次查询 — 全维度扫描不可高频 */
+    private static final long THROTTLE_TICKS = 20L;
+    private static final String THROTTLE_KEY = "maid_list_query";
 
     private MaidListQueryPacket() {
     }
@@ -52,6 +58,10 @@ public final class MaidListQueryPacket implements CustomPacketPayload {
             if (player == null) {
                 return;
             }
+            // NET-H1: per-player 20t 节流 — 连发 (开屏 + resize 重发) 直接丢弃
+            if (!C2SThrottle.allow(player, THROTTLE_KEY, THROTTLE_TICKS)) {
+                return;
+            }
             sendListTo(player);
         });
         ctx.get().setPacketHandled(true);
@@ -66,13 +76,16 @@ public final class MaidListQueryPacket implements CustomPacketPayload {
         return TYPE;
     }
 
-    public static final StreamCodec<ByteBuf, MaidListQueryPacket> STREAM_CODEC = StreamCodec.of(
-            (ByteBuf buf, MaidListQueryPacket msg) -> encode(msg, (FriendlyByteBuf) buf),
-            (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, MaidListQueryPacket> STREAM_CODEC =
+            PacketCodecs.wrap(MaidListQueryPacket::encode, MaidListQueryPacket::decode);
 
     public static void handlePayload(MaidListQueryPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer player)) {
+                return;
+            }
+            // NET-H1: per-player 20t 节流 — 连发 (开屏 + resize 重发) 直接丢弃
+            if (!C2SThrottle.allow(player, THROTTLE_KEY, THROTTLE_TICKS)) {
                 return;
             }
             sendListTo(player);
@@ -87,14 +100,19 @@ public final class MaidListQueryPacket implements CustomPacketPayload {
             for (Entity e : lvl.getAllEntities()) {
                 if (e instanceof EntityMaid m && m.isAlive() && m.getOwnerUUID() != null
                         && m.getOwnerUUID().equals(player.getUUID())) {
-                    // v79.26: level = exp/120 (TLM GUI 同款换算契约) + 生命值 — 列表行 Lv/❤ 数据
+                    // level = exp/120 (TLM GUI 同款换算契约) + 生命值 — 列表行 Lv/❤ 数据
+                    // envsense = per-maid 环境感知开关 (默认开: 无键视为开, 显式 false = 关)
+                    var pd = m.getPersistentData();
+                    boolean envsense = !pd.contains(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ENVSENSE_ENABLED)
+                            || pd.getBoolean(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ENVSENSE_ENABLED);
                     entries.add(new MaidListResponsePacket.MaidEntry(m.getUUID(),
                             m.getName().getString(),
                             lvl.dimension().location().toString(),
                             m.distanceToSqr(player),
                             m.getExperience() / 120,
                             m.getHealth(),
-                            m.getMaxHealth()));
+                            m.getMaxHealth(),
+                            envsense));
                 }
             }
         }

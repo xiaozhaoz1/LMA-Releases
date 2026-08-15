@@ -1,6 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.screen;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidEnvSenseTogglePacket;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidListQueryPacket;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidListResponsePacket;
 import net.minecraft.client.Minecraft;
@@ -42,7 +43,7 @@ import java.util.UUID;
  */
 public final class MaidListScreen extends Screen {
 
-    /** v79.26 回归: 320×240 大面板 (v79.25 尺寸) */
+    /** 回归 320×240 大面板 (前版尺寸) */
     private static final int PANEL_W = 320;
     private static final int PANEL_H = 240;
     private static final int LIST_X = 16;
@@ -60,7 +61,7 @@ public final class MaidListScreen extends Screen {
     /** 本地探测 20t 节流 (512 格 box 遍历有开销, 不必每 tick) */
     private static final int PROBE_INTERVAL = 20;
 
-    /** 深棕底浅米字配色 (回归 v79.26.1 TLM 棕面板配色) */
+    /** 深棕底浅米字配色 (回归 TLM 棕面板配色) */
     private static final int COLOR_TEXT = 0xFFFFE8D9;
     private static final int COLOR_SUB = 0xFFC0B0A0;
     private static final int COLOR_GOLD = 0xFFE8B74A;
@@ -74,6 +75,7 @@ public final class MaidListScreen extends Screen {
     private int scroll;
     private int probeCounter;
     private Button attrButton;
+    private Button envButton;
 
     public MaidListScreen(Screen parent) {
         super(Component.translatable("screen.littlemaidmoreaction.maid_list"));
@@ -84,7 +86,7 @@ public final class MaidListScreen extends Screen {
     protected void init() {
         int px = (this.width - PANEL_W) / 2;
         int py = (this.height - PANEL_H) / 2;
-        // v79.25.2: 打开即请求服务端全维度扫描 (C2S)
+        // 打开即请求服务端全维度扫描 (C2S)
         MaidListQueryPacket.sendToServer();
         this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.back"),
@@ -95,11 +97,40 @@ public final class MaidListScreen extends Screen {
                 btn -> openAttribute())
                 .pos(px + PREVIEW_X + 6, py + PANEL_H - 26).size(92, 20).build());
         this.attrButton.active = false;
+        // v79.47: per-maid 环境感知开关 (选中行可切; 服务端翻转 PD, 默认开)
+        this.envButton = this.addRenderableWidget(Button.builder(
+                Component.literal(""), btn -> toggleEnv())
+                .pos(px + LIST_X + 86, py + PANEL_H - 26).size(98, 20).build());
+        this.envButton.active = false;
+    }
+
+    /** 更新环境感知按钮 (选中行状态) — 无选中禁用 */
+    private void updateEnvButton() {
+        if (entries.isEmpty() || selected < 0 || selected >= entries.size()) {
+            this.envButton.active = false;
+            return;
+        }
+        this.envButton.active = true;
+        boolean on = entries.get(selected).envsense();
+        this.envButton.setMessage(Component.translatable(
+                on ? "gui.littlemaidmoreaction.maid_list.envsense.on"
+                   : "gui.littlemaidmoreaction.maid_list.envsense.off"));
+    }
+
+    /** 翻转选中女仆环境感知 (本地缓存即时反馈 + C2S 服务端落 PD) */
+    private void toggleEnv() {
+        if (entries.isEmpty() || selected < 0 || selected >= entries.size()) return;
+        MaidEntry old = entries.get(selected);
+        MaidEntry next = new MaidEntry(old.uuid(), old.name(), old.dimension(), old.distSqr(),
+                old.level(), old.health(), old.maxHealth(), !old.envsense());
+        entries.set(selected, next);
+        updateEnvButton();
+        MaidEnvSenseTogglePacket.sendToServer(old.uuid());
     }
 
     @Override
     public void tick() {
-        // v79.25.2: 轮询服务端响应缓存 (S2C handle 落 MaidListResponsePacket 静态缓存)
+        // 轮询服务端响应缓存 (S2C handle 落 MaidListResponsePacket 静态缓存)
         List<MaidEntry> fresh = MaidListResponsePacket.getLastEntries();
         if (!fresh.equals(entries)) {
             entries.clear();
@@ -113,6 +144,7 @@ public final class MaidListScreen extends Screen {
         if (++probeCounter >= PROBE_INTERVAL) {
             probeCounter = 0;
             this.attrButton.active = findLocal(selectedMaidId()) != null;
+            updateEnvButton();
         }
     }
 
@@ -137,9 +169,9 @@ public final class MaidListScreen extends Screen {
     }
 
     /**
-     * v79.26.3: 原版主菜单旋转全景背景 (统一 {@link PanoramaBackground})。不调 super:
+     * 原版主菜单旋转全景背景 (统一 {@link PanoramaBackground})。不调 super:
      * 1.21 默认 renderBackground 含 renderBlurredBackground (背景模糊, 明确去模糊
-     * — 让字不模糊)。1.21.1 用 Screen 内置 renderPanorama (v79.25 LMAConfigScreen
+     * — 让字不模糊)。1.21.1 用 Screen 内置 renderPanorama (LMAConfigScreen
      * 同款, 原版全景+vignette); 1.20.1 无此方法 → {@link PanoramaBackground} 直渲兜底
      * (PanoramaRenderer, partialTick 传 1.0F, 全景旋转基于实时时钟, 插值仅影响平滑度)。
      */
@@ -170,14 +202,14 @@ public final class MaidListScreen extends Screen {
             if (hovered) {
                 g.fill(lx, rowY, lx + LIST_W, rowY + ROW_H, COLOR_HOVER);
             }
-            // v79.26 双行: 名称 (行1) + 等级 ❤ 距离 (行2) — v79.26.1 等级改 lang key (中文)
+            // 双行: 名称 (行1) + 等级 ❤ 距离 (行2) — 等级/血量/距离全 lang key
             g.drawString(font, e.name(), lx + 5, rowY + 2, COLOR_TEXT, false);
             Component lv = Component.translatable(
                     "gui.littlemaidmoreaction.maid_list.level", e.level()).withStyle(ChatFormatting.GOLD);
-            Component heart = Component.literal("❤ " + (int) e.health() + "/" + (int) e.maxHealth())
-                    .withStyle(ChatFormatting.RED);
-            String dist = Math.round(Math.sqrt(e.distSqr())) + "格";
-            Component distC = Component.literal(dist).withStyle(ChatFormatting.GRAY);
+            Component heart = Component.translatable("gui.littlemaidmoreaction.maid_list.health",
+                    (int) e.health(), (int) e.maxHealth()).withStyle(ChatFormatting.RED);
+            Component distC = Component.translatable("gui.littlemaidmoreaction.maid_list.dist",
+                    Math.round(Math.sqrt(e.distSqr()))).withStyle(ChatFormatting.GRAY);
             // 行2 三段: 等级 左, ❤ 中, 距离右对齐
             g.drawString(font, lv, lx + 5, rowY + 13, COLOR_GOLD, false);
             g.drawString(font, heart, lx + 52, rowY + 13, COLOR_HEART, false);
@@ -201,9 +233,10 @@ public final class MaidListScreen extends Screen {
             drawCentered(g, local.getName(), px + PREVIEW_W / 2, py + PREVIEW_H + 6, COLOR_TEXT);
             Component lv = Component.translatable(
                     "gui.littlemaidmoreaction.maid_list.level", e.level()).withStyle(ChatFormatting.GOLD);
-            Component heart = Component.literal(" ❤ " + (int) e.health() + "/" + (int) e.maxHealth())
-                    .withStyle(ChatFormatting.RED);
-            drawCentered(g, lv.copy().append(heart), px + PREVIEW_W / 2, py + PREVIEW_H + 20, COLOR_TEXT);
+            Component heart = Component.translatable("gui.littlemaidmoreaction.maid_list.health",
+                    (int) e.health(), (int) e.maxHealth()).withStyle(ChatFormatting.RED);
+            // 原 literal " ❤ " 前导空格 = 与等级文本的间隔, 保留
+            drawCentered(g, lv.copy().append(" ").append(heart), px + PREVIEW_W / 2, py + PREVIEW_H + 20, COLOR_TEXT);
         } else {
             // 远端女仆 (跨维度/远距离): 无实体引用 — 只显示信息, 属性按钮已禁用
             drawCentered(g, Component.literal(e.name()), px + PREVIEW_W / 2, py + 20, COLOR_TEXT);
@@ -220,11 +253,12 @@ public final class MaidListScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int button) {
-        // 点行选中 (不直接开属性屏 — v79.25.2 点选 + 按钮进入, 防误触)
+        // 点行选中 (不直接开属性屏 — 点选 + 按钮进入, 防误触)
         if (button == 0 && !entries.isEmpty() && isListArea(mx, my)) {
             int index = scroll + (int) ((my - this.getListTop() - LIST_Y) / ROW_H);
             if (index >= 0 && index < entries.size()) {
                 selected = index;
+                updateEnvButton();
                 return true;
             }
         }

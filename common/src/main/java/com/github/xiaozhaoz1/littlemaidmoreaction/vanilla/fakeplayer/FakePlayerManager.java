@@ -41,11 +41,11 @@ public final class FakePlayerManager {
     public record FakePlayerTask(LmaFakePlayer player, BlockPos targetPos, Direction face,
                                   LmaPlayerSimulator.Mode mode) {}
 
-    /** 开始持续操作 — v63: 先清理旧任务防残留 */
+    /** 开始持续操作 — 先清理旧任务防残留 */
     public static FakePlayerTask start(EntityMaid maid, BlockPos pos, Direction face,
                                         LmaPlayerSimulator.Mode mode) {
         if (!(maid.level() instanceof ServerLevel sw)) return null;
-        stop(maid); // v63: 覆盖前清理旧的 FakePlayer
+        stop(maid); // 覆盖前清理旧的 FakePlayer
         LmaFakePlayer fp = new LmaFakePlayer(sw, maid, pos);
         FakePlayerTask task = new FakePlayerTask(fp, pos, face, mode);
         TASKS.put(maid.getId(), task);

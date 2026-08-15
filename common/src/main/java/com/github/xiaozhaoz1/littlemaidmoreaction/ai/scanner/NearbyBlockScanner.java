@@ -96,8 +96,8 @@ public final class NearbyBlockScanner {
         Set<Integer> seenAltarStructures = new HashSet<>();
         BlockPos.MutableBlockPos mPos = new BlockPos.MutableBlockPos();
 
-        // v77.5: BlockScanner (palette 短路) — 候选+球形裁剪, 分类/祭坛去重结果层处理
-        // v79.26.7: 垂直不限 (0) — 本类已在结果层按 range/vertical 方形裁剪 (下方 L103)
+        // BlockScanner (palette 短路) — 候选+球形裁剪, 分类/祭坛去重结果层处理;
+        // 垂直不限 (0) — 本类已在结果层按 range/vertical 方形裁剪 (下方)
         var matches = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.BlockScanner.scan((net.minecraft.server.level.ServerLevel) level,
                 center, Math.max(range, vertical) / 16 + 1, 0, s -> !s.isAir(), 4096);
         for (var m : matches) {

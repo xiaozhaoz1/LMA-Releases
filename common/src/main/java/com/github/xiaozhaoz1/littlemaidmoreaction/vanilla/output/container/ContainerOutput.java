@@ -14,7 +14,7 @@ public final class ContainerOutput {
     private ContainerOutput() {}
 
     /**
-     * v79.5: 容器 handler 获取 — capability 六方向遍历 (ArmTransferService.getHandler 提升)。
+     * 容器 handler 获取 — capability 六方向遍历 (ArmTransferService.getHandler 提升)。
      * 1.20.1 = ForgeCapabilities.ITEM_HANDLER + resolve; 1.21.1 = Capabilities.ItemHandler.BLOCK。
      */
     @javax.annotation.Nullable
@@ -37,7 +37,7 @@ public final class ContainerOutput {
     }
 
     /**
-     * v79.5: 按 ItemStack 匹配存取 (isSameItem — NBT 级) — ArmTransferService.execute*
+     * 按 ItemStack 匹配存取 (isSameItem — NBT 级) — ArmTransferService.execute*
      * 溢出退还算法统一于此。返回实际存取数。
      */
     public static int depositItemStack(EntityMaid maid, IItemHandler container,
@@ -62,7 +62,7 @@ public final class ContainerOutput {
         return actual;
     }
 
-    /** v79.5: 按 ItemStack 匹配提取 (isSameItem) — 溢出退还容器。返回实际提取数。 */
+    /** 按 ItemStack 匹配提取 (isSameItem) — 溢出退还容器。返回实际提取数。 */
     public static int withdrawItemStack(EntityMaid maid, IItemHandler container,
                                         ItemStack item, int count) {
         var inv = maid.getAvailableInv(false);
@@ -129,7 +129,7 @@ public final class ContainerOutput {
         return remaining < count;
     }
 
-    /** 从女仆背包提取任意物品 (首个非空栈起) 存入容器。溢出自动退还女仆。 (v76 Phase 4) */
+    /** 从女仆背包提取任意物品 (首个非空栈起) 存入容器。溢出自动退还女仆。 */
     public static boolean depositAny(EntityMaid maid, IItemHandler container, int count) {
         var inv = maid.getAvailableInv(false);
         int remaining = count;
@@ -151,7 +151,7 @@ public final class ContainerOutput {
         return remaining < count;
     }
 
-    /** 从容器提取任意物品存入女仆背包。溢出自动退还容器。 (v76 Phase 4) */
+    /** 从容器提取任意物品存入女仆背包。溢出自动退还容器。 */
     public static boolean withdrawAny(EntityMaid maid, IItemHandler container, int count) {
         var inv = maid.getAvailableInv(false);
         int remaining = count;

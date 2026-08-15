@@ -54,6 +54,10 @@ public final class BlueprintReader {
 
     /** 统计蓝图块列表 */
     public static BlueprintInfo describe(String name, List<BlueprintBlock> blocks) {
+        // v79.49: 空列表特判 — 否则 maxX-minX 整数溢出 (MIN_VALUE-MAX_VALUE=1) 尺寸假正
+        if (blocks.isEmpty()) {
+            return new BlueprintInfo(name, 0, 0, 0, Map.of(), List.of());
+        }
         Map<String, Integer> materials = new LinkedHashMap<>();
         int minX = Integer.MAX_VALUE, minY = Integer.MAX_VALUE, minZ = Integer.MAX_VALUE;
         int maxX = Integer.MIN_VALUE, maxY = Integer.MIN_VALUE, maxZ = Integer.MIN_VALUE;

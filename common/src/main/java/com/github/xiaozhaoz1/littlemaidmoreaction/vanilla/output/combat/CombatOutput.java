@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.combat;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ItemStackHelper;
 
@@ -44,10 +45,6 @@ public final class CombatOutput {
     }
     public static void executionKill(LivingEntity target, EntityMaid source) {
         target.hurt(source.damageSources().genericKill(), target.getHealth() + 1);
-    }
-    public static void bleed(LivingEntity target, float damagePerTick, int ticks) {
-        target.getPersistentData().putFloat(TaskKeys.BLEED_DMG, damagePerTick);
-        target.getPersistentData().putInt(TaskKeys.BLEED_TICKS, ticks);
     }
     public static void damageNearby(EntityMaid center, float range, float damage, boolean hostileOnly) {
         var list = center.level().getEntitiesOfClass(LivingEntity.class,
@@ -132,7 +129,7 @@ public final class CombatOutput {
     // === 近战 ===
     public static void doHurtTarget(EntityMaid maid, LivingEntity target) { maid.doHurtTarget(target); }
 
-    // === 怪物图鉴 (v35.4) ===
+    // === 怪物图鉴 ===
     private static final int KILL_BONUS_THRESHOLD = 1000;
 
     public static void ownerKillBonusDamage(LivingEntity target, EntityMaid source, float amount) {
@@ -143,7 +140,7 @@ public final class CombatOutput {
             target.hurt(source.damageSources().mobAttack(source), amount);
     }
 
-    // ── Phase 4: TLM 战斗执行委托 (v38) ──
+    // ── Phase 4: TLM 战斗执行委托 ──
 
     /** 女仆近战攻击 — 委托 {@link EntityMaid#doHurtTarget}. */
     public static boolean maidDoHurtTarget(EntityMaid maid, Entity target) {

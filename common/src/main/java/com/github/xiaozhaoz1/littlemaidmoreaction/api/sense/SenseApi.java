@@ -67,11 +67,11 @@ public final class SenseApi {
     // ── 同步扫描 (主线程有界半径 — 文档警告: tick 内同步, 半径勿大) ──
 
     /**
-     * 最近目标方块搜索 (v79.5, ChainHarvest.findNearestValid 泛化提升) — BlockScanner
+     * 最近目标方块搜索 (ChainHarvest.findNearestValid 泛化提升) — BlockScanner
      * palette 短路 (稀疏目标 50-200× 提速) + skip 集过滤 + 最近优先。
      *
      * @param radius  搜索半径 (方块)
-     * @param vRange  垂直范围 (±Y, 0 = 不限) — v79.26.7 档位扫描 (AGGRESSIVE 高 5 地下 5)
+     * @param vRange  垂直范围 (±Y, 0 = 不限) — 档位扫描 (AGGRESSIVE 高 5 地下 5)
      * @param filter  方块过滤 (可用 {@link ScanFilters} 组合)
      * @param skip    跳过集 (方块 longHash — 已尝试/不可采目标; 可 null)
      * @param maxHits 扫描预算上限 (越大越准, 每 tick 同步成本越高)
@@ -82,7 +82,7 @@ public final class SenseApi {
                                             Predicate<BlockState> filter,
                                             @Nullable java.util.Set<Long> skip, int maxHits) {
         if (!(maid.level() instanceof ServerLevel sl)) return null;
-        // v79.19o: radius (格) → chunk 半径 ceil 换算 — 原 radius/16+1: 16 → 2 chunk =
+        // radius (格) → chunk 半径 ceil 换算 — 原 radius/16+1: 16 → 2 chunk =
         // 32 格半径 (超预期 1 倍); 用户: "我说的周围16格是半径16格" → 16 格 = 1 chunk。
         // Math.max(1, ...): 0-16 格 → 1 chunk (BlockScanner 最少 1 环)
         int chunkRadius = Math.max(1, (radius + 15) / 16);
@@ -106,11 +106,6 @@ public final class SenseApi {
         return EnvScanner.scanSnowBlocks(sl, maid.blockPosition(), radius);
     }
 
-    /** 扫描附近红石灯 (同步有界) */
-    public static List<BlockPos> scanRedstoneLamps(EntityMaid maid, int radius) {
-        if (!(maid.level() instanceof ServerLevel sl)) return List.of();
-        return EnvScanner.scanRedstoneLamps(sl, maid.blockPosition(), radius);
-    }
 
     // ── 预算化异步扫描 (ScanScheduler 集中调度, 主线程逐 tick 切片) ──
 
@@ -157,7 +152,7 @@ public final class SenseApi {
     }
 
     /**
-     * 按方块 id 最近搜索 (v79.6, FindTargetAction 组合吸收) — BlockSearch nearest-first。
+     * 按方块 id 最近搜索 (FindTargetAction 组合吸收) — BlockSearch nearest-first。
      * 空 blockId = 任意非空气方块。仅搜索, 导航由调用方经 NavigationUtil 组合。
      *
      * @return 最近命中坐标; 无 → null
@@ -186,7 +181,7 @@ public final class SenseApi {
 //?}
     }
 
-    /** 女仆血量比例 (v79.6, WaitUntilMaidHealthAction 谓词吸收) */
+    /** 女仆血量比例 (WaitUntilMaidHealthAction 谓词吸收) */
     public static float healthRatio(EntityMaid maid) {
         return com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidStateReader.getHealthRatio(maid);
     }

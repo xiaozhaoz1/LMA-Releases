@@ -1,9 +1,8 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.gui;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.RequestTaskConfigPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.network.TaskConfigActionPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.CraftChainPipeline;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -36,22 +35,15 @@ public class CraftChainConfigScreen extends LmaTaskConfigScreen<CraftChainConfig
         return "craft_chain";
     }
 
-    // ── renderBg: TLM 基类渲染完整框架 ──
-
-    @Override
-    protected void renderBg(GuiGraphics g, float partialTick, int x, int y) {
-        super.renderBg(g, partialTick, x, y);
-    }
-
-    // ── initAdditionWidgets: 请求配置 + 产物编辑 + 上限按钮 ──
+    // ── initAdditionWidgets: 请求配置 + 产物编辑 + 上限按钮 (renderBg 基类默认委托) ──
 
     @Override
     protected void initAdditionWidgets() {
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), getTaskType());
 
-        int cx = leftPos + 88;
-        int y = topPos + 34;
+        int cx = contentX();
+        int y = contentY();
 
         targetBox = new EditBox(font, cx, y, 140, 20, Component.literal("当前产物"));
         addRenderableWidget(targetBox);
@@ -84,21 +76,18 @@ public class CraftChainConfigScreen extends LmaTaskConfigScreen<CraftChainConfig
         }
         int max = cfg.contains("max_products") ? cfg.getInt("max_products") : ActiveTaskConfig.CRAFT_MAX_PRODUCTS.get();
         String maxText = max < 0 ? "无限 (-1)" : String.valueOf(max);
-        // v67.13: y 118→140 — 避开第二行按钮 (114-134)
+        // y 118→140 — 避开第二行按钮 (114-134)
         g.drawString(font, Component.literal("产物上限: " + maxText
-                + (cfg.contains("max_products") ? " (单女仆)" : " (全局)")), leftPos + 88, topPos + 140, 0xFFFFFF);
+                + (cfg.contains("max_products") ? " (单女仆)" : " (全局)")), contentX(), topPos + 140, 0xFFFFFF);
     }
 
     // ── 业务 ──
 
     private void applyTarget(EntityMaid maid) {
         String value = targetBox.getValue().trim();
-        if (maid != null) {
-            CompoundTag payload = new CompoundTag();
-            payload.putString("value", value);
-            TaskConfigActionPacket.send(maid.getId(), getTaskType(),
-                    CraftChainPipeline.ACTION_SET_TARGET, payload);
-        }
+        CompoundTag payload = new CompoundTag();
+        payload.putString("value", value);
+        sendAction(CraftChainPipeline.ACTION_SET_TARGET, payload);
     }
 
     private void changeMax(EntityMaid maid, int delta) {
@@ -112,21 +101,10 @@ public class CraftChainConfigScreen extends LmaTaskConfigScreen<CraftChainConfig
     private void setMax(EntityMaid maid, int value) {
         if (value == Integer.MIN_VALUE) {
             getMenu().getConfig().remove("max_products");
-            if (maid != null) {
-                CompoundTag payload = new CompoundTag();
-                payload.putString("key", "max_products");
-                TaskConfigActionPacket.send(maid.getId(), getTaskType(),
-                        TaskPipeline.ACTION_REMOVE, payload);
-            }
+            sendRemove("max_products");
         } else {
             getMenu().getConfig().putInt("max_products", value);
-            if (maid != null) {
-                CompoundTag payload = new CompoundTag();
-                payload.putString("key", "max_products");
-                payload.putInt("value", value);
-                TaskConfigActionPacket.send(maid.getId(), getTaskType(),
-                        TaskPipeline.ACTION_SET_INT, payload);
-            }
+            sendSetInt("max_products", value);
         }
     }
 }

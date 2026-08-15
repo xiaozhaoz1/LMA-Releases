@@ -54,11 +54,11 @@ public final class CreateCompatClient {
                 MaidPowerBeltRenderer::new);
     }
 
-    /** v56: 便携装配 Screen 绑定 (v75.1 双平台 — 1.21 MenuScreens.register 私有, 改 RegisterMenuScreensEvent) */
+    /** 便携装配 Screen 绑定 (双平台 — 1.21 MenuScreens.register 私有, 改 RegisterMenuScreensEvent) */
 //? if 1.20.1 {
     @SubscribeEvent
     public static void onClientSetup(net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent event) {
-        // v77: CompatToggle 一致性门控 (模块关闭时菜单绑定无意义)
+        // CompatToggle 一致性门控 (模块关闭时菜单绑定无意义)
         if (com.github.xiaozhaoz1.littlemaidmoreaction.compat.CompatToggle.isModuleEnabled("create")
                 && net.minecraftforge.fml.ModList.get().isLoaded("create")) {
             event.enqueueWork(() -> MenuScreens.register(

@@ -5,6 +5,7 @@ import com.github.tartaricacid.touhoulittlemaid.gametest.TLMGameTests;
 import com.github.tartaricacid.touhoulittlemaid.init.InitEntities;
 import com.github.tartaricacid.touhoulittlemaid.init.InitItems;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.StructureSense;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.gametest.framework.GameTest;
@@ -136,7 +137,7 @@ public class LmaGameTests extends TLMGameTests {
     }
 
     /**
-     * v73: AI 操控门控全链 — 默认关闭 → executor 开启 → onCleanup 关闭 (权限闭环)。
+     * AI 操控门控全链 — 默认关闭 → tick 开启 → onCleanup 关闭 (权限闭环)。
      * 不依赖 Brain 30tick 时序, 直接驱动 pipeline。
      */
     @GameTest(template = "game_test")
@@ -151,11 +152,10 @@ public class LmaGameTests extends TLMGameTests {
             helper.fail("初始门控应为关闭");
             return;
         }
-        // executor 首次执行 → 开启
-        pl.executor().execute((net.minecraft.server.level.ServerLevel) maid.level(),
-                maid, maid.blockPosition(), maid.getPersistentData());
+        // tick 首次执行 → 开启 (原 execute 接口删除, 回归修复路径)
+        pl.tick((net.minecraft.server.level.ServerLevel) maid.level(), maid);
         if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AiControlGate.isEnabled(maid)) {
-            helper.fail("executor 未开启门控");
+            helper.fail("tick 未开启门控");
             return;
         }
         // onCleanup (任务取消) → 关闭 (键删除闭环)
@@ -168,7 +168,7 @@ public class LmaGameTests extends TLMGameTests {
     }
 
     /**
-     * v79: 任务优先级冲突 — 高优先级抢占 + 低优先级拒绝 (TaskDispatcher.submit 冲突策略)。
+     * 任务优先级冲突 — 高优先级抢占 + 低优先级拒绝 (TaskDispatcher.submit 冲突策略)。
      * 注册测试任务 __pri_test (priority=1) — gametest 服务器生命周期内留存 (showInBar=false 隔离)。
      */
     @GameTest(template = "game_test")
@@ -180,10 +180,9 @@ public class LmaGameTests extends TLMGameTests {
             @Override public String taskType() { return "__pri_test"; }
             @Override public int priority() { return 1; }
         };
-        com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.register(
-                "__pri_test", priPl,
-                (w, m, p, d) -> com.github.xiaozhaoz1.littlemaidmoreaction.api.TaskResult.CONTINUE,
-                false);
+        // 注册去 showInBar — 测试隔离任务用 registerPassive (不显示任务栏)
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.registerPassive(
+                "__pri_test", priPl);
 
         String flowTask = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.FLOW_TASK;
         var data = maid.getPersistentData();
@@ -220,7 +219,7 @@ public class LmaGameTests extends TLMGameTests {
     }
 
     /**
-     * v79: 被动 tick 预算 — 超预算时环形轮转 (每 tick 恰 budget 个被动管线被驱动)。
+     * 被动 tick 预算 — 超预算时环形轮转 (每 tick 恰 budget 个被动管线被驱动)。
      * 注册 2 个计数被动 (showInBar=false), budget=1, 手动驱动 tickPassiveFor 断言轮转。
      */
     @GameTest(template = "game_test")
@@ -244,35 +243,42 @@ public class LmaGameTests extends TLMGameTests {
         com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher.submitPassive(maid, "__passive_a");
         com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher.submitPassive(maid, "__passive_b");
 
-        // budget=1 → 每 tick 恰 1 个被驱动, 环形轮转覆盖两个
-        com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig.PASSIVE_TICK_BUDGET.set(1);
-        var passives = com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.passiveTasksList();
-        net.minecraft.server.level.ServerLevel sl = (net.minecraft.server.level.ServerLevel) maid.level();
-        long base = sl.getGameTime();
-        int prevTotal = 0;
-        for (int i = 0; i < 4; i++) {
-            com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.GameTickPipelineManager
-                    .tickPassiveFor(sl, maid, passives, base + i);
-            int total = tickA[0] + tickB[0];
-            if (total - prevTotal != 1) {
-                helper.fail("budget=1 时每 tick 应恰驱动 1 个被动, 实际 " + (total - prevTotal));
+        // TST-5 修复: 预算修改 + 断言包 try/finally — helper.fail 抛异常 (GameTestHelperException)
+        // 时 finally 仍执行恢复, 消除"fail 提前 return 跳过恢复"的跨测试污染; 恢复值从
+        // 配置默认值读取 (getDefault) 而非硬编码 2 (配置默认变化时测试不失效)
+        var budget = com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig.PASSIVE_TICK_BUDGET;
+        try {
+            // budget=1 → 每 tick 恰 1 个被驱动, 环形轮转覆盖两个
+            budget.set(1);
+            var passives = com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.passiveTasksList();
+            net.minecraft.server.level.ServerLevel sl = (net.minecraft.server.level.ServerLevel) maid.level();
+            long base = sl.getGameTime();
+            int prevTotal = 0;
+            for (int i = 0; i < 4; i++) {
+                com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.GameTickPipelineManager
+                        .tickPassiveFor(sl, maid, passives, base + i);
+                int total = tickA[0] + tickB[0];
+                if (total - prevTotal != 1) {
+                    helper.fail("budget=1 时每 tick 应恰驱动 1 个被动, 实际 " + (total - prevTotal));
+                    return;
+                }
+                prevTotal = total;
+            }
+            if (tickA[0] == 0 || tickB[0] == 0) {
+                helper.fail("环形轮转应覆盖两个被动 (a=" + tickA[0] + ", b=" + tickB[0] + ")");
                 return;
             }
-            prevTotal = total;
+        } finally {
+            // 恢复默认预算 (防跨测试影响) — fail 抛异常时也执行
+            budget.set(budget.getDefault());
         }
-        if (tickA[0] == 0 || tickB[0] == 0) {
-            helper.fail("环形轮转应覆盖两个被动 (a=" + tickA[0] + ", b=" + tickB[0] + ")");
-            return;
-        }
-        // 恢复默认预算 (防跨测试影响)
-        com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig.PASSIVE_TICK_BUDGET.set(2);
         helper.succeed();
     }
 
     /**
-     * v79.17: 哈气挥击 — 概率真实攻击: 手动构造状态 + 挥击倒计时 1,
+     * 哈气挥击 — 概率真实攻击: 手动构造状态 + 挥击倒计时 1,
      * 驱动 HaqiPipeline.tick 断言目标掉血且挥击只发生一次 (hit_ticks=-1 防重复)。
-     * v79.18: 改走 MOVE→LOOK 转换 (断言 YSM 动画请求 rouletteAnim), 再覆写挥击参数断言伤害。
+     * 改走 MOVE→LOOK 转换 (断言 YSM 动画请求 rouletteAnim), 再覆写挥击参数断言伤害。
      * 字符串键 "audio_ticks"/"hit_ticks" 对应 HaqiPipeline private 常量。
      */
     @GameTest(template = "game_test")
@@ -300,7 +306,7 @@ public class LmaGameTests extends TLMGameTests {
             return;
         }
 
-        // v79.18: 手动构造 MOVE 状态 (距离 1 ≤ ARRIVE_DIST_SQR=2.25) → 首 tick 转换 LOOK
+        // 手动构造 MOVE 状态 (距离 1 ≤ ARRIVE_DIST_SQR=2.25) → 首 tick 转换 LOOK
         var data = com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline
                 .stateData(maid);
         data.putString(com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.KEY_TARGET,
@@ -318,8 +324,8 @@ public class LmaGameTests extends TLMGameTests {
             helper.fail("首 tick 应转换到 LOOK");
             return;
         }
-        // v79.18: 测试女仆非 YSM 模型 → AnimExecute 走 TLM ISS 分支 — 哈气为 FULL 模式 (写 ANIM_START, 不写 ANIM_NAME)
-        // v79.25.1: 统一播 haqi — haqi.animation.json 骨 AllBody (TLM 通用根骨) 双模型均匹配 (v79.20.6 vanilla 分流已删, 错题 #134)
+        // 测试女仆非 YSM 模型 → AnimExecute 走 TLM ISS 分支 — 哈气为 FULL 模式 (写 ANIM_START, 不写 ANIM_NAME)
+        // 统一播 haqi — haqi.animation.json 骨 AllBody (TLM 通用根骨) 双模型均匹配 (vanilla 分流已删, 错题 #134)
         String animStart = maid.getPersistentData().getString(
                 com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_START);
         if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.HAQI_ANIM
@@ -359,7 +365,7 @@ public class LmaGameTests extends TLMGameTests {
     }
 
     /**
-     * v79.20: 哈气对主人 — 女仆 tame 玩家后, 手动构造 target_type=owner 状态,
+     * 哈气对主人 — 女仆 tame 玩家后, 手动构造 target_type=owner 状态,
      * 断言 MOVE→LOOK (owner 分支: 网络包 + 动画) + 挥击玩家掉血 (hit_ticks=-1 防重复)。
      * 主人 = 玩家 (ServerPlayer, 用户裁定); 不反击由玩家无自动反击保证。
      */
@@ -443,7 +449,7 @@ public class LmaGameTests extends TLMGameTests {
         data.putString(com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.KEY_TARGET,
                 player.getStringUUID());
         data.putString(com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.KEY_TARGET_TYPE,
-                com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.TARGET_OWNER);
+                com.github.xiaozhaoz1.littlemaidmoreaction.task.service.HaqiService.TARGET_OWNER);
         data.putString(com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.KEY_STATE,
                 "MOVE");
         data.putInt(com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.KEY_TIMER, 0);
@@ -457,9 +463,8 @@ public class LmaGameTests extends TLMGameTests {
             helper.fail("首 tick 应转换到 LOOK (owner), 实际 state=" + data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.KEY_STATE) + ", target=" + data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.KEY_TARGET) + ", playerPos=" + player.blockPosition() + ", maidPos=" + maid.blockPosition() + ", distSqr=" + player.blockPosition().distSqr(maid.blockPosition()) + ", getEntity=" + ((net.minecraft.server.level.ServerLevel) maid.level()).getEntity(java.util.UUID.fromString(data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.KEY_TARGET))));
             return;
         }
-        // v79.20.4: 对主人哈气动画 = maimeng (与对女仆 haqi 分流)
-        // v79.25.1: 统一播 maimeng — maimeng.animation.json 骨 PascalCase (Head/LeftArm/...) 与 TLM 模型骨名一致
-        // (v79.20.6 vanilla 分流误判已删, 错题 #134)
+        // 对主人哈气统一播 maimeng — maimeng.animation.json 骨 PascalCase (Head/LeftArm/...) 与 TLM 模型骨名一致
+        // (vanilla 分流误判已删, 错题 #134; 演化史见 changelog)
         String animStart = maid.getPersistentData().getString(
                 com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_START);
         if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline.HAQI_OWNER_ANIM
@@ -499,5 +504,194 @@ public class LmaGameTests extends TLMGameTests {
         com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher.cancelPassive(maid, "haqi");
         helper.succeed();
         });
+    }
+
+    /**
+     * 连锁挖矿链路 (v79.53 补测): 脚下铁矿石 → 开脉 (KEY_QUEUE 写入) → 强制蓄力到点 →
+     * charge 破坏 (矿变空气 + 队列闭环)。全同步驱动 ChainHarvestPipeline.tick (同一 server
+     * tick 内连续调用, 女仆无机会被 AI 移动/GMPM 介入 — 实测 runAfterDelay 等待期位置漂移
+     * 导致 3 格球破块失败); 覆盖可达裁剪后单轮全破语义 (v79.53 #4)。
+     */
+    @GameTest(template = "game_test", timeoutTicks = 120)
+    public static void lmaChainOre(GameTestHelper helper) {
+        EntityMaid maid = spawnMaid(helper);
+        if (maid == null) return; // spawnMaid 已 fail
+
+        net.minecraft.server.level.ServerLevel sl = (net.minecraft.server.level.ServerLevel) maid.level();
+        // 女仆位置 (7,2,7) — 脚下 (7,1,7) 放铁矿石 + 主手铁镐 (validate 要求持镐)
+        helper.setBlock(new BlockPos(7, 1, 7), net.minecraft.world.level.block.Blocks.IRON_ORE);
+        maid.setItemInHand(InteractionHand.MAIN_HAND, new ItemStack(net.minecraft.world.item.Items.IRON_PICKAXE));
+
+        // 提交 collect_ore (validate: 主手持镐 + 耐久 ✓)
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher
+                .submit(maid, "collect_ore", null, 0)) {
+            helper.fail("collect_ore submit 失败");
+            return;
+        }
+
+        var pl = com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.get("collect_ore").pipeline();
+        var data = maid.getPersistentData();
+
+        // tick 1: 开脉 (脚下矿匹配 → tryStartVein → KEY_QUEUE 写入)
+        pl.tick(sl, maid);
+        if (!data.contains(com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.KEY_QUEUE)) {
+            helper.fail("首 tick 未开脉 (KEY_QUEUE 未写入)");
+            return;
+        }
+        // v79.61x 状态机化: 开脉即 CHARGE (显式相位键, 与队列同生)
+        if (data.getInt(com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.KEY_PHASE)
+                != com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.Phase.CHARGE.ordinal()) {
+            helper.fail("开脉后相位应为 CHARGE");
+            return;
+        }
+
+        // 强制蓄力到点 (手动 tick 不推进 gameTime — 直接置 end 为已过期, 免 runAfterDelay 等待漂移)
+        data.putLong(com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.KEY_CHARGE_END,
+                sl.getGameTime() - 1);
+        // 女仆拉回原位 (防 AI 移动导致 3 格球破块门失败) — 同一 tick 内同步完成;
+        // moveTo 收绝对坐标 (直接传相对坐标会 teleport 到 gametest 结构偏移外的错误位置 — 实证坑)
+        BlockPos maidAbs = helper.absolutePos(new BlockPos(7, 2, 7));
+        maid.moveTo(maidAbs.getX() + 0.5, maidAbs.getY(), maidAbs.getZ() + 0.5,
+                maid.getYRot(), maid.getXRot());
+
+        // tick 2 (同一 server tick): charge 破块 → 矿变空气 + 队列闭环
+        pl.tick(sl, maid);
+        if (!sl.getBlockState(helper.absolutePos(new BlockPos(7, 1, 7))).isAir()) {
+            helper.fail("charge 后矿石未被破坏");
+            return;
+        }
+        if (data.contains(com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.KEY_QUEUE)) {
+            helper.fail("破块后 KEY_QUEUE 未清理 (闭环)");
+            return;
+        }
+        // 状态机化: 破块后相位随队列闭环 (单点清理)
+        if (data.contains(com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.KEY_PHASE)) {
+            helper.fail("破块后相位键未清理 (闭环)");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * 错题 #183 round-trip 守护 — NbtCodecs 写读对称 (1.21.1 IntArrayTag 漂移回归防线)。
+     * 运行时 MC 环境 (纯 JVM 禁 MC 类型 — #173 纪律; NbtUtils 双平台实现差异只在运行期暴露)。
+     */
+    @GameTest(template = "game_test")
+    public static void lmaNbtCodecsRoundTrip(GameTestHelper helper) {
+        net.minecraft.nbt.CompoundTag tag = new net.minecraft.nbt.CompoundTag();
+        BlockPos pos = new BlockPos(123, 45, -67);
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs.writeBlockPos(tag, "p", pos);
+        BlockPos back = com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs.readBlockPos(tag, "p");
+        if (back == null || !back.equals(pos)) {
+            helper.fail("NbtCodecs round-trip mismatch: " + pos + " -> " + back);
+            return;
+        }
+        // 缺键 → null (读侧守卫语义)
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs.readBlockPos(tag, "missing") != null) {
+            helper.fail("NbtCodecs 缺键应返回 null");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * 结构感知运行时锚点 (审计 T1): per-player 缓存生命周期 — detect 写 PLAYER_TEXT,
+     * sweep 回收不在 PlayerList 的玩家缓存 (离线清理, 错题 #195 回归);
+     * 状态机分支由 StructureSenseStateTest 28 例覆盖 (gametest 测试层无自然结构,
+     * 端到端 discover/leave 依赖地图生成, 不可构造 — 如实降级)。
+     */
+    @GameTest(template = "game_test")
+    public static void lmaStructureSenseState(GameTestHelper helper) {
+        net.minecraft.server.level.ServerLevel level = (net.minecraft.server.level.ServerLevel) helper.getLevel();
+        com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig.ENV_STRUCTURE_ENABLED.set(true);
+        // 纯构造 ServerPlayer (不进 PlayerList — detect 只读 UUID/坐标; sweep 以 PlayerList 为在线集,
+        // 恰好验证离线回收); 不 placeNewPlayer: mock connection 无 channel 会 NPE (haqi 测试同款实证)
+//? if 1.20.1 {
+        net.minecraft.server.level.ServerPlayer player = new net.minecraft.server.level.ServerPlayer(
+                level.getServer(), level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "sense-mock-player")) {
+//?} else {
+        net.minecraft.server.level.ServerPlayer player = new net.minecraft.server.level.ServerPlayer(
+                level.getServer(), level,
+                new com.mojang.authlib.GameProfile(java.util.UUID.randomUUID(), "sense-mock-player"),
+                net.minecraft.server.level.ClientInformation.createDefault()) {
+//?}
+            @Override public boolean isSpectator() { return false; }
+            @Override public boolean isCreative() { return false; }
+        };
+        java.util.UUID pid = player.getUUID();
+        if (StructureSense.hasPlayerText(pid) || StructureSense.hasPlayerState(pid)) {
+            helper.fail("检测前不应有玩家缓存");
+            return;
+        }
+        StructureSense.detect(level, player);
+        if (!StructureSense.hasPlayerText(pid)) {
+            helper.fail("detect 应写 PLAYER_TEXT 缓存");
+            return;
+        }
+        // mock 玩家不在 PlayerList → sweep 应回收 (玩家离线生命周期)
+        StructureSense.sweep(level);
+        if (StructureSense.hasPlayerText(pid) || StructureSense.hasPlayerState(pid)) {
+            helper.fail("sweep 未回收离线玩家缓存");
+            return;
+        }
+        helper.succeed();
+    }
+
+    /**
+     * 外部注册链 (LMAT 门面 + 迟注册钩子 fail-soft): 主动一行注册 → 注册表可见;
+     * submit/cancel 生命周期; 被动 registerPassive + submitPassive/cancelPassive 键闭环。
+     * gametest 运行时 TLM TaskManager.init 已冻结 (ImmutableMap) — 迟注册钩子走 fail-soft
+     * 分支 (不炸即过); 冻结前路径 (addMaidTask 内) 由生产环境实证。
+     */
+    @GameTest(template = "game_test")
+    public static void lmaExternalRegistration(GameTestHelper helper) {
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.LMAT.register("__ext_active",
+                new com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline() {
+                    @Override public String taskType() { return "__ext_active"; }
+                    @Override public void tick(net.minecraft.server.level.ServerLevel w, EntityMaid m) { }
+                });
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.get("__ext_active") == null) {
+            helper.fail("LMAT.register 未进注册表");
+            return;
+        }
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.isShowInBar("__ext_active")) {
+            helper.fail("主动任务应任务栏可见");
+            return;
+        }
+
+        EntityMaid maid = spawnMaid(helper);
+        if (maid == null) return; // spawnMaid 已 fail
+
+        // 主动生命周期: submit → in_progress → cancel
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.api.LMAT.submit(maid, "__ext_active", null, 0)) {
+            helper.fail("外部主动任务 submit 失败");
+            return;
+        }
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.STATE_IN_PROGRESS
+                .equals(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getState(maid))) {
+            helper.fail("submit 后状态应为 in_progress");
+            return;
+        }
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.LMAT.cancel(maid);
+
+        // 被动注册 + 触发/取消键闭环
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.LMAT.registerPassive("__ext_passive",
+                new com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline() {
+                    @Override public String taskType() { return "__ext_passive"; }
+                });
+        String pkey = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.passiveKey("__ext_passive");
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.LMAT.submitPassive(maid, "__ext_passive");
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.STATE_IN_PROGRESS
+                .equals(maid.getPersistentData().getString(pkey))) {
+            helper.fail("submitPassive 未写被动键");
+            return;
+        }
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.LMAT.cancelPassive(maid, "__ext_passive");
+        if (maid.getPersistentData().contains(pkey)) {
+            helper.fail("cancelPassive 未清被动键");
+            return;
+        }
+        helper.succeed();
     }
 }

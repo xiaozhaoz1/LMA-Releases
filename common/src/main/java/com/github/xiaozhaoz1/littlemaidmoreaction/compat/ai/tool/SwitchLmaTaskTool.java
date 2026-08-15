@@ -18,7 +18,7 @@ import java.util.List;
  * ai_control 等)。参数枚举 = TaskRegistry.taskTypes() (动态, 同 SwitchWorkTaskTool 模式)。
  * 权限: AI 操控任务开启 (防止 AI 乱切任务)。
  */
-public final class SwitchLmaTaskTool implements ITool<SwitchLmaTaskTool.Result> {
+public final class SwitchLmaTaskTool implements GatedMaidTool<SwitchLmaTaskTool.Result> {
 
     private static final String TASK_ID = "task_id";
     private static final Codec<Result> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -54,12 +54,6 @@ public final class SwitchLmaTaskTool implements ITool<SwitchLmaTaskTool.Result> 
         return callback.addToolResult(ok
                 ? "Task '%s' started".formatted(taskId)
                 : "Task '%s' failed to start (requirements not met)".formatted(taskId), toolCallId);
-    }
-
-    @Override
-    public boolean trigger(EntityMaid maid,
-                           com.github.tartaricacid.touhoulittlemaid.ai.service.llm.openai.request.ChatCompletion chatCompletion) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AiControlGate.isEnabled(maid);
     }
 
     public record Result(String taskId) {}

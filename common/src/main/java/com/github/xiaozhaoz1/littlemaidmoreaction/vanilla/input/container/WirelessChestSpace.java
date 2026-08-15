@@ -57,7 +57,7 @@ public final class WirelessChestSpace {
         return total;
     }
 
-    /** v43: 公开 — 替代 interact/ 层的重复实现 */
+    /** 公开 — 替代 interact/ 层的重复实现 */
     @Nullable
     public static IItemHandler getWirelessHandler(EntityMaid maid) {
         var baubleInv = maid.getMaidBauble();

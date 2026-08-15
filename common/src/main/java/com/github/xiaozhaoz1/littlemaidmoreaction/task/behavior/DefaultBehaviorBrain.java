@@ -26,6 +26,15 @@ public enum DefaultBehaviorBrain implements IExtraMaidBrain {
         );
     }
 
+    @Override
+    public List<Pair<Integer, BehaviorControl<? super EntityMaid>>> getCoreBehaviors() {
+        // v79.48: 自动修复 — core 所有 activity 都跑 (工作/战斗/发呆, 慢慢修); 优先级 5 低
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.REPAIR_AUTO_ENABLED.get()) {
+            return List.of();
+        }
+        return List.of(Pair.of(5, new AutoRepairBehavior()));
+    }
+
     /** 从当前任务的 Pipeline 获取收集过滤器 */
     private java.util.function.Predicate<net.minecraft.world.item.ItemStack> resolveFilter(EntityMaid maid) {
         if (!(maid.getTask() instanceof com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask)) return null;
@@ -33,6 +42,8 @@ public enum DefaultBehaviorBrain implements IExtraMaidBrain {
         String taskType = uid.startsWith("task/") ? uid.substring(5) : uid;
         var h = TaskRegistry.get(taskType);
         if (h == null) return null;
-        return h.pipeline().collectFilter(maid);
+        // 配置维度拆分 — 未实现 TaskConfigurable 的管线无收集过滤
+        return h.pipeline() instanceof com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable c
+                ? c.collectFilter(maid) : null;
     }
 }

@@ -5,6 +5,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.HaqiService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -13,19 +14,22 @@ import net.minecraft.world.phys.AABB;
 import java.util.Random;
 
 /**
- * 哈气独立触发 (v79.11) — 不依赖 EnvSense 广播 (ENVSENSE_ENABLED 默认关 → 信号永不产生,
- * 用户实测哈气永不触发的根因)。每 20t 直接扫描女仆周围 2 格内的其他女仆 → 概率掷骰 →
+ * 哈气独立触发 (v79.11) — 不依赖 EnvSense 广播 (当时 ENVSENSE_ENABLED 默认关 → 信号永不产生,
+ * 用户实测哈气永不触发的根因; 2026-08-11b 默认已改 true, 独立通道保留双通道)。每 20t 直接扫描女仆周围 2 格内的其他女仆 → 概率掷骰 →
  * 锁定目标 + submitPassive。onSignal (EnvSense 通道) 保留 — 双通道。
  *
  * <p>v79.20 节流顺序 (用户裁定, 对女仆优先): 先查 2 格内女仆 → 命中概率 → 锁女仆;
  * 未触发 (无女仆或概率未中) → 再查 2 格内主人 → 独立概率 (HAQI_CHANCE_TO_OWNER) →
  * 锁主人 (目标类型 target_type=owner, 与对女仆区分)。
+ *
+ * <p>v79.58: 续哈气 ({@link #tryContinue}) — 哈气结束时立即扫描 2 格内女仆无缝续
+ * (消除 20t 触发周期间隙 → 哈气持续期间自救等被动永不触发, 用户裁定)。
  */
 public final class HaqiTrigger {
 
-    /** 触发距离: 3 格 (distSqr <= 9, v79.14c 2→3) */
+    /** 触发距离: 3 格 (distSqr <= 9) */
     private static final double TRIGGER_DIST_SQR = 9.0;
-    /** v79.20: 对主人触发距离: 2 格 (distSqr <= 4) */
+    /** 对主人触发距离: 2 格 (distSqr <= 4) */
     private static final double OWNER_TRIGGER_DIST_SQR = 4.0;
 
     private static final Random RANDOM = new Random();
@@ -35,7 +39,7 @@ public final class HaqiTrigger {
     /** 每 20t 调 — TaskTickHandler 挂载; 遍历维度内女仆触发 */
     public static void tick(ServerLevel level) {
         if (level.getGameTime() % 20 != 0) return;
-        // v79.20: 总开关 + 对主人二级开关, 任一开则扫描 (tryTrigger 内部分别门控)
+        // 总开关 + 对主人二级开关, 任一开则扫描 (tryTrigger 内部分别门控)
         if (!PassiveTaskConfig.HAQI_ENABLED.get() && !PassiveTaskConfig.HAQI_ENABLED_TO_OWNER.get()) return;
         if (TaskRegistry.get("haqi") == null) return;
         for (var e : level.getAllEntities()) {
@@ -46,7 +50,7 @@ public final class HaqiTrigger {
     }
 
     /**
-     * 触发判定 — v79.20 节流: 先 2 格内其他女仆 → 概率 → 锁女仆; 未触发 → 对主人变体。
+     * 触发判定 — 节流: 先 2 格内其他女仆 → 概率 → 锁女仆; 未触发 → 对主人变体。
      * (对女仆优先, 用户裁定)
      */
     public static void tryTrigger(ServerLevel level, EntityMaid maid) {
@@ -55,22 +59,11 @@ public final class HaqiTrigger {
         if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))) return;
 
         // 2 格内其他女仆 (AABB 直接扫描 — 独立于 EnvSense 快照)
-        EntityMaid target = null;
-        double best = Double.MAX_VALUE;
-        BlockPos center = maid.blockPosition();
-        for (EntityMaid m : level.getEntitiesOfClass(EntityMaid.class,
-                new AABB(center).inflate(2, 2, 2))) {
-            if (m == maid || !m.isAlive()) continue;
-            double d = m.blockPosition().distSqr(center);
-            if (d <= TRIGGER_DIST_SQR && d < best) {
-                best = d;
-                target = m;
-            }
-        }
+        EntityMaid target = scanNearestMaid(maid);
 
-        // v79.20: 有女仆且概率命中 → 锁女仆 (显式写 target_type=maid)
+        // 有女仆且概率命中 → 锁女仆 (显式写 target_type=maid)
         if (target != null && RANDOM.nextDouble() < PassiveTaskConfig.HAQI_CHANCE.get()) {
-            // 锁定目标 + 提交 (v79.12: 写 lma_pl_haqi compound — 原写根导致状态机读空立即取消)
+            // 锁定目标 + 提交 (写 lma_pl_haqi compound — 原写根导致状态机读空立即取消)
             var data = HaqiPipeline.stateData(maid);
             data.putString(HaqiPipeline.KEY_TARGET, target.getStringUUID());
             data.putString(HaqiPipeline.KEY_TARGET_TYPE, HaqiPipeline.TARGET_MAID);
@@ -79,12 +72,46 @@ public final class HaqiTrigger {
             TaskDispatcher.submitPassive(maid, "haqi");
             return;
         }
-        // 女仆未触发 (无目标或概率未中) → 对主人变体 (独立开关/概率/距离)
+        // 女仆未触发 → 对主人变体 (独立开关/概率/距离, 与 HaqiTrigger 同通道复用)
         tryTriggerOwner(maid);
     }
 
     /**
-     * v79.20: 对主人变体触发 — 2 格内主人 (TLM getOwner, 在线玩家) → 独立概率掷骰 →
+     * 续哈气 (v79.58 用户裁定) — 哈气结束时立即扫描 2 格内其他女仆: 有 → 无缝续
+     * (重置 MOVE/timer/新目标 — 不掷概率, 有女仆即续; 消除 20t 触发周期间隙 →
+     * 哈气持续期间自救等被动永不触发); 无 → false (调用方停止)。
+     * 只续女仆 — 对主人哈气结束正常停 (用户裁定范围)。
+     */
+    public static boolean tryContinue(ServerLevel level, EntityMaid maid) {
+        EntityMaid target = scanNearestMaid(maid);
+        if (target == null) return false;
+        var data = HaqiPipeline.stateData(maid);
+        data.putString(HaqiPipeline.KEY_TARGET, target.getStringUUID());
+        data.putString(HaqiPipeline.KEY_TARGET_TYPE, HaqiPipeline.TARGET_MAID);
+        data.putString(HaqiPipeline.KEY_STATE, "MOVE");
+        data.putInt(HaqiPipeline.KEY_TIMER, 0);
+        return true;
+    }
+
+    /** 2 格内最近其他女仆扫描 (tryTrigger/tryContinue 共用) */
+    private static EntityMaid scanNearestMaid(EntityMaid maid) {
+        EntityMaid target = null;
+        double best = Double.MAX_VALUE;
+        BlockPos center = maid.blockPosition();
+        for (EntityMaid m : maid.level().getEntitiesOfClass(EntityMaid.class,
+                new AABB(center).inflate(2, 2, 2))) {
+            if (m == maid || !m.isAlive()) continue;
+            double d = m.blockPosition().distSqr(center);
+            if (d <= TRIGGER_DIST_SQR && d < best) {
+                best = d;
+                target = m;
+            }
+        }
+        return target;
+    }
+
+    /**
+     * 对主人变体触发 — 2 格内主人 (TLM getOwner, 在线玩家) → 独立概率掷骰 →
      * 锁定主人 (target_type=owner) + submitPassive。主人不反击 (玩家无自动反击)。
      */
     public static void tryTriggerOwner(EntityMaid maid) {
@@ -99,7 +126,7 @@ public final class HaqiTrigger {
         }
         var data = HaqiPipeline.stateData(maid);
         data.putString(HaqiPipeline.KEY_TARGET, owner.getStringUUID());
-        data.putString(HaqiPipeline.KEY_TARGET_TYPE, HaqiPipeline.TARGET_OWNER);
+        data.putString(HaqiPipeline.KEY_TARGET_TYPE, HaqiService.TARGET_OWNER);
         data.putString(HaqiPipeline.KEY_STATE, "MOVE");
         data.putInt(HaqiPipeline.KEY_TIMER, 0);
         TaskDispatcher.submitPassive(maid, "haqi");

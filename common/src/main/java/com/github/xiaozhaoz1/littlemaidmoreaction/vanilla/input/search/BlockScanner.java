@@ -36,7 +36,7 @@ public final class BlockScanner {
     private BlockScanner() {}
 
     /** 同步扫描 — 环形 chunk 螺旋 (近优先) + palette 短路; 返回近优先排序后的命中列表 (截断 maxHits)。
-     *  @param vRange 垂直范围 (±Y, 0/负 = 不限) — v79.26.7 档位扫描 (AGGRESSIVE 高 5 地下 5) */
+     *  @param vRange 垂直范围 (±Y, 0/负 = 不限) — 档位扫描 (AGGRESSIVE 高 5 地下 5) */
     public static List<Match> scan(ServerLevel level, BlockPos center, int maxRing, int vRange,
                                    Predicate<BlockState> filter, int maxHits) {
         List<Match> results = new ArrayList<>();
@@ -82,7 +82,7 @@ public final class BlockScanner {
         for (int d = 0; d <= spread && results.size() < maxHits; d++) {
             for (int y0 : new int[]{centerSectionY - d, centerSectionY + d}) {
                 if (y0 < minSectionY || y0 > maxSectionY) continue;
-                int idx = y0; // v79.13: y0 已是 0-based 节索引 — 原再减 getMinSection()(-4) 导致偏移 64 格 (对照 Numen 原版 sections[y0])
+                int idx = y0; // y0 已是 0-based 节索引 — 原再减 getMinSection()(-4) 导致偏移 64 格 (对照 Numen 原版 sections[y0])
                 if (idx < 0 || idx >= sections.length) continue;
                 LevelChunkSection section = sections[idx];
                 if (section == null || section.hasOnlyAir()) continue;

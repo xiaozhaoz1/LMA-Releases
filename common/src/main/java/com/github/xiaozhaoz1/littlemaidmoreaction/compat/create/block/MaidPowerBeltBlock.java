@@ -160,7 +160,7 @@ public class MaidPowerBeltBlock extends HorizontalKineticBlock
         if (!isEntityOnBeltSurface(pos, entity))
             return;
 
-        // v4.5: sprint时用固定模拟速度(女仆原地跑→位置不变→不用位置差)
+        // sprint时用固定模拟速度(女仆原地跑→位置不变→不用位置差)
         float surfaceSpeed;
         if (maid.isSprinting()) {
             surfaceSpeed = 0.2f; // 4 m/s sprint → ~96 RPM
@@ -176,7 +176,7 @@ public class MaidPowerBeltBlock extends HorizontalKineticBlock
         if (Math.abs(surfaceSpeed) < MaidPowerBeltBlockEntity.MIN_SURFACE_SPEED)
             return;
 
-        // v4.4: 去掉位置修正 — 女仆自己走路，不是被皮带运输
+        // 去掉位置修正 — 女仆自己走路，不是被皮带运输
         entity.hurtMarked = true;
 
         if (level.isClientSide)
@@ -311,11 +311,11 @@ public class MaidPowerBeltBlock extends HorizontalKineticBlock
     @Override
 //? if 1.20.1 {
     public BlockPathTypes getBlockPathType(BlockState state, BlockGetter world, BlockPos pos, @Nullable Mob entity) {
-        return BlockPathTypes.WALKABLE; // v4.3: 用静态常量，防EnumMap越界崩溃
+        return BlockPathTypes.WALKABLE; // 用静态常量，防EnumMap越界崩溃
     }
 //?} else {
     public net.minecraft.world.level.pathfinder.PathType getBlockPathType(BlockState state, BlockGetter world, BlockPos pos, @Nullable Mob entity) {
-        return net.minecraft.world.level.pathfinder.PathType.WALKABLE; // v75.1: 1.21 BlockPathTypes → PathType
+        return net.minecraft.world.level.pathfinder.PathType.WALKABLE; // 1.21 BlockPathTypes → PathType
     }
 //?}
 
@@ -357,7 +357,7 @@ public class MaidPowerBeltBlock extends HorizontalKineticBlock
 //?} else {
     public boolean isPathfindable(BlockState state, PathComputationType type) {
 //?}
-        return true; // v4.2: 女仆需寻路走到皮带上
+        return true; // 女仆需寻路走到皮带上
     }
 
     @Override

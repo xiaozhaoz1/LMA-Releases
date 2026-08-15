@@ -36,7 +36,7 @@ public final class LmaBlockEntityTypes {
             DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, LittleMaidMoreAction.MOD_ID);
 //?}
 
-    // Create 兼容方块实体 (v75.1 双平台化) — 与 LmaBlocks.MAID_POWER_BELT 同步门控 (无 Create 时为 null)
+    // Create 兼容方块实体 (双平台化) — 与 LmaBlocks.MAID_POWER_BELT 同步门控 (无 Create 时为 null)
 //? if 1.20.1 {
     public static final RegistryObject<BlockEntityType<MaidPowerBeltBlockEntity>> MAID_POWER_BELT =
             LmaBlocks.MAID_POWER_BELT != null

@@ -23,19 +23,22 @@ import java.util.concurrent.ConcurrentMap;
  *
  * <p>检查 6 侧 (Baritone 只查上+四侧; LMA 加下方 — 目标矿下方是岩浆池时挖掉矿,
  * 掉落物掉进岩浆烧毁, 先垫住防掉落物损失)。岩浆优先 (烫伤), 水兜底 (冲掉落物)。
- * 防摔落 (垫柱) 由 {@link BlockUpCoordinator} 负责 — 本类只管液体。
+ * <p>v79.53 更正: 原"防摔落由 {@link BlockUpCoordinator} 垫柱负责"为死引用 —
+ * 垫柱链 v79.26.8e 已删, BlockUpCoordinator 仅剩堵护放置链; 挖穿逐格下落无坠落伤害,
+ * 防摔落无独立机制属现状语义。
  *
  * <p>放置链复用 {@link BlockUpCoordinator#placeMaterial} (换主手 + 假人放置 + 工具
  * 恢复 + 诚实消耗); 从液体格任一实心邻格点击朝向液体 (块落液体位置)。
  */
 public final class DangerGuardCoordinator {
 
-    /** tick 返回: IDLE=未处理 / RUNNING=堵护中 (调用方 CONTINUE) / DONE=已安全 (下轮开脉) / FAILED=放弃 (无方块, 调用方跳过) */
-    public enum Phase { IDLE, RUNNING, DONE, FAILED }
+    /** tick 返回: RUNNING=堵护中 (调用方 CONTINUE) / DONE=已安全 (下轮开脉) / FAILED=放弃 (无方块, 调用方跳过) */
+    public enum Phase { RUNNING, DONE, FAILED }
 
     private static final ConcurrentMap<UUID, State> STATES = new ConcurrentHashMap<>();
-    /** 堵护看门狗 (tick) — 对齐垫柱看门狗 */
-    private static final int TIMEOUT = 240;
+    /** 堵护看门狗 (tick) — v79.53: 240→60 对齐跳过集 TTL (原 240 与 SKIP_TTL=60 不匹配:
+     *  堵护 240t 超时 FAILED → skip 60t 重试 → 每 60t 循环空转; 6 侧液体最多 6 块 60t 足够) */
+    private static final int TIMEOUT = 60;
 
     private record State(BlockPos target, long startTick) {}
 
@@ -91,7 +94,10 @@ public final class DangerGuardCoordinator {
     }
 
     /** 往液体位置放方块 — 从任一实心邻格点击朝向液体 (块落液体格); 液体已被别的东西
-     *  占住 (非可替换) = 已堵住 → true (下轮重检消失); 全邻格不可点 → false */
+     *  占住 (非可替换) = 已堵住 → true (下轮重检消失); 全邻格不可点 → false。
+     *  <p>放置复查说明 (P-6): placeMaterial 返回 true 仅表示 useOn 被接受, 不复查目标格 —
+     *  若假阳性 (事件吞交互/目标被占), 液体仍在 → 下轮 findDanger 重检继续堵, 240t 看门狗
+     *  超时 FAILED (调用方跳过), 自愈语义成立, 无需本层复查。 */
     private static boolean blockDanger(ServerLevel world, EntityMaid maid, BlockPos danger) {
         if (!world.getBlockState(danger).canBeReplaced()) return true;
         for (Direction dir : Direction.values()) {

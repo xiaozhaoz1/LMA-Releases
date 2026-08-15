@@ -28,15 +28,20 @@ public final class NbtCodecs {
 //?}
     }
 
-    /** 写 BlockPos — 各平台自身格式 (与读对称) */
+    /**
+     * 写 BlockPos — 各平台自身格式 (与读对称, 错题 #183)。
+     * 1.20.1: tag[key] = NbtUtils 三元组 {x,y,z} (读侧 readBlockPos 同款解析);
+     * 1.21.1: tag[key] = {"pos": long}。原 1.20.1 分支包 "pos" 子键与读侧不对称 —
+     * 死代码掩盖 (0 调用方), v79.55 修对称 + 接入 2 写侧调用方。
+     */
     public static void writeBlockPos(CompoundTag tag, String key, BlockPos pos) {
-        CompoundTag sub = new CompoundTag();
 //? if 1.20.1 {
-        sub.put("pos", NbtUtils.writeBlockPos(pos));
+        tag.put(key, NbtUtils.writeBlockPos(pos));
 //?} else {
+        CompoundTag sub = new CompoundTag();
         sub.putLong("pos", pos.asLong());
-//?}
         tag.put(key, sub);
+//?}
     }
 
     /** 读坐标键 (pipelineData/persistentData 顶层 long 键 — 1.21 "pos" 同格式) */

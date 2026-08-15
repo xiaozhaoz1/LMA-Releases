@@ -1,10 +1,9 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.gui;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.RequestTaskConfigPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.network.TaskConfigActionPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.BellRingPipeline;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -29,22 +28,15 @@ public class BellRingConfigScreen extends LmaTaskConfigScreen<BellRingConfigMenu
         return "bell_ring";
     }
 
-    // ── renderBg: TLM 基类渲染完整框架 ──
-
-    @Override
-    protected void renderBg(GuiGraphics g, float partialTick, int x, int y) {
-        super.renderBg(g, partialTick, x, y);
-    }
-
-    // ── initAdditionWidgets: 请求配置 + 步进按钮 ──
+    // ── initAdditionWidgets: 请求配置 + 步进按钮 (renderBg 基类默认委托) ──
 
     @Override
     protected void initAdditionWidgets() {
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), getTaskType());
 
-        int cx = leftPos + 88;
-        int y = topPos + 34;
+        int cx = contentX();
+        int y = contentY();
 
         addRenderableWidget(Button.builder(Component.literal("-100"),
                 btn -> changeInterval(m, -100)).pos(cx, y).size(46, 20).build());
@@ -68,7 +60,7 @@ public class BellRingConfigScreen extends LmaTaskConfigScreen<BellRingConfigMenu
                 : ActiveTaskConfig.BELL_RING_INTERVAL.get();
         String text = "敲钟间隔: " + interval + " tick ("
                 + (cfg.contains(BellRingPipeline.KEY_RING_INTERVAL) ? "单女仆" : "全局") + ")";
-        // v67.14: y 70→84 — 避开「恢复全局」按钮 (58-78)
+        // y 70→84 — 避开「恢复全局」按钮 (58-78)
         g.drawString(font, Component.literal(text), leftPos + 88, topPos + 84, 0xFFFFFF);
     }
 
@@ -81,23 +73,12 @@ public class BellRingConfigScreen extends LmaTaskConfigScreen<BellRingConfigMenu
                 : ActiveTaskConfig.BELL_RING_INTERVAL.get();
         int next = Math.max(30, Math.min(12000, cur + delta));
         cfg.putInt(BellRingPipeline.KEY_RING_INTERVAL, next);
-        if (maid != null) {
-            CompoundTag payload = new CompoundTag();
-            payload.putString("key", BellRingPipeline.KEY_RING_INTERVAL);
-            payload.putInt("value", next);
-            TaskConfigActionPacket.send(maid.getId(), getTaskType(),
-                    TaskPipeline.ACTION_SET_INT, payload);
-        }
+        sendSetInt(BellRingPipeline.KEY_RING_INTERVAL, next);
     }
 
     /** 清除 per-maid 覆盖 (回全局) */
     private void resetToGlobal(EntityMaid maid) {
         getMenu().getConfig().remove(BellRingPipeline.KEY_RING_INTERVAL);
-        if (maid != null) {
-            CompoundTag payload = new CompoundTag();
-            payload.putString("key", BellRingPipeline.KEY_RING_INTERVAL);
-            TaskConfigActionPacket.send(maid.getId(), getTaskType(),
-                    TaskPipeline.ACTION_REMOVE, payload);
-        }
+        sendRemove(BellRingPipeline.KEY_RING_INTERVAL);
     }
 }

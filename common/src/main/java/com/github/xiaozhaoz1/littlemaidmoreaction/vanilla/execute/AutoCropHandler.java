@@ -28,7 +28,7 @@ public final class AutoCropHandler implements ISpecialCropHandler {
 
     @Override
     public void harvest(EntityMaid maid, BlockPos cropPos, BlockState cropState, boolean isDestroyMode) {
-        // v72 Phase 4: 恢复收割事件 — 无条件 post (恢复 v68 裁撤前旧逻辑, 覆盖所有调用路径)
+        // 恢复收割事件 — 无条件 post (恢复裁撤前旧逻辑, 覆盖所有调用路径)
         postHarvestEvent(maid, cropPos, cropState.getBlock());
 
         Block cropBlock = cropState.getBlock();

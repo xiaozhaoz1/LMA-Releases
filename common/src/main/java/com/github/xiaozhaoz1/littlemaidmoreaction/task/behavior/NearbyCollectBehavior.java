@@ -93,19 +93,27 @@ public class NearbyCollectBehavior extends MaidCheckRateTask {
                 ItemStack old = maid.getMainHandItem();
                 if (!old.isEmpty()) {
                     old = ItemHandlerHelper.insertItemStacked(maid.getAvailableBackpackInv(), old, false);
-                    if (!old.isEmpty()) return; // 旧物品塞不回去, 放弃
                 }
-                maid.setItemInHand(InteractionHand.MAIN_HAND, stack);
-                remaining = ItemStack.EMPTY;
+                if (old.isEmpty()) {
+                    maid.setItemInHand(InteractionHand.MAIN_HAND, stack);
+                    remaining = ItemStack.EMPTY;
+                } else {
+                    // 旧物品塞不回去 → 不换手, taken 走溢出链 (隙间→地上), 不凭空消失 (H-1 同类: 原 return 丢 taken)
+                    remaining = stack;
+                }
             }
             case "offhand" -> {
                 ItemStack old = maid.getOffhandItem();
                 if (!old.isEmpty()) {
                     old = ItemHandlerHelper.insertItemStacked(maid.getAvailableBackpackInv(), old, false);
-                    if (!old.isEmpty()) return;
                 }
-                maid.setItemInHand(InteractionHand.OFF_HAND, stack);
-                remaining = ItemStack.EMPTY;
+                if (old.isEmpty()) {
+                    maid.setItemInHand(InteractionHand.OFF_HAND, stack);
+                    remaining = ItemStack.EMPTY;
+                } else {
+                    // 旧物品塞不回去 → 不换手, taken 走溢出链 (隙间→地上), 不凭空消失 (H-1 同类: 原 return 丢 taken)
+                    remaining = stack;
+                }
             }
             default -> remaining = ItemHandlerHelper.insertItemStacked(maid.getAvailableBackpackInv(), stack, false);
         }

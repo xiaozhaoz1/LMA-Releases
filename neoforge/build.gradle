@@ -21,10 +21,12 @@ dependencies {
     compileOnly files(rootProject.file('libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar'))
     // TLM 运行时 mod (LMA mods.toml 声明 required; TLM 自身 neoforge 范围 [21,) 开区间, 21.1.62 满足)
     runtimeOnly files(rootProject.file('libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar'))
-    // Cloth Config 17
+    // Cloth Config 15.0.140 (neoforge)
     implementation 'maven.modrinth:cloth-config:15.0.140+neoforge'
     // ClassGraph
     implementation 'io.github.classgraph:classgraph:4.8.168'
+    // v79.47 农历节日: 农历换算库 — 2026-08-11c jar-in-jar 内置 (Maven Central, 部署零额外 jar)
+    jarJar(implementation('cn.6tail:lunar:1.7.7'))
 }
 
 tasks.withType(JavaCompile).configureEach {
@@ -49,11 +51,7 @@ dependencies {
     )
 }
 
-// v73: neoforge 21.1.247 ≥ 21.1.228 (create 生态要求) — create 4 基础管线双平台编译 (common);
-// cbc compat 未移植 (1.20.1 仅) 仍排除; CreateCompat* 已删 (v73 compat 清理)
-sourceSets.main.java {
-    exclude "com/github/xiaozhaoz1/littlemaidmoreaction/compat/createbigcannons/**"
-}
+// v73: neoforge 21.1.247 ≥ 21.1.228 (create 生态要求) — create 4 基础管线双平台编译 (common)
 
 // ModDevGradle userdev: FML UserdevLocator 将 classes/java/main 作为 mod 目录候选, 必须含 META-INF/neoforge.mods.toml
 // 否则 "is not a valid mod file" 崩溃。multiloader 插件覆盖了 processResources 输出目录,
@@ -84,6 +82,10 @@ neoForge {
             type = "gameTestServer"
             gameDirectory = project.file('run/gametest')
             systemProperty 'neoforge.enabledGameTestNamespaces', 'littlemaidmoreaction'
+            // v79.50: NeoGradle run classpath 不含 libs/ files() 依赖 → additionalRuntimeClasspath 显式追加;
+            // 2026-08-11c: lunar 改 maven 坐标 (jar-in-jar 内置, dev 运行 classpath 用 maven 缓存)
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('cn.6tail:lunar:1.7.7'))
         }
     }
 }

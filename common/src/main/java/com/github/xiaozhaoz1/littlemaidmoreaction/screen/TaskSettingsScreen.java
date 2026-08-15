@@ -144,7 +144,7 @@ public final class TaskSettingsScreen {
                         .setDefaultValue(ActiveTaskConfig.AI_VOICE.getDefault())
                         .setTooltip(Component.literal("Numen G 面板创建的声线条目名; 空=不绑定; per-maid 覆盖见 TLM 任务设置标签页 (v74)"))
                         .setSaveConsumer(ActiveTaskConfig.AI_VOICE::set).build());
-                // v77.9: 假人随机台词气泡/语音 (SHELVED 假人头顶气泡 + 女仆语音包音频)
+                // 假人随机台词气泡/语音 (SHELVED 假人头顶气泡 + 女仆语音包音频)
                 cat.addEntry(eb.startBooleanToggle(
                                 Component.literal("随机台词气泡"), PassiveTaskConfig.COMPANION_CHAT_ENABLED.get())
                         .setDefaultValue(PassiveTaskConfig.COMPANION_CHAT_ENABLED.getDefault())

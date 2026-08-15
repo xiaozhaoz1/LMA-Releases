@@ -67,28 +67,35 @@ public final class RecipeTreeResolver {
             return new RecipeChain(target, targetCount, List.of(), Map.of());
         }
 
-        // BFS 队列: (item, needed)
-        Deque<Node> queue = new ArrayDeque<>();
-        Set<Item> visited = new LinkedHashSet<>();
+        // BFS: (item → 需求) 合并同一中间产物跨分支需求 (共享木板/木棍不误判环, 审计 H1)
+        Map<Item, Integer> pending = new LinkedHashMap<>();
+        Map<Item, Set<Item>> ancestors = new HashMap<>();
+        Map<Item, Integer> depthOf = new HashMap<>();
+        Deque<Item> queue = new ArrayDeque<>();
         List<RawStep> rawSteps = new ArrayList<>();
 
         int needed = targetCount - alreadyHave;
-        queue.add(new Node(target, needed, 0));
-        visited.add(target);
+        pending.put(target, needed);
+        ancestors.put(target, Set.of());
+        depthOf.put(target, 0);
+        queue.add(target);
 
         while (!queue.isEmpty()) {
-            Node node = queue.poll();
-            if (node.depth > maxDepth) return null;
+            Item item = queue.poll();
+            int need = pending.remove(item);
+            Set<Item> path = ancestors.getOrDefault(item, Set.of());
+            int depth = depthOf.getOrDefault(item, 0);
+            if (depth > maxDepth) return null;
 
             // 此物品已在 available 中且数量足够 → 不需要合成
-            if (available.getOrDefault(node.item, 0) >= node.needed) {
+            if (available.getOrDefault(item, 0) >= need) {
                 continue;
             }
 
             // 查找产出此物品的配方
-            List<CraftingRecipe> recipes = index.recipesProducing(node.item);
+            List<CraftingRecipe> recipes = index.recipesProducing(item);
             if (recipes.isEmpty()) {
-                LittleMaidMoreAction.LOGGER.debug("[RecipeTree] unreachable: {} (no recipes found)", node.item);
+                LittleMaidMoreAction.LOGGER.debug("[RecipeTree] unreachable: {} (no recipes found)", item);
                 return null;
             }
 
@@ -96,41 +103,48 @@ public final class RecipeTreeResolver {
             CraftingRecipe best = selectBestRecipe(recipes, available, index, registryAccess);
             ItemStack result = best.getResultItem(registryAccess);
             int perCraft = result.getCount();
-            int craftCount = (int) Math.ceil((double) node.needed / perCraft);
+            int craftCount = (int) Math.ceil((double) need / perCraft);
 
-            // ★ 聚合相同原料的需求量（多槽位配方如木棍需要2个木板）
+            // ★ 聚合相同原料的需求量（多槽位配方如木棍需要2个木板）;
+            // 变体选择按 available 感知 (审计 H1 — matches[0] 会漏 tag 变体)
             Map<Item, Integer> neededPerItem = new LinkedHashMap<>();
             for (Ingredient ing : best.getIngredients()) {
                 if (ing.isEmpty()) continue;
-                ItemStack[] matches = ing.getItems();
-                if (matches.length == 0) continue;
-                Item matchItem = matches[0].getItem();
-                int perIngredient = matches[0].getCount();
-                int totalNeeded = craftCount * perIngredient;
-                neededPerItem.merge(matchItem, totalNeeded, Integer::sum);
+                ItemStack match = pickIngredientMatch(ing, available, index);
+                if (match.isEmpty()) continue;
+                int totalNeeded = craftCount * match.getCount();
+                neededPerItem.merge(match.getItem(), totalNeeded, Integer::sum);
             }
 
             Set<Item> deps = new LinkedHashSet<>();
-            List<Item> subGoals = new ArrayList<>();
-
             for (var entry : neededPerItem.entrySet()) {
-                Item matchItem = entry.getKey();
+                Item dep = entry.getKey();
                 int totalNeeded = entry.getValue();
-                int have = available.getOrDefault(matchItem, 0);
+                int have = available.getOrDefault(dep, 0);
 
                 if (have < totalNeeded) {
-                    if (visited.contains(matchItem)) {
-                        LittleMaidMoreAction.LOGGER.debug("[RecipeTree] cycle detected: {} ← {}", node.item, matchItem);
+                    if (dep == item || path.contains(dep)) {
+                        LittleMaidMoreAction.LOGGER.debug("[RecipeTree] cycle detected: {} ← {}", item, dep);
                         return null;
                     }
-                    deps.add(matchItem);
-                    subGoals.add(matchItem);
-                    queue.add(new Node(matchItem, totalNeeded - have, node.depth + 1));
-                    visited.add(matchItem);
+                    deps.add(dep);
+                    int more = totalNeeded - have;
+                    boolean fresh = !pending.containsKey(dep);
+                    pending.merge(dep, more, Integer::sum);
+                    Set<Item> newAnc = new LinkedHashSet<>(path);
+                    newAnc.add(item);
+                    ancestors.computeIfAbsent(dep, k -> new LinkedHashSet<>());
+                    ancestors.merge(dep, newAnc, (a, b) -> {
+                        var u = new LinkedHashSet<>(a);
+                        u.addAll(b);
+                        return u;
+                    });
+                    depthOf.putIfAbsent(dep, depth + 1);
+                    if (fresh) queue.add(dep);
                 }
             }
 
-            rawSteps.add(new RawStep(best, node.item, perCraft, craftCount, deps));
+            rawSteps.add(new RawStep(best, item, perCraft, craftCount, deps));
         }
 
         // 拓扑排序: 依赖关系 → 正向执行顺序
@@ -138,7 +152,7 @@ public final class RecipeTreeResolver {
         if (orderedSteps == null) return null;
 
         // 计算原材料消耗
-        Map<Item, Integer> cost = calculateCost(rawSteps, available);
+        Map<Item, Integer> cost = calculateCost(rawSteps, available, index);
 
         return new RecipeChain(target, targetCount, orderedSteps, cost);
     }
@@ -167,6 +181,27 @@ public final class RecipeTreeResolver {
 //?} else {
                 recipes.size(), registryAccess.registryOrThrow(net.minecraft.core.registries.Registries.RECIPE).getKey(best), bestScore);
 //?}
+        return best;
+    }
+
+    private static ItemStack pickIngredientMatch(Ingredient ing, Map<Item, Integer> available, RecipeIndex index) {
+        ItemStack[] matches = ing.getItems();
+        if (matches.length == 0) return ItemStack.EMPTY;
+        ItemStack best = matches[0];
+        int bestCount = -1;
+        for (ItemStack m : matches) {
+            int c = available.getOrDefault(m.getItem(), 0);
+            if (c > bestCount) {
+                bestCount = c;
+                best = m;
+            }
+        }
+        if (bestCount <= 0) {
+            // 无库存变体时优先可再合成的变体 (tag 内木板等), 否则保持确定性取首个
+            for (ItemStack m : matches) {
+                if (!index.recipesProducing(m.getItem()).isEmpty()) return m;
+            }
+        }
         return best;
     }
 
@@ -238,18 +273,18 @@ public final class RecipeTreeResolver {
     // ─── 成本计算 ───────────────────────────────────────────────
 
     private static Map<Item, Integer> calculateCost(
-            List<RawStep> rawSteps, Map<Item, Integer> available) {
+            List<RawStep> rawSteps, Map<Item, Integer> available, RecipeIndex index) {
 
         Map<Item, Integer> cost = new HashMap<>();
 
         for (RawStep rs : rawSteps) {
             for (Ingredient ing : rs.recipe.getIngredients()) {
                 if (ing.isEmpty()) continue;
-                ItemStack[] matches = ing.getItems();
-                if (matches.length == 0) continue;
+                ItemStack match = pickIngredientMatch(ing, available, index);
+                if (match.isEmpty()) continue;
 
-                Item item = matches[0].getItem();
-                int perCraft = matches[0].getCount();
+                Item item = match.getItem();
+                int perCraft = match.getCount();
                 int total = rs.craftCount * perCraft;
 
                 if (available.containsKey(item)) {
@@ -262,8 +297,6 @@ public final class RecipeTreeResolver {
     }
 
     // ─── 内部数据结构 ───────────────────────────────────────────
-
-    private record Node(Item item, int needed, int depth) {}
 
     private record RawStep(
         CraftingRecipe recipe,

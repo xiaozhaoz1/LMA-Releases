@@ -3,7 +3,6 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.api.io.IWriter;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.MaidAttrRegistry;
 import com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager;
 import net.minecraft.core.BlockPos;
@@ -23,37 +22,10 @@ import net.minecraftforge.registries.RegistryObject;
 import java.util.function.Supplier;
 //?}
 
-/** 女仆状态写入 */
-public final class MaidStateWriter implements IWriter<EntityMaid> {
+/** 女仆状态写入 (v79.50b: IWriter SPI 死链删 — 接口零调用方, write() 分发面整删,
+ *  static 方法编目保留) */
+public final class MaidStateWriter {
     private MaidStateWriter() {}
-
-    @Override public String category() { return "maid_state"; }
-    @Override public Class<EntityMaid> targetType() { return EntityMaid.class; }
-    @Override public <T> void write(EntityMaid m, String property, T value) {
-        switch (property) {
-            case "sitting"      -> setSitting(m, (Boolean) value);
-            case "invisible"    -> setInvisible(m, (Boolean) value);
-            case "glowing"      -> setGlowing(m, (Boolean) value);
-            case "invulnerable" -> setInvulnerable(m, (Boolean) value);
-            case "silent"       -> setSilent(m, (Boolean) value);
-            case "home_mode"    -> setHomeMode(m, (Boolean) value);
-            case "aiming"       -> setAiming(m, (Boolean) value);
-            case "begging"      -> setBegging(m, (Boolean) value);
-            case "pickup"       -> setPickup(m, (Boolean) value, null);
-            case "sprinting"    -> setSprinting(m, (Boolean) value);
-            case "swimming"     -> setSwimming(m, (Boolean) value);
-            case "sneaking"     -> setSneaking(m, (Boolean) value);
-            case "hunger"       -> setHunger(m, ((Number) value).intValue());
-            case "favor"        -> setFavor(m, ((Number) value).intValue());
-            case "health"       -> setHealth(m, ((Number) value).floatValue());
-            case "experience"   -> setExperience(m, ((Number) value).intValue());
-            case "model"        -> setModel(m, (String) value);
-            case "restrict_radius" -> setRestrictRadius(m, ((Number) value).intValue());
-            case "attack_damage"   -> setAttackDamage(m, ((Number) value).doubleValue());
-            case "movement_speed"  -> setMovementSpeed(m, ((Number) value).doubleValue());
-            default -> throw new IllegalArgumentException("Unknown property: " + property);
-        }
-    }
 
     public static void setSitting(EntityMaid m, boolean v) { m.setInSittingPose(v); }
     public static void setInvisible(EntityMaid m, boolean v) { m.setInvisible(v); }
@@ -96,13 +68,6 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
         m.setItemSlot(EquipmentSlot.MAINHAND, off);
         m.setItemSlot(EquipmentSlot.OFFHAND, main);
     }
-    @Deprecated
-    public static void dropHandItem(EntityMaid m) {
-        var s = m.getMainHandItem(); if (!s.isEmpty()) { m.spawnAtLocation(s); m.setItemSlot(EquipmentSlot.MAINHAND, ItemStack.EMPTY); }
-    }
-    public static void dropHandItem(EntityMaid m, EquipmentSlot slot) {
-        var s = m.getItemBySlot(slot); if (!s.isEmpty()) { m.spawnAtLocation(s.copy()); m.setItemSlot(slot, ItemStack.EMPTY); }
-    }
     public static void clearInventory(LivingEntity target) {
         target.setItemSlot(EquipmentSlot.HEAD, ItemStack.EMPTY);
         target.setItemSlot(EquipmentSlot.CHEST, ItemStack.EMPTY);
@@ -117,11 +82,7 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
 //? if 1.20.1 {
         var item = ForgeRegistries.ITEMS.getValue(rl);
 //?} else {
-//? if 1.20.1 {
-        var item = BuiltInRegistries.ITEM.getValue(rl);
-//?} else {
         var item = BuiltInRegistries.ITEM.get(rl);
-//?}
 //?}
         if (item != null) m.setBackpackShowItem(new ItemStack(item));
     }
@@ -144,11 +105,7 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
 //? if 1.20.1 {
         var item = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(itemId));
 //?} else {
-//? if 1.20.1 {
-        var item = BuiltInRegistries.ITEM.getValue(ResourceLocation.tryParse(itemId));
-//?} else {
         var item = BuiltInRegistries.ITEM.get(ResourceLocation.tryParse(itemId));
-//?}
 //?}
         if (item == null) return;
 //? if 1.20.1 {
@@ -209,19 +166,8 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
     public static void setPersistentBoolean(EntityMaid m, String key, boolean value) { m.getPersistentData().putBoolean(key, value); }
     public static void removePersistent(EntityMaid m, String key) { m.getPersistentData().remove(key); }
 
-    // === 任务生命周期 ===
-    public static void saveAndSwitchTask(EntityMaid m, String targetTaskName) {
-        m.getPersistentData().putString("lma_prev_task", m.getTask().getUid().toString());
-        setTask(m, "touhou_little_maid:" + targetTaskName);
-    }
-    public static boolean restorePreviousTask(EntityMaid m) {
-        var pd = m.getPersistentData();
-        String prevUid = pd.getString("lma_prev_task");
-        if (prevUid.isEmpty()) return false;
-        pd.remove("lma_prev_task");
-        setTask(m, prevUid);
-        return true;
-    }
+    // saveAndSwitchTask/restorePreviousTask 已删 (v79.54, 错题 #180): 零调用方死代码,
+    // "lma_prev_task" 键写方全死 — task 恢复由 TLM TASK_TAG 原生持久化负责
     public static boolean repairHandItemWithXp(EntityMaid m) {
         var stack = m.getMainHandItem();
         if (stack.isEmpty() || !stack.isDamageableItem()) return false;
@@ -236,7 +182,7 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
     }
 
     /**
-     * v79.6: 全槽位经验修装备 (RepairItemAction 组合吸收) — 主手 (复用 repairHandItemWithXp)
+     * 全槽位经验修装备 (RepairItemAction 组合吸收) — 主手 (复用 repairHandItemWithXp)
      * → 副手 → 4 甲 → 饰品 → 背包, 单次修一件。
      */
     public static boolean repairItemWithXp(EntityMaid m) {
@@ -254,7 +200,36 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
         return true;
     }
 
-    /** 查找可修装备 — 副手 → 4 甲 → 饰品 → 背包 (v79.6) */
+    /**
+     * 自动修复原语 (v79.48) — 一次修 1 点耐久 (AutoRepairBehavior 每 ~5 秒调)。
+     * 顺序: 主手 → 其余 (副手/4甲/饰品/背包, {@link #findRepairable} 复用)。
+     * 消耗: max(1, 4 × 好感度消耗乘区) XP/点; 失败 (无破损/经验不足) 静默返回 false。
+     */
+    public static boolean repairOneWithXp(EntityMaid m) {
+        if (repairOne(m, m.getMainHandItem())) return true;
+        net.minecraft.world.item.ItemStack stack = findRepairable(m);
+        return stack != null && repairOne(m, stack);
+    }
+
+    private static boolean repairOne(EntityMaid m, net.minecraft.world.item.ItemStack stack) {
+        if (stack == null || !isRepairable(stack)) return false;
+        int exp = m.getExperience();
+        int cost = repairCostFor(com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.costMultiplier(m));
+        if (exp < cost) return false;
+        m.setExperience(exp - cost);
+        stack.setDamageValue(Math.max(0, stack.getDamageValue() - 1));
+        return true;
+    }
+
+    /**
+     * 1 点耐久消耗 (XP) — 纯函数: 4 × 消耗乘区, 至少 1。
+     * 原版 Mending 1 耐久 = 2 XP; LMA 基数 4 (2 倍), 好感度 Lv3 默认 0.5 → 2 = 原版水平。
+     */
+    public static int repairCostFor(double costMultiplier) {
+        return Math.max(1, (int) Math.round(4 * costMultiplier));
+    }
+
+    /** 查找可修装备 — 副手 → 4 甲 → 饰品 → 背包 */
     @javax.annotation.Nullable
     private static net.minecraft.world.item.ItemStack findRepairable(EntityMaid m) {
         net.minecraft.world.item.ItemStack off = m.getOffhandItem();
@@ -287,11 +262,7 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
 //? if 1.20.1 {
         var item = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(itemId));
 //?} else {
-//? if 1.20.1 {
-        var item = BuiltInRegistries.ITEM.getValue(ResourceLocation.tryParse(itemId));
-//?} else {
         var item = BuiltInRegistries.ITEM.get(ResourceLocation.tryParse(itemId));
-//?}
 //?}
         if (item == null) return;
         var stack = new ItemStack(item, count);
@@ -356,7 +327,7 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
     /** 好感度升至满级 */
     public static void maxFavor(EntityMaid m) { m.getFavorabilityManager().max(); }
 
-    // === v34: ConfigManager 写 ===
+    // === ConfigManager 写 ===
     public static void setShowBackpack(EntityMaid m, boolean v) { m.getConfigManager().setShowBackpack(v); }
     public static void setShowBackItem(EntityMaid m, boolean v) { m.getConfigManager().setShowBackItem(v); }
     public static void setChatBubbleShow(EntityMaid m, boolean v) { m.getConfigManager().setChatBubbleShow(v); }
@@ -372,7 +343,7 @@ public final class MaidStateWriter implements IWriter<EntityMaid> {
     public static void setOpenFenceGate(EntityMaid m, boolean v) { m.getConfigManager().setOpenFenceGate(v); }
     public static void setActiveClimbing(EntityMaid m, boolean v) { m.getConfigManager().setActiveClimbing(v); }
 
-    // === v34.2: 女仆编辑器 Writer ===
+    // === 女仆编辑器 Writer ===
     public static void setHealth(EntityMaid m, float v) { m.setHealth(Math.min(v, m.getMaxHealth())); }
     public static void setMaxHealth(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.MAX_HEALTH).setBaseValue(Math.max(1.0, v)); }
     public static void setAttackDamage(EntityMaid m, double v) { m.getAttribute(net.minecraft.world.entity.ai.attributes.Attributes.ATTACK_DAMAGE).setBaseValue(v); }

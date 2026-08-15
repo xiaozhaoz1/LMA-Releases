@@ -34,14 +34,14 @@ public final class ScanJob implements Tickable {
     private int maxHits;
     private Runnable onDone;
     private int startTick;
-    /** v79.3: 归属 owner (女仆 entityId; -1 = 无归属) — 卸载 cancelFor 用 */
+    /** 归属 owner (女仆 entityId; -1 = 无归属) — 卸载 cancelFor 用 */
     private int ownerId = -1;
 
     // 游标
     private int ring = 0;
     private int perimIdx = 0;
     private int ringMax;
-    private int sectionCursor = -1;   // 当前 chunk 内 section 序号
+    private int sectionCursor = 0;   // 当前 chunk 内 section 续扫游标 (预算中断续扫, 审计 H1)
     private int currentCX, currentCZ;
     private final List<BlockScanner.Match> matches = new ArrayList<>();
     private boolean done;
@@ -56,7 +56,7 @@ public final class ScanJob implements Tickable {
         return start(level, center, maxRing, filter, maxHits, serverTick, onDone, -1);
     }
 
-    /** v79.3: 启动扫描 — 带归属 ownerId (ScanScheduler 集中调度 + 卸载清理) */
+    /** 启动扫描 — 带归属 ownerId (ScanScheduler 集中调度 + 卸载清理) */
     public static ScanJob start(ServerLevel level, BlockPos center, int maxRing,
                                 Predicate<BlockState> filter, int maxHits, int serverTick,
                                 Runnable onDone, int ownerId) {
@@ -72,15 +72,15 @@ public final class ScanJob implements Tickable {
         return job;
     }
 
-    /** v79.3: 归属 owner (女仆 entityId) */
+    /** 归属 owner (女仆 entityId) */
     public int ownerId() { return ownerId; }
 
     public boolean isDone() { return done; }
 
-    /** v79.3: 防御拷贝 (外部修改不影响任务内部收集) */
+    /** 防御拷贝 (外部修改不影响任务内部收集) */
     public List<BlockScanner.Match> matches() { return List.copyOf(matches); }
 
-    /** v79.3: 取消 — 置 done + 清回调 + 释放引用 (onDone 不再触发) */
+    /** 取消 — 置 done + 清回调 + 释放引用 (onDone 不再触发) */
     public void cancel() {
         done = true;
         onDone = null;
@@ -112,18 +112,17 @@ public final class ScanJob implements Tickable {
                 int cx = centerCX + off[0];
                 int cz = centerCZ + off[1];
                 var chunk = level.getChunkSource().getChunkNow(cx, cz);
-                perimIdx++;
-                if (chunk == null) continue;   // 未加载跳过
+                if (chunk == null) { perimIdx++; continue; }   // 未加载跳过
                 currentCX = cx;
                 currentCZ = cz;
-                // 该 chunk 内 section 扫描 (预算切片)
+                // 该 chunk 内 section 扫描 (预算切片; sectionCursor 续扫被打断的 chunk)
                 int spread = Math.max(Math.abs(centerSectionY - minSectionY),
                         Math.abs(centerSectionY - maxSectionY));
                 boolean budgetDry = false;
-                for (int d = 0; d <= spread && matches.size() < maxHits; d++) {
+                for (int d = sectionCursor; d <= spread && matches.size() < maxHits; d++) {
                     for (int y0 : new int[]{centerSectionY - d, centerSectionY + d}) {
                         if (y0 < minSectionY || y0 > maxSectionY) continue;
-                        int idx = y0; // v79.13: 同 BlockScanner — y0 已是索引, 原偏移 64 格
+                        int idx = y0; // 同 BlockScanner — y0 已是索引, 原偏移 64 格
                         var sections = chunk.getSections();
                         if (idx < 0 || idx >= sections.length) continue;
                         var section = sections[idx];
@@ -132,6 +131,7 @@ public final class ScanJob implements Tickable {
                         // ★ 预算 permit — 每个 section 扫描消耗 1
                         if (!budget.trySectionScan()) {
                             budgetDry = true;
+                            sectionCursor = d;   // 记中断层, 下 tick 续扫 (perimIdx 不推进)
                             break;
                         }
                         scanSection(section, currentCX, (y0 + level.getMinSection()) << 4,
@@ -140,7 +140,9 @@ public final class ScanJob implements Tickable {
                     }
                     if (budgetDry) break;
                 }
-                if (budgetDry) return;   // 预算耗尽 — 下 tick 续扫 (游标已在 perimIdx)
+                if (budgetDry) return;   // 预算耗尽 — 下 tick 同 chunk 从 sectionCursor 续扫
+                sectionCursor = 0;       // chunk 完成 → 重置续扫游标并推进周界
+                perimIdx++;
                 if (matches.size() >= MAX_COLLECT) break;
             }
             perimIdx = 0;

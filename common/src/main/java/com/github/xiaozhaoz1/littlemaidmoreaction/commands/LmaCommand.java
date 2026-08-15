@@ -37,7 +37,7 @@ public final class LmaCommand {
     @SubscribeEvent
     public static void register(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> d = event.getDispatcher();
-        d.register(Commands.literal("LMA")
+        d.register(Commands.literal("lma")
             .requires(s -> s.hasPermission(2))
             .then(Commands.literal("task")
                 .then(Commands.argument("args", StringArgumentType.greedyString())
@@ -58,7 +58,7 @@ public final class LmaCommand {
             case "disable"->toggleTask(ctx, parts, false);
             case "show"  -> toggleVisible(ctx, parts, true);
             case "hide"  -> toggleVisible(ctx, parts, false);
-            case "debug"  -> taskDebug(ctx, parts);   // v76 Phase 5: 任务运行时快照
+            case "debug"  -> taskDebug(ctx, parts);   // 任务运行时快照
             default      -> send(ctx, "§c未知: " + parts[0]);
         };
     }
@@ -76,7 +76,7 @@ public final class LmaCommand {
 
     // ── task display ──
 
-    /** v76 Phase 5: /lma task debug [uuid] — 任务运行时快照 (状态/游标/最后转换/最后错误) */
+    /** /lma task debug [uuid] — 任务运行时快照 (状态/游标/最后转换/最后错误) */
     private static int taskDebug(CommandContext<CommandSourceStack> ctx, String[] parts) {
         java.util.UUID filter = null;
         if (parts.length >= 2) {
@@ -105,7 +105,7 @@ public final class LmaCommand {
                     continue;
                 }
                 sb.append("§8").append(maid.getName().getString()).append("\n");
-                // v79.6: FSM 调试分支随 FsmPipeline 删除 — 统一代码管线提示
+                // FSM 调试分支随 FsmPipeline 删除 — 统一代码管线提示
                 sb.append("§7代码管线 ").append(task).append(" (无调试快照)\n");
             }
         }

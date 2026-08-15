@@ -39,7 +39,7 @@ public final class MoreActionConfig {
     public static final ModConfigSpec.BooleanValue DEBUG_MODE;
 //?}
 
-    /** v67.11: 通用段 ConfigValue 句柄注册表 (path → value, 前缀 "common.") — 配置同步用 */
+    /** 通用段 ConfigValue 句柄注册表 (path → value, 前缀 "common.") — 配置同步用 */
 //? if 1.20.1 {
     public static final Map<String, ForgeConfigSpec.ConfigValue<?>> COMMON_VALUES = new HashMap<>();
 //?} else {
@@ -65,14 +65,14 @@ public final class MoreActionConfig {
 
     private MoreActionConfig() {}
 
-    /** v67.6: 三段 Spec 统一落盘 — Cloth 屏/编辑器保存的唯一入口 */
+    /** 三段 Spec 统一落盘 — Cloth 屏/编辑器保存的唯一入口 */
     public static void saveAll() {
         SPEC.save();
         ActiveTaskConfig.ACTIVE_SPEC.save();
         PassiveTaskConfig.PASSIVE_SPEC.save();
     }
 
-    // ── v67.11: 配置同步 (专用服务器) — ConfigValue 句柄注册表 ──
+    // ── 配置同步 (专用服务器) — ConfigValue 句柄注册表 ──
 
 //? if 1.20.1 {
     static <T> void reg(Map<String, ForgeConfigSpec.ConfigValue<?>> map, String prefix,

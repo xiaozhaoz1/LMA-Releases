@@ -20,41 +20,31 @@ public final class TaskKeys {
     public static final String FLOW_TASK      = "lma_flow_task";
     public static final String FLOW_TASK_ID   = "lma_flow_task_id";
     public static final String FLOW_STATE     = "lma_flow_state";
-    public static final String FLOW_STEP      = "lma_flow_step";
     public static final String FLOW_TICK      = "lma_flow_tick";
     public static final String FLOW_COUNTER   = "lma_flow_counter";
     public static final String FLOW_MAX_COUNT = "lma_flow_max_count";
-    public static final String FLOW_TIMEOUT   = "lma_flow_timeout";
-    public static final String FLOW_DATA      = "lma_flow_data";
     public static final String FLOW_CACHED    = "lma_flow_cached";
 
     // ── 状态值 ──
     public static final String STATE_IN_PROGRESS = "in_progress";
     public static final String STATE_COMPLETED   = "completed";
     public static final String STATE_FAILED      = "failed";
-    public static final String STATE_STOPPED     = "stopped";
-    public static final String STATE_QUEUED      = "queued";
     public static final String STATE_CANCELLED   = "cancelled";
 
     // ── 任务目标/反馈 ──
     public static final String TASK_TARGET    = "lma_task_target";
-    public static final String TASK_INPUT     = "lma_task_input";
     public static final String TASK_COMPLETED = "lma_task_completed";
-    public static final String FAIL_REASON    = "lma_fail_reason";
 
     // ── 状态保存/恢复 ──
-    public static final String SAVED_HOME     = "lma_saved_home";
-    public static final String SAVED_PICKUP   = "lma_saved_pickup";
     public static final String SAVED_HOME_POS = "lma_saved_home_pos";
 
     // ── 动画 ──
     public static final String ANIM_MODE     = "lma_anim_mode";
     public static final String ANIM_TICK     = "lma_anim_tick";
     public static final String ANIM_DUR      = "lma_anim_dur";
-    public static final String ANIM_ID       = "lma_anim_id";
     public static final String ANIM_NAME     = "lma_anim";
 
-    // ── 动画运行时 (v75.4 标准化: AnimExecute 写入键收拢) ──
+    // ── 动画运行时 (标准化: AnimExecute 写入键收拢) ──
     public static final String ANIM_SEQ        = "lma_anim_seq";
     public static final String ANIM_PHASE      = "lma_anim_phase";
     public static final String ANIM_START      = "lma_anim_start";
@@ -65,86 +55,85 @@ public final class TaskKeys {
     public static final String DUR_START       = "lma_dur_start";
     public static final String DUR_CASTING     = "lma_dur_casting";
     public static final String DUR_END         = "lma_dur_end";
-    /** 只写不读键 (v75.4 审计实证: 全 common 无读取方) — 随任务清理删除 */
+    /** 只写不读键 (审计实证: 全 common 无读取方) — 随任务清理删除 */
     public static final String WAIT_TICKS      = "lma_wait_ticks";
 
-    /** 动画运行时全部键 — clearAll 统一清理源 (防 v67 #67 类跨 session 残留) */
+    /** 动画运行时全部键 — clearAll 统一清理源 (防错题 #67 类跨 session 残留) */
     public static final List<String> ANIM_RUNTIME_KEYS = List.of(
-            ANIM_MODE, ANIM_TICK, ANIM_DUR, ANIM_ID, ANIM_NAME,
+            ANIM_MODE, ANIM_TICK, ANIM_DUR, ANIM_NAME,
             ANIM_SEQ, ANIM_PHASE, ANIM_START, ANIM_CASTING, ANIM_END,
             ANIM_PRIORITY, LOCK_MOVE, DUR_START, DUR_CASTING, DUR_END, WAIT_TICKS);
 
     /** 客户端渲染清理键 = ANIM_RUNTIME_KEYS 去 ANIM_SEQ (SEQ 保留供新请求对比, 见 LmaMagicCastingProvider.cleanup) */
     public static final List<String> ANIM_CLEANUP_KEYS = List.of(
-            ANIM_MODE, ANIM_TICK, ANIM_DUR, ANIM_ID, ANIM_NAME,
+            ANIM_MODE, ANIM_TICK, ANIM_DUR, ANIM_NAME,
             ANIM_PHASE, ANIM_START, ANIM_CASTING, ANIM_END,
             ANIM_PRIORITY, LOCK_MOVE, DUR_START, DUR_CASTING, DUR_END, WAIT_TICKS);
 
     // ── 唱片机 ──
     public static final String JUKEBOX_PHASE = "lma_jukebox_phase";
     public static final String JUKEBOX_TICK  = "lma_jukebox_tick";
-    public static final String JUKEBOX_LAST  = "lma_jukebox_last";
 
-    // ── adapter→task 通信标记 (v49) ──
-    /** TLM 任务切换标记 — TlmTaskMonitor 写，TaskTickHandler 读 (v64 迁入) */
+    // ── adapter→task 通信标记 ──
+    /** TLM 任务切换标记 — TlmTaskMonitor 写，TaskTickHandler 读 (值 = 完整 RL, 错题 #179 契约) */
     public static final String TLM_SWITCH = "lma_tlm_switch";
-    /** GUI 启动新任务标记 — LmaFlowCoordinationBehavior 写，TaskTickHandler 读 (v64 迁入) */
+    /** GUI 启动新任务标记 — LmaFlowCoordinationBehavior 写，TaskTickHandler 读 */
     public static final String GUI_INIT = "lma_gui_init";
 
-    // ── 任务开关 ──
-    public static final String TASK_ENABLED_PREFIX = "lma_task_enabled_";
-
-    // ── 被动任务 (v61) ──
+    // ── 被动任务 ──
     public static final String PASSIVE_PREFIX = "lma_passive_";
     public static String passiveKey(String taskType) { return PASSIVE_PREFIX + taskType; }
 
-    // ── 环境感知 (v63) ──
+    // ── 环境感知 ──
     /** master开关 — 默认 false */
     public static final String ENVSENSE_ENABLED = "lma_envsense_enabled";
 
-    // ── 机械臂 (v52→v63.2: 标准化) ──
+    // ── 机械臂 (标准化) ──
     public static final String ARM_TAKE = "lma_arm_take";
     public static final String ARM_DEPOSIT = "lma_arm_deposit";
     public static final String ARM_ITEM = "lma_arm_item";
 
-    // ── 任务切换 (v63.2) ──
-    public static final String PREV_TASK = "lma_prev_task";
-    public static final String AUTOCROP_ENABLED = "lma_autocrop_enabled";
-
-    // ── 女仆属性 (v63.2) ──
+    // ── 女仆属性 ──
     public static final String RESIST_PREFIX = "lma_resist_";
 
-    // ── 熔炉 (v63.2) ──
+    // ── 熔炉 ──
     public static final String FURNACE_PHASE = "lma_furnace_phase";
 
-    // ── 重试计数 (v53) ──
-    public static final String RETRY_COUNT = "lma_retry_count";
-
-    // ── 事件桥 (v72 Phase 4) ──
-    /** MaidTick 信号节流时间戳 (per-maid) */
-    public static final String TICK_LAST = "lma_tick_last";
-
-    // ── 其他运行时键 (v75.4 标准化: 高频内联字面量收拢) ──
+    // ── 其他运行时键 (标准化: 高频内联字面量收拢) ──
     /** 便携装配背包键 (MaidAssemblyInventory) */
     public static final String ASSEMBLY_INV       = "lma_assembly_inv";
-    /** 任务进度气泡消息/时间戳 (ProgressNotifier) */
-    public static final String BUBBLE_MSG         = "lma_bubble_msg";
-    public static final String BUBBLE_TICK        = "lma_bubble_tick";
     /** BlockInteract 木棍绑定位置 (BlockInteractSetupHandler) */
     public static final String BIND_POS           = "lma_bind_pos";
     /** 女仆进食追踪 (OwnerFoodTracker) */
     public static final String LAST_FOOD          = "lma_last_food";
-    /** 移动冻结剩余 ticks (MovementOutput) */
-    public static final String FREEZE_TICKS       = "lma_freeze_ticks";
-    /** 流血效果时间/伤害 (CombatOutput) */
-    public static final String BLEED_TICKS        = "lma_bleed_ticks";
-    public static final String BLEED_DMG          = "lma_bleed_dmg";
-    /** 主人目标刷新节流 (TargetStateReader) */
-    public static final String OWNER_TARGET_TICK  = "lma_owner_target_tick";
-    /** 动态动画集开关 (StartupLoader) */
-    public static final String DYNAMIC_ANIMATIONS = "lma_dynamic_animations";
 
-    // v62: 任务类型常量已删除 — 每个 Pipeline 的 taskType() 是正源
+    // ── 散键收编 (Explore 实证 TaskKeys 外键) ──
+
+    /** AI 操控权限标记 (AiControlGate) */
+    public static final String AI_CONTROL = "lma_ai_control";
+    /** 气泡节流时间戳 (MaidChatBubbleApi) */
+    public static final String BUBBLE_FAIL_TICK = "lma_bubble_fail_tick";
+    public static final String BUBBLE_TRIGGER_TICK = "lma_bubble_trigger_tick";
+    /** 连锁采集队列/蓄力结束 (ChainHarvestExecute) */
+    public static final String CHAIN_QUEUE = "lma_chain_queue";
+    public static final String CHAIN_CHARGE_END = "lma_chain_charge_end";
+    /** 连锁采集相位 (v79.61x 状态机化: SCAN/CHARGE — 队列存在不再兼任状态判据) */
+    public static final String CHAIN_PHASE = "lma_chain_phase";
+    /** 节日跨天去重 (FestivalPipeline) */
+    public static final String FESTIVAL_DAY = "lma_festival_day";
+    /** 女仆图鉴击杀计数 (MaidCodexKillListener) */
+    public static final String CODEX = "lma_codex";
+    /** 假人绑定 UUID (NumenMaidBridge) */
+    public static final String COMPANION_UUID = "lma_companion_uuid";
+    /** 前缀 — 管线临时数据 (内存态, MaidData) / 管线持久配置 / 状态机状态 */
+    public static final String PL_PREFIX = "lma_pl_";
+    public static final String CFG_PREFIX = "lma_cfg_";
+
+    // 任务类型常量已删除 — 每个 Pipeline 的 taskType() 是正源
+    // 死键删 (RETRY_COUNT/SAVED_HOME/SAVED_PICKUP/JUKEBOX_LAST/WEAPON_ANIM/
+    //   LAST_EMOJI_TICK/FREEZE_TICKS/BLEED_TICKS/BLEED_DMG/FLOW_TIMEOUT/TASK_INPUT/
+    //   FAIL_REASON/ANIM_TIME — 全项目 0 引用实证 (v79.55);
+    //   旧存档残留由 FlowTaskData.clearAll 字面量清理面兜底)
 
     private TaskKeys() {}
 }

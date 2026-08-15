@@ -62,14 +62,17 @@ public final class RequestTaskConfigPacket implements CustomPacketPayload {
             if (player == null) return;
             Entity e = player.serverLevel().getEntity(msg.maidId);
             if (!(e instanceof EntityMaid maid)) return;
-            // v67.3: 权限 — 仅女仆所有者可读配置 (对齐 TaskConfigActionPacket)
-            if (!maid.isOwnedBy(player)) return;
+            // 鉴权 (M-2, 对齐 OpenMaidListPacket 四连): UUID 级比较 (错题 #130 isOwnedBy 引用比较陷阱) + 距离 ≤8 格
+            if (maid.getOwnerUUID() == null || !maid.getOwnerUUID().equals(player.getUUID())) return;
+            if (maid.distanceToSqr(player) > 64.0D) return;
 
             TaskRegistry.TaskHandler handler = TaskRegistry.get(msg.taskType);
             if (handler == null) return;
 
             TaskPipeline pipeline = handler.pipeline();
-            CompoundTag config = pipeline.getConfigNbt(maid);
+            // 配置维度拆分 — 未实现 TaskConfigurable 的管线无配置面
+            CompoundTag config = pipeline instanceof com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable t
+                    ? t.getConfigNbt(maid) : new CompoundTag();
 
             LmaNetwork.sender.sendToPlayer(player, new ReplyTaskConfigPacket(msg.maidId, msg.taskType, config));
         });
@@ -83,23 +86,25 @@ public final class RequestTaskConfigPacket implements CustomPacketPayload {
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public static final StreamCodec<ByteBuf, RequestTaskConfigPacket> STREAM_CODEC = StreamCodec.of(
-        (ByteBuf buf, RequestTaskConfigPacket msg) -> encode(msg, (FriendlyByteBuf) buf),
-        (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, RequestTaskConfigPacket> STREAM_CODEC =
+        PacketCodecs.wrap(RequestTaskConfigPacket::encode, RequestTaskConfigPacket::decode);
 
     public static void handlePayload(RequestTaskConfigPacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> {
             if (!(ctx.player() instanceof ServerPlayer player)) return;
             Entity e = player.serverLevel().getEntity(msg.maidId);
             if (!(e instanceof EntityMaid maid)) return;
-            // v67.3: 权限 — 仅女仆所有者可读配置 (对齐 TaskConfigActionPacket)
-            if (!maid.isOwnedBy(player)) return;
+            // 鉴权 (M-2, 对齐 OpenMaidListPacket 四连): UUID 级比较 (错题 #130 isOwnedBy 引用比较陷阱) + 距离 ≤8 格
+            if (maid.getOwnerUUID() == null || !maid.getOwnerUUID().equals(player.getUUID())) return;
+            if (maid.distanceToSqr(player) > 64.0D) return;
 
             TaskRegistry.TaskHandler handler = TaskRegistry.get(msg.taskType);
             if (handler == null) return;
 
             TaskPipeline pipeline = handler.pipeline();
-            CompoundTag config = pipeline.getConfigNbt(maid);
+            // 配置维度拆分 — 未实现 TaskConfigurable 的管线无配置面
+            CompoundTag config = pipeline instanceof com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable t
+                    ? t.getConfigNbt(maid) : new CompoundTag();
 
             LmaNetwork.sender.sendToPlayer(player, new ReplyTaskConfigPacket(msg.maidId, msg.taskType, config));
         });

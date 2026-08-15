@@ -77,9 +77,8 @@ public final class LmaAnimSyncMessage implements CustomPacketPayload {
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public static final StreamCodec<ByteBuf, LmaAnimSyncMessage> STREAM_CODEC = StreamCodec.of(
-        (ByteBuf buf, LmaAnimSyncMessage msg) -> encode(msg, (FriendlyByteBuf) buf),
-        (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, LmaAnimSyncMessage> STREAM_CODEC =
+        PacketCodecs.wrap(LmaAnimSyncMessage::encode, LmaAnimSyncMessage::decode);
 
     public static void handlePayload(LmaAnimSyncMessage msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> handleClient(msg));
@@ -91,6 +90,7 @@ public final class LmaAnimSyncMessage implements CustomPacketPayload {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) return;
         if (level.getEntity(msg.maidId) instanceof EntityMaid maid) {
+            if (msg.animData == null) return;   // 恶意/损坏包: 空 NBT 忽略 (客户端信任边界)
             CompoundTag clientData = maid.getPersistentData();
             // 合并服务端动画数据到客户端
             for (String key : msg.animData.getAllKeys()) {

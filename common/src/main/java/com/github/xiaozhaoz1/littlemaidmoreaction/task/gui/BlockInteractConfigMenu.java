@@ -1,7 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.gui;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LmaMenus;
 
-import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import net.minecraft.world.entity.player.Inventory;
 
 /**

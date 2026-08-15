@@ -4,7 +4,6 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskProgressDisplay;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.TaskResult;
-import com.github.xiaozhaoz1.littlemaidmoreaction.api.io.IExecutor;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
@@ -23,11 +22,11 @@ import java.util.Set;
  *
  * <p>子类定义 {@code S} 枚举作为状态集合。引擎自动处理:
  * <ul>
- *   <li>状态 NBT 持久化 — 键名 {@code "lma_fsm_<taskType>"}，与 {@code lma_flow_*} 隔离</li>
+ *   <li>状态存储 (v79.31 内存化) — {@code MaidData.pl(maid, "<type>.fsm")} 的 FSM_KEY，零 NBT</li>
  *   <li>转换合法性验证 — {@link #transitions()} 图，非法转换被拦截 + 日志</li>
  *   <li>取消检测 — 每 tick 入口检查 {@link TaskKeys#STATE_CANCELLED}</li>
  *   <li>进入/退出钩子 — {@link #onEnter(Enum, ServerLevel, EntityMaid)} / {@link #onExit(Enum, EntityMaid)}</li>
- *   <li>默认 executor — {@link #executor()} 返回匿名 IExecutor</li>
+ *   <li>执行 — 子类覆写 {@link #tick(Enum, ServerLevel, EntityMaid)}, GameTick 驱动</li>
  * </ul>
  *
  * <h3>任务终结</h3>
@@ -38,6 +37,8 @@ import java.util.Set;
  * }</pre>
  * 调用后 {@code TaskDispatcher} 设置 {@code STATE_COMPLETED/STATE_FAILED} 并 {@code clearAll}，
  * {@code TaskTickHandler} 检测到非 {@code in_progress} 后自然停止 tick。
+ *
+ * <h3>子类标准长相 (四段式约定, v79.61) — 固定顺序: 状态枚举 → transitions() → onEnter/onExit → tick()</h3>
  *
  * <h3>子类必须实现</h3>
  * <ul>
@@ -121,11 +122,11 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
     @Override
     public void interrupt(EntityMaid maid) {
         onExit(readState(maid), maid);
-        onCleanup(maid);  // v62: interrupt 统一走 onCleanup
+        onCleanup(maid);  // interrupt 统一走 onCleanup
     }
 
     /**
-     * v46 修正: onCleanup 委托 cleanup()，确保子类覆写的清理逻辑在所有终结路径生效。
+     * onCleanup 委托 cleanup()，确保子类覆写的清理逻辑在所有终结路径生效。
      */
     @Override
     public void onCleanup(EntityMaid maid) {
@@ -133,40 +134,68 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
         TaskPipeline.super.onCleanup(maid);
     }
 
-    // ── NBT 序列化 ──
+    // ── 状态存储 (内存化 — 存 MaidData.pl(maid, "<type>.fsm") 的 "s" 键,
+    //   tick 内零 NBT 读 (原每 tick getString + Enum.valueOf + try/catch);
+    //   flush 由心跳 flushAllPl / 实体离开 / ServerStopping / 终结兜底) ──
 
-    /** 状态 NBT 键 — 格式 {@code "lma_fsm_<taskType>"}，与 {@code lma_flow_*} 隔离 */
-    protected String stateKey() {
-        return "lma_fsm_" + taskType();
+    private static final String FSM_KEY = "s";
+    private static final String FSM_SUFFIX = ".fsm";
+
+    /** 状态存储键 (PL 缓存内独立键 — 与管线 pipelineData(lma_pl_<type>) 不冲突) */
+    private String fsmKey() {
+        return taskType() + FSM_SUFFIX;
+    }
+
+    // ── 纯函数 (单测直接调用 — 禁 MC 类加载) ──
+
+    /**
+     * 转换合法性校验 — 纯逻辑。
+     * 空图 (Map.of()) = 不限制转换; current 无出边或 next 不在出边集 = 非法 (引擎拦截)。
+     */
+    static <S extends Enum<S>> boolean isTransitionAllowed(S current, S next, Map<S, Set<S>> transitions) {
+        if (transitions.isEmpty()) return true;
+        return transitions.getOrDefault(current, Set.of()).contains(next);
     }
 
     /**
-     * 从 NBT 读取当前状态。异常时返回 {@link #initialState()}。
+     * 状态名 → 枚举解析容错 — 纯逻辑 (防 NBT 损坏防线)。
+     * 空/null/未知名/异常 → fallback (initialState)。
+     */
+    static <S extends Enum<S>> S parseState(Class<S> stateClass, String raw, S fallback) {
+        if (raw == null || raw.isEmpty()) return fallback;
+        try {
+            return Enum.valueOf(stateClass, raw);
+        } catch (Exception e) {
+            return fallback;
+        }
+    }
+
+    /**
+     * 从内存态读取当前状态。异常时返回 {@link #initialState()} (防 NBT 损坏)。
      */
     protected S readState(EntityMaid maid) {
         try {
-            String raw = maid.getPersistentData().getString(stateKey());
-            if (raw.isEmpty()) return initialState();
-            return Enum.valueOf(stateClass(), raw);
+            String raw = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.pl(maid, fsmKey()).getString(FSM_KEY);
+            return parseState(stateClass(), raw, initialState());
         } catch (Exception e) {
             return initialState();
         }
     }
 
-    /** 写入状态到 NBT */
+    /** 写入状态到内存态 (flush 落盘) */
     protected void writeState(EntityMaid maid, S state) {
-        maid.getPersistentData().putString(stateKey(), state.name());
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.pl(maid, fsmKey()).putString(FSM_KEY, state.name());
     }
 
-    /** 移除 NBT 中的状态键 */
+    /** 移除状态 (缓存 + NBT) */
     protected void clearState(EntityMaid maid) {
-        maid.getPersistentData().remove(stateKey());
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.removePl(maid, fsmKey());
     }
 
     // ── 主 tick ──
 
     /**
-     * 每 tick 由 {@code TaskTickHandler} 或 {@link #executor()} 驱动.
+     * 每 tick 由 {@code TaskTickHandler} (→ GameTickPipelineManager.tickActive) 驱动.
      *
      * <p>流程:
      * <ol>
@@ -178,9 +207,9 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
      */
     @Override
     public void tick(ServerLevel world, EntityMaid maid) {
-        // v79.20.5: 防御 — 任务已被终结/切换 (clearAll 后 getTask 空, 或已切到其他任务) →
+        // 防御 — 任务已被终结/切换 (clearAll 后 getTask 空, 或已切到其他任务) →
         // 不 tick, 清状态残留 (防跨任务污染; 错题 #124 同类: 终结后继续执行的通用防线 —
-        // 覆盖 GameTickPipelineManager/executor/外部 mod 全驱动路径)
+        // 覆盖 GameTickPipelineManager/外部 mod 全驱动路径)
         String flowTask = FlowTaskData.getTask(maid);
         if (flowTask.isEmpty() || !taskType().equals(flowTask)) {
             clearState(maid);
@@ -192,13 +221,13 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
             return;
         }
 
-        // 2. 读取当前状态
+        // 2. 读取当前状态 (内存态 — isFirstTick 判 "s" 键是否存在)
         S current = readState(maid);
-        boolean isFirstTick = !maid.getPersistentData().contains(stateKey());
+        boolean isFirstTick = !com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.pl(maid, fsmKey()).contains(FSM_KEY);
         if (isFirstTick) {
             writeState(maid, current);
             onEnter(current, world, maid);
-            showStepBubble(maid, current);   // v79.21: 步骤气泡 (替换式)
+            showStepBubble(maid, current);   // 步骤气泡 (替换式)
         }
 
         // 3. 执行业务逻辑
@@ -207,8 +236,7 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
         // 4. 状态转换
         if (next != null && next != current) {
             // 验证转换合法性
-            Map<S, Set<S>> t = transitions();
-            if (!t.isEmpty() && !t.getOrDefault(current, Set.of()).contains(next)) {
+            if (!isTransitionAllowed(current, next, transitions())) {
                 LittleMaidMoreAction.LOGGER.warn(
                     "[LMA/FSM] {} illegal transition: {} -> {}", taskType(), current, next);
                 return; // 拒绝非法转换，保持当前状态
@@ -218,11 +246,11 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
             onExit(current, maid);
             writeState(maid, next);
             onEnter(next, world, maid);
-            showStepBubble(maid, next);      // v79.21: 步骤气泡 (替换式)
+            showStepBubble(maid, next);      // 步骤气泡 (替换式)
         }
     }
 
-    // ── 步骤气泡 (v79.21) ──
+    // ── 步骤气泡 ──
 
     /**
      * 状态步骤气泡 — 首 tick + 每次合法转换触发, 替换式进度气泡 (循环状态不堆积).
@@ -232,13 +260,5 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
         LmaTaskProgressDisplay.showStep(maid, taskType(), state.name());
     }
 
-    // ── Executor ──
-
-    /**
-     * 默认 executor — 委托给 {@link #tick(ServerLevel, EntityMaid)}.
-     */
-    public IExecutor executor() {
-        // v75.4: 样板壳 → IExecutor.ticker (语义不变)
-        return IExecutor.ticker(this::tick);
-    }
+    // executor/execute 删除 (v79.45) — 执行全归 GMPM tick 驱动, 无需覆写
 }

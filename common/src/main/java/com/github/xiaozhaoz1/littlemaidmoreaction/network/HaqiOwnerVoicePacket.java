@@ -34,21 +34,14 @@ import java.util.function.Supplier;
  * 客户端 {@link PecoHaqiSoundPlayer} 按 11 文件子集随机读取并播放。
  */
 //? if 1.20.1 {
-public final class HaqiOwnerVoicePacket {
+public record HaqiOwnerVoicePacket(int maidId, float volume) {
 //?} else {
-public final class HaqiOwnerVoicePacket implements CustomPacketPayload {
+public record HaqiOwnerVoicePacket(int maidId, float volume) implements CustomPacketPayload {
 //?}
-    private final int maidId;
-    private final float volume;
-
-    public HaqiOwnerVoicePacket(int maidId, float volume) {
-        this.maidId = maidId;
-        this.volume = volume;
-    }
 
     public static void encode(HaqiOwnerVoicePacket msg, FriendlyByteBuf buf) {
-        buf.writeInt(msg.maidId);
-        buf.writeFloat(msg.volume);
+        buf.writeInt(msg.maidId());
+        buf.writeFloat(msg.volume());
     }
 
     public static HaqiOwnerVoicePacket decode(FriendlyByteBuf buf) {
@@ -68,9 +61,8 @@ public final class HaqiOwnerVoicePacket implements CustomPacketPayload {
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public static final StreamCodec<ByteBuf, HaqiOwnerVoicePacket> STREAM_CODEC = StreamCodec.of(
-        (ByteBuf buf, HaqiOwnerVoicePacket msg) -> encode(msg, (FriendlyByteBuf) buf),
-        (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, HaqiOwnerVoicePacket> STREAM_CODEC =
+        PacketCodecs.wrap(HaqiOwnerVoicePacket::encode, HaqiOwnerVoicePacket::decode);
 
     public static void handlePayload(HaqiOwnerVoicePacket msg, IPayloadContext ctx) {
         ctx.enqueueWork(() -> handleClient(msg));
@@ -81,8 +73,8 @@ public final class HaqiOwnerVoicePacket implements CustomPacketPayload {
     private static void handleClient(HaqiOwnerVoicePacket msg) {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) return;
-        if (level.getEntity(msg.maidId) instanceof EntityMaid maid) {
-            PecoHaqiSoundPlayer.play(maid, msg.volume);
+        if (level.getEntity(msg.maidId()) instanceof EntityMaid maid) {
+            PecoHaqiSoundPlayer.play(maid, msg.volume());
         }
     }
 

@@ -1,7 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.storage;
 
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.core.model.LmaAnimationDef;
+import com.github.xiaozhaoz1.littlemaidmoreaction.resource.LmaAnimationDef;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 

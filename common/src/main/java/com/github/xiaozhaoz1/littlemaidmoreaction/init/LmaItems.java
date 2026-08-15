@@ -47,6 +47,15 @@ public final class LmaItems {
             DeferredRegister.create(BuiltInRegistries.ITEM, LittleMaidMoreAction.MOD_ID);
 //?}
 
+    /** 女仆图鉴 (v79.47) — 右键打开击杀图鉴界面 (MaidCodexScreen) */
+    //? if 1.20.1 {
+    public static final RegistryObject<Item> MAID_CODEX =
+            ITEMS.register("maid_codex", MaidCodexItem::new);
+    //?} else {
+    public static final Supplier<Item> MAID_CODEX =
+            ITEMS.register("maid_codex", MaidCodexItem::new);
+    //?}
+
     public static void register(IEventBus bus) {
         ITEMS.register(bus);
     }

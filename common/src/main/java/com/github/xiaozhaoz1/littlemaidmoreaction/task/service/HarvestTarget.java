@@ -35,7 +35,7 @@ public abstract class HarvestTarget {
     public static final HarvestTarget ORE = new OreTarget();
 
     private static final int NATURE_CHECK_MAX_LOGS = 100;
-    private static final int TOOL_RESERVE_DURABILITY = 1;
+    public static final int TOOL_RESERVE_DURABILITY = 1;
 
     /** 方块是否为本类型采集目标 */
     public abstract boolean matches(BlockState state);

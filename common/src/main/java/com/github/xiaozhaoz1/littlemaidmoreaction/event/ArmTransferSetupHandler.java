@@ -1,4 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.event;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.DataKey;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 //? if !1.20.1 {
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.core.component.DataComponents;
@@ -138,8 +140,10 @@ CompoundTag tag = _cd.copyTag();
         //? if !1.20.1 {
         held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         //?}
-        data.put(ArmTransferPipeline.KEY_TAKE, NbtUtils.writeBlockPos(takePos));
-        data.put(ArmTransferPipeline.KEY_DEPOSIT, NbtUtils.writeBlockPos(depositPos));
+        // v79.55 (错题 #183): 原直调 NbtUtils.writeBlockPos — 1.21.1 返回 IntArrayTag 强转 CompoundTag 必 CCE;
+        // 改走 NbtCodecs (双平台格式契约, 与读侧 ArmTransferPipeline.readPos 同款)
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs.writeBlockPos(data, DataKey.ARM_TAKE.key(), takePos);
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs.writeBlockPos(data, DataKey.ARM_DEPOSIT.key(), depositPos);
 
         TaskDispatcher.submit(maid, "arm_transfer", null, 0);
 

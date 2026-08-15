@@ -56,10 +56,10 @@ public final class LookAroundGrid {
             return s.is(net.minecraft.tags.BlockTags.LOGS) || s.is(net.minecraft.tags.BlockTags.LEAVES);
         }
         @Override public boolean canStandAt(int x, int y, int z) {
+            // 修条件 — 原 body.isAir() → false 把平地全判不可站 (平地上方为空气是正常站立);
+            // 可站判定 = 脚格实心非可替换 (身体格净空由调用方分类语义处理)
             BlockState feet = at(x, y, z);
-            BlockState body = at(x, y + 1, z);
-            if (feet.isAir() || body.isAir()) return false;
-            return !feet.canBeReplaced() && !body.canBeReplaced();
+            return !feet.isAir() && !feet.canBeReplaced();
         }
     }
 

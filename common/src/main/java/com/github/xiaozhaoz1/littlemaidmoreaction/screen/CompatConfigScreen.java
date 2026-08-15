@@ -33,7 +33,7 @@ public final class CompatConfigScreen extends Screen {
     private static final int ROW_H = 32, LEFT_W = 180;
 
     public CompatConfigScreen(Screen parent) {
-        super(Component.literal("LMA 兼容模块"));
+        super(Component.translatable("screen.littlemaidmoreaction.compat"));
         this.parent = parent;
     }
 
@@ -43,16 +43,18 @@ public final class CompatConfigScreen extends Screen {
         if (selectedIdx >= modules.size()) selectedIdx = modules.isEmpty() ? -1 : 0;
 
         // 关闭按钮
-        addRenderableWidget(Button.builder(Component.literal("返回"), b -> onClose())
+        addRenderableWidget(Button.builder(Component.translatable("gui.littlemaidmoreaction.compat.back"), b -> onClose())
                 .pos(this.width - 80, this.height - 28).size(70, 20).build());
 
         // 右侧详情: 开关按钮 (仅已装 mod; 选中项变化时重建, 不随列表滚动)
         if (selectedIdx >= 0 && selectedIdx < modules.size()) {
             var m = modules.get(selectedIdx);
             if (isModLoaded(m.modId())) {
-                int btnY = 40 + 16 + 12 + 16 + 16 + 16;   // name + status + 依赖 + 描述 + 红字区 + gap (v77.3.2: ly 40 对齐)
+                int btnY = 40 + 16 + 12 + 16 + 16 + 16;   // name + status + 依赖 + 描述 + 红字区 + gap (ly 40 对齐)
                 addRenderableWidget(Button.builder(
-                        Component.literal(CompatToggle.isModuleEnabled(m.id()) ? "禁用" : "启用"),
+                        Component.translatable(CompatToggle.isModuleEnabled(m.id())
+                                ? "gui.littlemaidmoreaction.compat.disable"
+                                : "gui.littlemaidmoreaction.compat.enable"),
                         b -> {
                             CompatToggle.setModuleEnabled(m.id(), !CompatToggle.isModuleEnabled(m.id()));
                             clearWidgets(); init();
@@ -69,12 +71,12 @@ public final class CompatConfigScreen extends Screen {
 //?} else {
         renderBackground(g, mx, my, pt);
 //?}
-        g.drawCenteredString(font, Component.literal("LMA 兼容模块")
+        g.drawCenteredString(font, Component.translatable("screen.littlemaidmoreaction.compat")
                 .withStyle(s -> s.withColor(0xFFD700)), this.width / 2, 6, 0xFFFFFF);
-        g.drawCenteredString(font, Component.literal("更改需重启游戏生效 (注册期门控)")
+        g.drawCenteredString(font, Component.translatable("gui.littlemaidmoreaction.compat.restart_hint")
                 .withStyle(s -> s.withColor(0xFFAA55)), this.width / 2, 24, 0xFFFFFF);
 
-        int lx = 10, ly = 40, lh = this.height - 72, dx = lx + LEFT_W + 4;   // v77.3.2: ly 40 避提示行 (y=24) 重叠
+        int lx = 10, ly = 40, lh = this.height - 72, dx = lx + LEFT_W + 4;   // ly 40 避提示行 (y=24) 重叠
 
         // 左侧列表 (scissor — 溢出行裁剪)
         g.fill(lx, ly, lx + LEFT_W, ly + lh, 0xAA1A1A1A);
@@ -88,7 +90,7 @@ public final class CompatConfigScreen extends Screen {
             boolean hov = mx >= lx && mx <= lx + LEFT_W && my >= ry && my <= ry + ROW_H;
             if (sel) g.fill(lx + 3, ry, lx + LEFT_W - 3, ry + ROW_H, 0x553355AA);
             else if (hov) g.fill(lx + 3, ry, lx + LEFT_W - 3, ry + ROW_H, 0x33333333);
-            // 三态 (v74.5: 合并单次计算 — 双 withStyle 后者赢)
+            // 三态 (合并单次计算 — 双 withStyle 后者赢)
             boolean loaded = isModLoaded(m.modId());
             boolean enabled = loaded && CompatToggle.isModuleEnabled(m.id());
             int rowColor = !loaded ? 0x888888 : (enabled ? 0x55FF55 : 0xFF5555);
@@ -107,25 +109,26 @@ public final class CompatConfigScreen extends Screen {
             boolean enabled = loaded && CompatToggle.isModuleEnabled(m.id());
             int dy = ly;
             g.drawString(font, Component.literal(m.name()).withStyle(s -> s.withColor(0xFFD700)), dx, dy, 0xFFFFFF); dy += 16;
-            g.drawString(font, Component.literal("状态: ")
+            g.drawString(font, Component.translatable("gui.littlemaidmoreaction.compat.status")
                     .withStyle(s -> s.withColor(0xAAAAAA))
-                    .append(Component.literal(!loaded ? "未安装" : (enabled ? "已启用" : "已禁用"))
+                    .append(Component.translatable(!loaded ? "gui.littlemaidmoreaction.compat.not_installed"
+                                    : (enabled ? "gui.littlemaidmoreaction.compat.enabled" : "gui.littlemaidmoreaction.compat.disabled"))
                             .withStyle(s -> s.withColor(!loaded ? 0x888888 : (enabled ? 0x55FF55 : 0xFF5555)))),
                     dx, dy, 0xFFFFFF); dy += 12;
-            g.drawString(font, Component.literal("依赖: " + m.modId())
+            g.drawString(font, Component.translatable("gui.littlemaidmoreaction.compat.dependency", m.modId())
                     .withStyle(s -> s.withColor(0x888888)), dx, dy, 0xFFFFFF); dy += 16 + 8;
             g.drawString(font, Component.literal(m.description())
                     .withStyle(s -> s.withColor(0xAAAAAA)), dx, dy, 0xFFFFFF);
             if (!loaded) {
                 dy += 16;
-                g.drawString(font, Component.literal("未安装该 mod — 模块不可用")
+                g.drawString(font, Component.translatable("gui.littlemaidmoreaction.compat.unavailable")
                         .withStyle(s -> s.withColor(0xFF5555)), dx, dy, 0xFFFFFF);
             }
         }
         super.render(g, mx, my, pt);
     }
 
-    /** v79.26.3: 原版主菜单旋转全景背景 (统一 {@link PanoramaBackground}, 去 TLM 深棕渐变衬底)。
+    /** 原版主菜单旋转全景背景 (统一 {@link PanoramaBackground}, 去 TLM 深棕渐变衬底)。
      *  不调 super: 1.21 默认 renderBackground 含 renderBlurredBackground 模糊 (明确去模糊)。 */
 //? if 1.20.1 {
     @Override
@@ -141,7 +144,7 @@ public final class CompatConfigScreen extends Screen {
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-        int ly = 40, lh = this.height - 72;   // v77.3.2: 与 render 对齐
+        int ly = 40, lh = this.height - 72;   // 与 render 对齐
         if (mx >= 10 && mx <= 10 + LEFT_W && my >= ly && my <= ly + lh) {
             int idx = (int) ((my - ly - 4 - scroll) / ROW_H);
             if (idx >= 0 && idx < modules.size()) {

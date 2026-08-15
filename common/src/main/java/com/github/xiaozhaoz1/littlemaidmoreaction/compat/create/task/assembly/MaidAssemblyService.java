@@ -92,7 +92,7 @@ public final class MaidAssemblyService {
             result = (Optional) AllRecipeTypes.DEPLOYING.find(wrapper, level);
         return (DeployerApplicationRecipe) result.orElse(null);
 //?} else {
-        // v75.1: 1.21 RecipeWrapper = neoforge items.wrapper; getRecipe 返回 RecipeHolder
+        // 1.21 RecipeWrapper = neoforge items.wrapper; getRecipe 返回 RecipeHolder
         net.neoforged.neoforge.items.wrapper.RecipeWrapper wrapper =
                 new net.neoforged.neoforge.items.wrapper.RecipeWrapper(inv);
         var result = SequencedAssemblyRecipe.getRecipe(level, wrapper,
@@ -133,7 +133,7 @@ public final class MaidAssemblyService {
         return hasSequencedTag(out);
     }
 
-    /** v75.1: 序列装配标记判断双平台 (1.21 无 hasTag/getTag — DataComponents.CUSTOM_DATA) */
+    /** 序列装配标记判断双平台 (1.21 无 hasTag/getTag — DataComponents.CUSTOM_DATA) */
     private static boolean hasSequencedTag(ItemStack stack) {
 //? if 1.20.1 {
         return stack.hasTag() && stack.getTag().contains("SequencedAssembly");
@@ -143,7 +143,7 @@ public final class MaidAssemblyService {
 //?}
     }
 
-    /** v75.1: 物品相同判断双平台 */
+    /** 物品相同判断双平台 */
     // ═══ Sound ═══
 
     public static void playMachineSound(Level level, Vec3i pos, MachineKind kind) {
@@ -161,10 +161,8 @@ public final class MaidAssemblyService {
 
     public static int getDuration(MachineKind kind, EntityMaid maid) {
         int base = switch (kind) { case DEPLOYER -> 120; default -> BASE_DURATION; };
-        return switch (maid.getFavorabilityManager().getLevel()) {
-            case 3 -> base * 40 / 100; case 2 -> base * 60 / 100;
-            case 1 -> base * 80 / 100; default -> base;
-        };
+        // 好感度效率乘区 (原 switch 分档 → base / speed 倍率)
+        return (int) (base / com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.workSpeedMultiplier(maid));
     }
 
     // ═══ Nearby search (委托 NearbyContainerService) ═══

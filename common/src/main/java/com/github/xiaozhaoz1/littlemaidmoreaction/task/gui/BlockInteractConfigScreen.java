@@ -1,9 +1,8 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.gui;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.RequestTaskConfigPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.network.TaskConfigActionPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.BlockInteractPipeline;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -20,7 +19,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
  * <p>Parchment/Mojang 映射冲突导致无法调 {@code super.renderBg()},
  * 改为在 renderBg 中手动绘制 TLM 主背景纹理.
  * 控件通过 {@code initAdditionWidgets} + {@code renderAddition} 添加.
- * 配置修改通过引擎通用动作 (TaskPipeline.ACTION_*) 发送, 服务端由
+ * 配置修改通过引擎通用动作 (TaskConfigurable.ACTION_*) 发送, 服务端由
  * {@link TaskPipeline#handleConfigAction} 默认实现处理.
  * 定时器默认间隔 (v67.2): {@link MoreActionConfig#BI_TIMER_DEFAULT_INTERVAL}.
  */
@@ -37,35 +36,21 @@ public class BlockInteractConfigScreen extends LmaTaskConfigScreen<BlockInteract
         return "block_interact";
     }
 
-    // ── renderBg: TLM 基类渲染完整框架 (背景/女仆3D/血量条), LMA 控件叠加 ──
-
-    @Override
-    protected void renderBg(GuiGraphics g, float partialTick, int x, int y) {
-        // LMA-MAIN 全量 TLM 映射 — 基类 renderBg 直接可用, 无需自绘 (旧 v67 映射冲突 hack 已删)
-        super.renderBg(g, partialTick, x, y);
-        // LMA 控件通过 initAdditionWidgets (按钮) + renderAddition (文字) 绘制
-    }
-
-    // ── initAdditionWidgets: 请求配置 + 添加按钮 (TLM 标准钩子) ──
+    // ── initAdditionWidgets: 请求配置 + 添加按钮 (TLM 标准钩子; renderBg 基类默认委托) ──
 
     @Override
     protected void initAdditionWidgets() {
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), getTaskType());
 
-        int cx = leftPos + 88;
-        int y = topPos + 34;
+        int cx = contentX();
+        int y = contentY();
 
         timerToggleBtn = Button.builder(getTimerLabel(), btn -> {
             CompoundTag cfg = getMenu().getConfig();
             boolean cur = cfg.getBoolean(BlockInteractPipeline.KEY_TIMER_ENABLED);
             cfg.putBoolean(BlockInteractPipeline.KEY_TIMER_ENABLED, !cur);
-            if (m != null) {
-                CompoundTag payload = new CompoundTag();
-                payload.putString("key", BlockInteractPipeline.KEY_TIMER_ENABLED);
-                TaskConfigActionPacket.send(m.getId(), getTaskType(),
-                        TaskPipeline.ACTION_TOGGLE, payload);
-            }
+            sendToggle(BlockInteractPipeline.KEY_TIMER_ENABLED);
         }).pos(cx, y).size(80, 20).build();
         addRenderableWidget(timerToggleBtn);
 
@@ -83,12 +68,7 @@ public class BlockInteractConfigScreen extends LmaTaskConfigScreen<BlockInteract
         y += 24;
         addRenderableWidget(Button.builder(Component.literal("§c清除绑定"), btn -> {
             getMenu().getConfig().remove(BlockInteractPipeline.KEY_POS);
-            if (m != null) {
-                CompoundTag payload = new CompoundTag();
-                payload.putString("key", BlockInteractPipeline.KEY_POS);
-                TaskConfigActionPacket.send(m.getId(), getTaskType(),
-                        TaskPipeline.ACTION_REMOVE, payload);
-            }
+            sendRemove(BlockInteractPipeline.KEY_POS);
         }).pos(cx, y).size(80, 20).build());
     }
 
@@ -97,7 +77,7 @@ public class BlockInteractConfigScreen extends LmaTaskConfigScreen<BlockInteract
     @Override
     protected void renderAddition(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
         CompoundTag cfg = getMenu().getConfig();
-        int cx = leftPos + 88;
+        int cx = contentX();
         int y = topPos + 100;
         g.drawString(font, Component.literal("绑定: " + getPosText(cfg)), cx, y, 0xFFFFFF);
         y += 14;
@@ -109,11 +89,6 @@ public class BlockInteractConfigScreen extends LmaTaskConfigScreen<BlockInteract
         timerToggleBtn.setMessage(getTimerLabel());
     }
 
-    @Override
-    public void onClose() {
-        super.onClose();
-    }
-
     // ── 业务 ──
 
     private void changeInterval(EntityMaid maid, int delta) {
@@ -122,12 +97,7 @@ public class BlockInteractConfigScreen extends LmaTaskConfigScreen<BlockInteract
         if (cur <= 0) cur = ActiveTaskConfig.BI_TIMER_DEFAULT_INTERVAL.get();
         int next = Math.max(1, cur + delta);
         cfg.putInt(BlockInteractPipeline.KEY_TIMER_INTERVAL, next);
-        if (maid != null) {
-            CompoundTag payload = new CompoundTag();
-            payload.putString("key", BlockInteractPipeline.KEY_TIMER_INTERVAL);
-            payload.putInt("value", next);
-            TaskConfigActionPacket.send(maid.getId(), getTaskType(), TaskPipeline.ACTION_SET_INT, payload);
-        }
+        sendSetInt(BlockInteractPipeline.KEY_TIMER_INTERVAL, next);
     }
 
     private Component getTimerLabel() {

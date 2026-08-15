@@ -1,6 +1,9 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskSignalListener;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.PassiveSignalSkeleton;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
@@ -23,15 +26,14 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
  * <p>信号: SNOWING → 扫描雪层 → 逐个清除。
  * 雪清完或天气转晴自动停止。
  */
-public final class SnowShovelPipeline implements TaskPipeline {
+public final class SnowShovelPipeline implements PassiveSignalSkeleton, TaskConfigurable {
 
     @Override public String taskType() { return "snow_shovel"; }
     @Override public boolean isLongRunning() { return true; }
-    @Override public boolean needsGameTick() { return true; }
 
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
-        return PipelineResult.ok("", Set.of(Signals.ENV_SNOWING));
+        return okSignals(Set.of(Signals.ENV_SNOWING));
     }
 
     @Override
@@ -65,7 +67,9 @@ public final class SnowShovelPipeline implements TaskPipeline {
 
         // 清除最近的一块雪
         world.destroyBlock(snow.get(0), true, maid);
-        pd.putInt("Cd", 40); // 2秒一块
+        // v79.58 (用户裁定): 好感度乘区 — 等级高铲得快 (40 / speed, 同挖矿蓄力/吃食间隔模式)
+        pd.putInt("Cd", Math.max(1, (int) (40
+                / com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.workSpeedMultiplier(maid))));
     }
-    // onCleanup 用接口默认 (clearPipelineData) — v67.3 删除冗余覆写
+    // onCleanup 用接口默认 (clearPipelineData) — 删除冗余覆写
 }

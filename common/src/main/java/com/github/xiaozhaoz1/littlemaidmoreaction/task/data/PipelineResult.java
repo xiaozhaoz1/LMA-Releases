@@ -13,7 +13,7 @@ public record PipelineResult(boolean completed, String feedback, @Nullable ItemS
     public static PipelineResult ok(String feedback, ItemStack output) {
         return new PipelineResult(true, feedback, output, Set.of());
     }
-    /** v63: 声明信号需求 (v72: String 信号 id, event:/env: 前缀) */
+    /** 声明信号需求 (String 信号 id, event:/env: 前缀) */
     public static PipelineResult ok(String feedback, Set<String> needsSignals) {
         return new PipelineResult(true, feedback, null, needsSignals);
     }

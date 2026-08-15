@@ -21,11 +21,11 @@ import java.util.function.Function;
 /**
  * 任务配置屏幕 API (v67.9) — 外部 mod / 任务注册方的配置 GUI 入口。
  *
- * <p>配合 {@link TaskPipeline#getConfigGuiProvider(EntityMaid)} 使用:
+ * <p>配合 {@link TaskConfigurable#getConfigGuiProvider(EntityMaid)} 使用:
  * Pipeline 覆写该方法返回本类工厂创建的 MenuProvider, 即出现在
  * TLM 任务设置标签页 (女仆 GUI → 任务配置), 数据经
- * {@link TaskPipeline#pipelineConfig(EntityMaid)} (lma_cfg_&lt;taskType&gt; NBT)
- * 与引擎通用动作 ({@link TaskPipeline#handleConfigAction}) 读写。
+ * {@link TaskConfigurable#pipelineConfig(EntityMaid)} (lma_cfg_&lt;taskType&gt; NBT)
+ * 与引擎通用动作 ({@link TaskConfigurable#handleConfigAction}) 读写。
  *
  * <h3>使用示例</h3>
  * <pre>
@@ -53,7 +53,7 @@ import java.util.function.Function;
  */
 public final class TaskConfigGuiFactory {
 
-    /** v79.24.1: 任务配置 GUI 注册表 (taskType → provider) — 注册优先, Pipeline 覆写兜底 */
+    /** 任务配置 GUI 注册表 (taskType → provider) — 注册优先, Pipeline 覆写兜底 */
     private static final Map<String, Function<EntityMaid, MenuProvider>> CONFIG_PROVIDERS = new HashMap<>();
 
     private TaskConfigGuiFactory() {}
@@ -61,7 +61,7 @@ public final class TaskConfigGuiFactory {
     // ── 注册表 ──
 
     /**
-     * v79.24.1: 注册任务配置 GUI — 任务注册方一行接入 TLM 任务设置标签页
+     * 注册任务配置 GUI — 任务注册方一行接入 TLM 任务设置标签页
      * (女仆 GUI → 任务设置 tab, 无需覆写 TaskPipeline.getConfigGuiProvider)。
      * 也可经统一门面 MaidGuiRegistry.registerTaskConfig(...)。
      */
@@ -75,7 +75,7 @@ public final class TaskConfigGuiFactory {
      * 从当前运行的任务 Pipeline 获取配置 GUI (经 lma_flow_task 查当前任务)。
      * 无任务或 Pipeline 未覆写 getConfigGuiProvider 时回退 TLM 默认任务配置容器。
      *
-     * <p>v67.10: 永不为 null — TLM 契约 {@code IMaidTask.getTaskConfigGuiProvider} 默认非 null,
+     * <p>永不为 null — TLM 契约 {@code IMaidTask.getTaskConfigGuiProvider} 默认非 null,
      * {@code EntityMaid.openMaidGui(TASK_CONFIG)} 对 null 无防护 (NetworkHooks.openScreen),
      * 返回 null 会导致任务设置标签页点击没反应。
      * 供 {@code LmaTypedFlowTask.getTaskConfigGuiProvider()} 调用 (TLM 任务设置标签页入口)。
@@ -86,13 +86,13 @@ public final class TaskConfigGuiFactory {
     }
 
     /**
-     * v67.12: 按 taskType 直查配置 GUI — 不依赖 lma_flow_task 写入时序。
+     * 按 taskType 直查配置 GUI — 不依赖 lma_flow_task 写入时序。
      *
-     * <p>任务刚选中即点「任务设置」时 lma_flow_task 尚未初始化 (v64 GUI_INIT 下 tick 写入),
+     * <p>任务刚选中即点「任务设置」时 lma_flow_task 尚未初始化 (GUI_INIT 下 tick 写入),
      * of() 会误回退默认屏。TLM 任务实例自带 taskType, 直接按此查询,
      * 供 {@code LmaTypedFlowTask.getTaskConfigGuiProvider()} 等使用。
      *
-     * <p>v79.24.1: 注册表优先 ({@link #register} / MaidGuiRegistry.registerTaskConfig),
+     * <p>注册表优先 ({@link #register} / MaidGuiRegistry.registerTaskConfig),
      * Pipeline 覆写兜底 — 新任务一行注册接入 TLM 任务设置标签页。</p>
      */
     public static MenuProvider forTask(EntityMaid maid, String taskType) {
@@ -101,7 +101,9 @@ public final class TaskConfigGuiFactory {
             return registered.apply(maid);
         }
         TaskRegistry.TaskHandler h = taskType == null || taskType.isEmpty() ? null : TaskRegistry.get(taskType);
-        MenuProvider provider = h == null ? null : h.pipeline().getConfigGuiProvider(maid);
+        // 配置维度拆分 — 未实现 TaskConfigurable 的管线回退 TLM 默认屏
+        MenuProvider provider = h == null || !(h.pipeline() instanceof TaskConfigurable c)
+                ? null : c.getConfigGuiProvider(maid);
         if (provider != null) {
             return provider;
         }
@@ -155,7 +157,7 @@ public final class TaskConfigGuiFactory {
     }
 
     /**
-     * v67.3: 通用黑白名单配置 (furnace/jukebox/arm_transfer 共用; v67.8 +collect_wood/collect_ore)。
+     * 通用黑白名单配置 (furnace/jukebox/arm_transfer 共用; +collect_wood/collect_ore)。
      *
      * <p>标题用任务中文名 (lang key: task.littlemaidmoreaction.&lt;taskType&gt;)。
      * 名单存 pipelineConfig 的 blacklist/whitelist 键, 引擎经 ItemFilters.effective 读取 (per-maid 覆盖全局)。
@@ -167,7 +169,7 @@ public final class TaskConfigGuiFactory {
     }
 
     /**
-     * v67.3: 配方链合成配置 (当前产物 + 产物上限)。
+     * 配方链合成配置 (当前产物 + 产物上限)。
      */
     public static MenuProvider craftChainConfig(EntityMaid maid) {
         return createMenuProvider(maid,
@@ -176,7 +178,7 @@ public final class TaskConfigGuiFactory {
     }
 
     /**
-     * v67.13: 敲钟单女仆间隔配置 (步进按钮 + 恢复全局)。
+     * 敲钟单女仆间隔配置 (步进按钮 + 恢复全局)。
      * 间隔存 pipelineConfig "ring_interval", 空则用全局 BELL_RING_INTERVAL。
      */
     public static MenuProvider bellRingConfig(EntityMaid maid) {

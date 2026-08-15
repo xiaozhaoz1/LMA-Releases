@@ -60,7 +60,7 @@ public final class RunningBeltService {
         return controller != null ? controller.getBlockPos() : null;
     }
 
-    /** 找皮带链中点 — 让女仆导航到中间不冲过头 (v4.5) */
+    /** 找皮带链中点 — 让女仆导航到中间不冲过头 */
     public static BlockPos findBeltMidpoint(Level level, BlockPos segmentPos) {
         BlockPos controllerPos = getBeltControllerPos(level, segmentPos);
         if (controllerPos == null) return segmentPos;
@@ -72,7 +72,7 @@ public final class RunningBeltService {
     // ── Compute ──
 
     public static boolean isMaidOnBelt(net.minecraft.world.entity.Entity maid, BlockPos pos) {
-        // v79.13: 加水平约束 — 原仅查 Y, 水平走开同高度仍算"在皮带上" → 永不 revert 乱跑
+        // 加水平约束 — 原仅查 Y, 水平走开同高度仍算"在皮带上" → 永不 revert 乱跑
         if (Math.abs(maid.getBlockX() - pos.getX()) > 1
                 || Math.abs(maid.getBlockZ() - pos.getZ()) > 1) {
             return false;
@@ -85,7 +85,7 @@ public final class RunningBeltService {
     /** 食物槽位记录 */
     public record FoodSlot(int slotIndex, ItemStack stack) {}
 
-    /** v75.1: 可食判断双平台 (1.21 无 isEdible — DataComponents.FOOD) */
+    /** 可食判断双平台 (1.21 无 isEdible — DataComponents.FOOD) */
     private static boolean hasFood(ItemStack stack) {
 //? if 1.20.1 {
         return stack.getItem().isEdible();
@@ -182,7 +182,7 @@ public final class RunningBeltService {
 //? if 1.20.1 {
         Block beltBlock = ForgeRegistries.BLOCKS.getValue(BELT_ID);
 //?} else {
-        Block beltBlock = BuiltInRegistries.BLOCK.get(BELT_ID);   // v75.1: 1.21 getValue→get
+        Block beltBlock = BuiltInRegistries.BLOCK.get(BELT_ID);   // 1.21 getValue→get
 //?}
         if (beltBlock == null) return false;
 

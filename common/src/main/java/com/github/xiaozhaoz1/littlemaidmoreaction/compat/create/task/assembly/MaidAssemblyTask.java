@@ -49,7 +49,7 @@ public final class MaidAssemblyTask implements IMaidTask {
     @Override public boolean enableEating(EntityMaid maid) { return true; }
     @Override public boolean isEnable(EntityMaid maid) { return isCreateLoaded(); }
 
-    /** v75.1: create 运行时门控双平台 */
+    /** create 运行时门控双平台 */
     private static boolean isCreateLoaded() {
 //? if 1.20.1 {
         return net.minecraftforge.fml.ModList.get().isLoaded("create");
@@ -61,7 +61,7 @@ public final class MaidAssemblyTask implements IMaidTask {
     @Override public FunctionCallSwitchResult onFunctionCallSwitch(EntityMaid maid) { return FunctionCallSwitchResult.OK; }
     @Override public String getMaidActionSummary() { return "执行便携装配任务"; }
 
-    /** v67.16: UID 路径带 "task/" 前缀, 默认 getName 生成 key 不匹配 lang — 显式覆写 */
+    /** UID 路径带 "task/" 前缀, 默认 getName 生成 key 不匹配 lang — 显式覆写 */
     @Override
     public net.minecraft.network.chat.MutableComponent getName() {
         return net.minecraft.network.chat.Component.translatable(
@@ -70,7 +70,7 @@ public final class MaidAssemblyTask implements IMaidTask {
 
     @Override
     public MenuProvider getTaskConfigGuiProvider(EntityMaid maid) {
-        // v67.12: 按任务类型直查 — 避免任务刚选中 lma_flow_task 未初始化时误回退默认屏
+        // 按任务类型直查 — 避免任务刚选中 lma_flow_task 未初始化时误回退默认屏
         return com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigGuiFactory.forTask(maid, "maid_assembly");
     }
 }

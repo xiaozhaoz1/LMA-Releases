@@ -18,32 +18,19 @@ public final class PassiveSenseRegistration {
      * 全部 showInBar=false，在任务树被动分区展示。
      */
     public static void init() {
-        // 管线在 task.pipeline.sense.* — 编译时自动发现
-        // 为防步骤2编译: 若 Pipeline 类未加载则跳过
-        try {
-            registerIfExists("snow_shovel", "task.pipeline.sense.SnowShovelPipeline");
-            registerIfExists("light_control", "task.pipeline.sense.LightControlPipeline");
-            registerIfExists("temp_adapt", "task.pipeline.sense.TempAdaptPipeline");
-            registerIfExists("monster_log", "task.pipeline.sense.MonsterLogPipeline");
-            // v79.9: 哈气 (默认关闭 — HAQI_ENABLED 门控; 触发走 MAID_NEARBY 信号)
-            registerIfExists("haqi", "task.pipeline.sense.HaqiPipeline");
-            LittleMaidMoreAction.LOGGER.info("[EnvSense] 被动感知任务注册完成");
-        } catch (Exception ex) {
-            LittleMaidMoreAction.LOGGER.warn("[EnvSense] 被动感知任务注册跳过: {}", ex.getMessage());
+        // 规格表驱动 (v79.61 规格化): 名字+构造引用单一真相 — 与主动任务同构, 名字不再抄两遍
+        // (规格含逐任务注释: 哈气默认关闭/黑暗点亮/结构气泡/节日/自救 — 见 TaskRegistryManifest.PASSIVE)
+        for (com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistryManifest.TaskSpec s
+                : com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistryManifest.PASSIVE) {
+            TaskRegistry.registerPassive(s.taskType(), s.factory().get());
         }
-    }
-
-    @SuppressWarnings("unchecked")
-    private static void registerIfExists(String taskType, String className) {
-        try {
-            Class<?> clazz = Class.forName("com.github.xiaozhaoz1.littlemaidmoreaction." + className);
-            var pipeline = (com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline) clazz
-                    .getDeclaredConstructor().newInstance();
-            TaskRegistry.registerPassive(taskType, pipeline);
-        } catch (ClassNotFoundException e) {
-            LittleMaidMoreAction.LOGGER.info("[EnvSense] 跳过未实现的管线: {}", taskType);
-        } catch (Exception e) {
-            LittleMaidMoreAction.LOGGER.error("[EnvSense] 管线 {} 初始化失败", taskType, e);
+        // 注册完整性 fail-fast (v79.61 批 3c C3) — 被动 7 全注册, 漂移启动即炸
+        for (com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistryManifest.TaskSpec s
+                : com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistryManifest.PASSIVE) {
+            if (TaskRegistry.get(s.taskType()) == null) {
+                throw new IllegalStateException("[LMA] 被动任务注册缺失: " + s.taskType());
+            }
         }
+        LittleMaidMoreAction.LOGGER.info("[EnvSense] 被动感知任务注册完成");
     }
 }

@@ -38,8 +38,9 @@ import net.neoforged.fml.common.EventBusSubscriber;
 //?}
 public final class TaskTickHandler {
 
-    /** v63: 上次广播 tick (全局节流) */
-    private static long nextBroadcastTick = 0;
+    /** 上次广播 tick — per-dimension 节流 (静态单值多维度共享 = 轮替饥饿) */
+    private static final java.util.Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, Long>
+            NEXT_BROADCAST = new java.util.HashMap<>();
 
     private TaskTickHandler() {}
 
@@ -52,34 +53,58 @@ public final class TaskTickHandler {
 //? if 1.20.1 {
         if (event.phase != TickEvent.Phase.END) return;
 //?}
-        // v79.3: 扫描任务集中调度 (全维度共享预算, 每服务端 tick 一次)
+        // 扫描任务集中调度 (全维度共享预算, 每服务端 tick 一次)
         com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ScanScheduler
                 .tick(event.getServer().getTickCount());
         for (ServerLevel sl : event.getServer().getAllLevels()) {
             long now = sl.getGameTime();
-            // v79: 被动清单每 level hoist 一次 (原每女仆新建 Stream 过滤)
+            // 被动清单每 level hoist 一次 (原每女仆新建 Stream 过滤)
             var passives = TaskRegistry.passiveTasksList();
             for (var e : sl.getAllEntities()) {
                 if (!(e instanceof EntityMaid maid)) continue;
-                // v79: 主动+被动合并单次遍历 (原双循环 — 无跨女仆耦合, 行为等价)
+                // 主动+被动合并单次遍历 (原双循环 — 无跨女仆耦合, 行为等价)
                 GameTickPipelineManager.tickActive(sl, maid, now);
                 GameTickPipelineManager.tickPassiveFor(sl, maid, passives, now);
-                // v79.26.8f: 拉拽看门狗 (NavWatchdog) 删 — 只用 TLM 寻路, 不干预导航
+                // 拉拽看门狗 (NavWatchdog) 删 — 只用 TLM 寻路, 不干预导航
             }
-            // v79.23: 走路全 TLM — 无自研执行器 (PathExecutor.sweep 退役)
-            // v79.11: 哈气独立触发 (不依赖 EnvSense 广播 — 每 20t)
+            // 走路全 TLM — 无自研执行器 (PathExecutor.sweep 退役)
+            // 哈气独立触发 (不依赖 EnvSense 广播 — 每 20t)
             com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiTrigger.tick(sl);
-            // v63: EnvSense 全局广播 (自节流 200tick)
+            // EnvSense 全局广播 (自节流 200tick)
             tickBroadcast(sl);
         }
     }
 
-    /** v63: EnvSense 广播 — 按 config 间隔节流 */
+    /**
+     * 服务器停止 (保存前) — 全女仆 PL 内存态落盘。
+     * 被动任务无心跳 flush 兜底, 强制关闭场景靠本事件补齐 (TLM 参考: 实体 save 钩子时机,
+     * 但 Forge/NeoForge 无实体保存事件, ServerStopping 为最近等价点)。
+     */
+    @SubscribeEvent
+//? if 1.20.1 {
+    public static void onServerStopping(net.minecraftforge.event.server.ServerStoppingEvent event) {
+//?} else {
+    public static void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
+//?}
+        for (ServerLevel sl : event.getServer().getAllLevels()) {
+            for (var e : sl.getAllEntities()) {
+                if (e instanceof EntityMaid maid) {
+                    com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.flushAllPl(maid);
+                }
+            }
+        }
+        // EnvSense 广播节流跨 session 残留修复 — 重启后 gameTime 归零, 旧值会把
+        // 广播压到数天 (旧值追平); 停止时清空, 新会话立即恢复广播节奏
+        NEXT_BROADCAST.clear();
+    }
+
+    /** EnvSense 广播 — 按 config 间隔节流 (每维度独立节流, 防跨维度共享压榨) */
     private static void tickBroadcast(ServerLevel sl) {
         long now = sl.getGameTime();
-        if (now < nextBroadcastTick) return;
+        Long next = NEXT_BROADCAST.get(sl.dimension());
+        if (next != null && now < next) return;
         int interval = PassiveTaskConfig.ENV_SCAN_INTERVAL.get();
-        nextBroadcastTick = now + interval;
+        NEXT_BROADCAST.put(sl.dimension(), now + interval);
         EnvSenseBroadcaster.broadcast(sl);
     }
 }

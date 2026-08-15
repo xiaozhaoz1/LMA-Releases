@@ -4,7 +4,9 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 
-/** Brain 操作工具 — 消除直接 brain.setMemory/eraseMemory 调用 */
+/** Brain 操作工具 — 消除直接 brain.setMemory/eraseMemory 调用。
+ *  <p>v79.50b: isFrozen/clearWalkTarget/clearLookTarget/clearCantReachTarget 4 死方法删
+ *  (全项目零引用实证); freeze/unfreeze 为 AnimExecute/HaqiPipeline 活调用保留。 */
 public final class BrainHelper {
     private BrainHelper() {}
 
@@ -18,21 +20,5 @@ public final class BrainHelper {
     /** 解除 AI 冻结 */
     public static void unfreeze(LivingEntity entity) {
         entity.getBrain().eraseMemory(MemoryModuleType.IS_PANICKING);
-    }
-    /** AI 是否被冻结 */
-    public static boolean isFrozen(LivingEntity entity) {
-        return entity.getBrain().hasMemoryValue(MemoryModuleType.IS_PANICKING);
-    }
-    /** 清除寻路目标 */
-    public static void clearWalkTarget(EntityMaid maid) {
-        maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
-    }
-    /** 清除视线目标 */
-    public static void clearLookTarget(EntityMaid maid) {
-        maid.getBrain().eraseMemory(MemoryModuleType.LOOK_TARGET);
-    }
-    /** ★ v35.1: 清除 CANT_REACH_WALK_TARGET — 恢复 AI 移动能力 */
-    public static void clearCantReachTarget(EntityMaid maid) {
-        maid.getBrain().eraseMemory(MemoryModuleType.CANT_REACH_WALK_TARGET_SINCE);
     }
 }

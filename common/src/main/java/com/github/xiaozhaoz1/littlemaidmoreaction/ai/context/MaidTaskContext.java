@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.ai.context;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 
 import com.github.tartaricacid.touhoulittlemaid.ai.agent.context.AbstractMaidContext;
 import com.github.tartaricacid.touhoulittlemaid.ai.agent.context.GameContextRegister;
@@ -33,14 +34,14 @@ public final class MaidTaskContext {
 
         @Override
         public String getValue(EntityMaid maid) {
-            var data = maid.getPersistentData();
-            String task = data.getString(TaskKeys.FLOW_TASK);
+            // 门面收编
+            String task = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getTask(maid);
             if (task.isEmpty()) return "idle (no LMA task active)";
 
-            String state = data.getString(TaskKeys.FLOW_STATE);
-            int counter = data.getInt(TaskKeys.FLOW_COUNTER);
-            int max = data.getInt(TaskKeys.FLOW_MAX_COUNT);
-            String target = data.getString(TaskKeys.TASK_TARGET);
+            String state = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getState(maid);
+            int counter = (int) com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getCounter(maid);
+            int max = (int) com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getMaxCount(maid);
+            String target = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskMetaData.getTarget(maid);
 
             StringBuilder sb = new StringBuilder();
             sb.append("task=").append(task);

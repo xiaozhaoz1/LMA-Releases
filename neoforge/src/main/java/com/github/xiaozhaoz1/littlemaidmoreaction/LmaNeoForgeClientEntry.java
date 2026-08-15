@@ -1,6 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction;
 
-import com.github.xiaozhaoz1.littlemaidmoreaction.screen.LMAConfigScreen;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigScreen;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BellRingConfigMenu;
@@ -29,8 +28,10 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 public final class LmaNeoForgeClientEntry {
 
     public LmaNeoForgeClientEntry(IEventBus modBus, ModContainer modContainer) {
+        // v79.51: 打开入口收敛 ScreenRegistry "lma_config"
         modContainer.registerExtensionPoint(IConfigScreenFactory.class,
-                (modContainer1, parent) -> new LMAConfigScreen(parent));
+                (modContainer1, parent) -> com.github.xiaozhaoz1.littlemaidmoreaction.screen.ScreenRegistry
+                        .create("lma_config", parent));
         // v79.18 修复: neoforge @EventBusSubscriber(GAME) auto-scan 实测失效 (ISS 动画事件收不到 —
         // 日志: TLM "Model loading time" 出现但 LMA "注册 N 个动画到 TLM" 缺失, cachedIISSFile 恒 null)
         // → 构造器手动注册到 GAME 总线 (TLM 1.5.3 反编译实证: post 到 NeoForge.EVENT_BUS)
@@ -49,6 +50,22 @@ public final class LmaNeoForgeClientEntry {
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
                 net.neoforged.neoforge.client.event.ClientTickEvent.Post.class,
                 event -> com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmReloadListener.onClientTick());
+        // M-3: 客户端断开 → 清 MaidListResponsePacket 静态缓存 (防跨世界 stale 列表; LoggingOut 是具体类, 可监听)
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent.LoggingOut.class,
+                event -> com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidListResponsePacket.clearCache());
+        // v79.51 (KeyTrigger): 通用按键触发 — 注册全部绑定 (MOD bus, RegisterKeyMappingsEvent 是 IModBusEvent)
+        // + 检测 (GAME bus 手动 — v79.18 教训: neoforge GAME bus 静态订阅失效, 禁 @EventBusSubscriber)
+        modBus.addListener(net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent.class,
+                event -> com.github.xiaozhaoz1.littlemaidmoreaction.client.MaidKeyTriggerClient
+                        .getAllBindings().forEach(event::register));
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                net.neoforged.neoforge.client.event.InputEvent.Key.class,
+                event -> com.github.xiaozhaoz1.littlemaidmoreaction.client.MaidKeyTriggerClient.handleKeyInput());
+        // v79.50: 图鉴屏打开注入 (包字节码禁 Screen — DEDICATED_SERVER RuntimeDistCleaner 实证)
+        // v79.51: 赋值点保留 (boot 期就绪), 实现收敛 ScreenRegistry.openCodex
+        com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidCodexScreenPacket.opener =
+                com.github.xiaozhaoz1.littlemaidmoreaction.screen.ScreenRegistry::openCodex;
         // v79.20.4c: 构造期注入已删 — mod 并行构造与 YSM builtin 解压竞态 (NoSuchFileException 崩溃, 用户实测);
         // 注入时机 = YsmReloadListener.prepare (资源重载, 所有 construct 完成后 YSM 包已就绪)
     }

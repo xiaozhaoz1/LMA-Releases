@@ -47,7 +47,7 @@ public final class LmaSounds {
         reg("man");
         reg("manbaout");
         reg("whatcanisay");
-        // v79.9: 哈气音频 (ha_1..5 哈气音 / laowu_1..5 老五音 — D:\claudecode\sounds 导入)
+        // 哈气音频 (ha_1..5 哈气音 / laowu_1..5 老五音)
         reg("ha_1");
         reg("ha_2");
         reg("ha_3");

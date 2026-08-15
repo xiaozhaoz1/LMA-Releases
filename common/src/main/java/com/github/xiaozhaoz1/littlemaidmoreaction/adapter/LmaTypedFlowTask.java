@@ -32,17 +32,9 @@ public final class LmaTypedFlowTask extends LmaFlowTaskBase {
 
     LmaTypedFlowTask(String taskType) {
         this.taskType = taskType;
-        String safePath = sanitize(taskType);
+        String safePath = TaskTypeUid.sanitize(taskType);
         this.uid = ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, "task/" + safePath);
         this.icon = LmaTaskTypeRegistry.getIcon(taskType);
-    }
-
-    /** 将 task_type 转为 ResourceLocation path 合法字符 */
-    private static String sanitize(String raw) {
-        String s = raw.toLowerCase(java.util.Locale.ROOT)
-            .replaceAll("[^a-z0-9_\\-./]", "_");
-        if (s.isEmpty()) s = "unknown";
-        return s;
     }
 
     // ── IMaidTask ──
@@ -65,8 +57,16 @@ public final class LmaTypedFlowTask extends LmaFlowTaskBase {
 
     @Override
     public boolean isHidden(EntityMaid maid) {
-        // 在 TLM GUI 中可见 — 玩家能直观看到女仆当前任务类型
-        return false;
+        // 任务树 GUI "可视" 开关真实生效 (原恒 false — TaskToggle.isVisible 半成品修复);
+        // /lma task 命令 + TaskTreeScreen 切换 → task_toggles.json → TLM 任务栏显示/隐藏
+        return !com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskToggle.isVisible(taskType);
+    }
+
+    /** 固定工作点标记 — 委托当前任务管线 (TLM 骑乘调度: 工作点任务不脱离坐骑) */
+    @Override
+    public boolean workPointTask(EntityMaid maid) {
+        var h = com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.get(taskType);
+        return h != null && h.pipeline().workPointTask();
     }
 
     // 永不为 null — 工厂内部回退 TLM 默认配置容器 (TLM 契约)
@@ -77,13 +77,25 @@ public final class LmaTypedFlowTask extends LmaFlowTaskBase {
     }
 
     @Override
+    public java.util.List<com.mojang.datafixers.util.Pair<Integer, net.minecraft.world.entity.ai.behavior.BehaviorControl<? super EntityMaid>>> createBrainTasks(EntityMaid maid) {
+        // 2026-08-11c F2 (砍树管线检查): 连锁采集 (collect_wood/collect_ore) 不注册 Brain 导航 —
+        // LMA 自导航 (PathingApi 直写 WALK_TARGET) 唯一化; 原 Brain (LmaFlowCoordinationBehavior,
+        // MaidMoveToBlockTask) 在蓄力期间抢写 WALK_TARGET 拽向最近目标 (多树场景 = 别的树)
+        // → 破块落空 (distSqr>9) 恶性循环 (无斧慢砍蓄力 40t×块数最严重)
+        if ("collect_wood".equals(taskType) || "collect_ore".equals(taskType)) {
+            return new java.util.ArrayList<>();
+        }
+        return super.createBrainTasks(maid);
+    }
+
+    @Override
     public String getMaidActionSummary() {
         return "执行LMA任务：" + taskType;
     }
 
     @Override
     public MutableComponent getName() {
-        return Component.translatable("task." + LittleMaidMoreAction.MOD_ID + "." + sanitize(taskType));
+        return Component.translatable("task." + LittleMaidMoreAction.MOD_ID + "." + TaskTypeUid.sanitize(taskType));
     }
 
     // ── 辅助 ──

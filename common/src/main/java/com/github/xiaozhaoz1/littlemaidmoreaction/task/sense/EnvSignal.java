@@ -1,7 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.sense;
 
 /**
- * 环境感知信号枚举 (v63) — 边沿触发的环境事件。
+ * 环境感知信号枚举 (v63, v79.47 补 8: 3 CLEAR + 3 结构 LEAVE + 2 节日) — 边沿触发的环境事件。
  *
  * <p>广播器每 200 tick 对比 prev/now 快照，生成命中信号。
  * 被动任务 Pipeline 在 {@code validate()} 中声明需要的信号，
@@ -27,11 +27,11 @@ public enum EnvSignal {
     /** 返回常温 */
     TEMP_NORMAL,
 
-    // ── 时间/光照 (LightControlPipeline) ──
     /** 昼夜切换（天亮/天黑边界） */
-    DAY_NIGHT_CHANGE,
     /** 进入黑暗（光照 < darkness_threshold 默认7） */
     DARKNESS,
+    /** 脱离黑暗（光照恢复） */
+    DARKNESS_CLEAR,
 
     // ── 维度/时段 ──
     /** 女仆切换维度 */
@@ -39,17 +39,17 @@ public enum EnvSignal {
     /** 时间段切换（DAY/DUSK/NIGHT/DAWN） */
     TIME_SEGMENT,
 
-    // ── 实体 (MonsterLogPipeline) ──
-    /** 附近出现怪物 */
-    MONSTER_NEARBY,
-    /** 附近怪物清除 */
-    MONSTER_CLEAR,
+    // ── 实体 (HaqiPipeline 用 MAID_NEARBY; v79.58 删 monster_log — MONSTER_NEARBY/CLEAR 退役) ──
     /** 附近有友好生物 */
     FRIENDLY_NEARBY,
+    /** 附近友好生物清除 */
+    FRIENDLY_CLEAR,
     /** 附近有其他女仆 */
     MAID_NEARBY,
+    /** 附近女仆离开 */
+    MAID_CLEAR,
 
-    // ── v79.3: 生物群系/站立点结构 (200t 零成本通道) ──
+    // ── 生物群系/站立点结构 (200t 零成本通道) ──
     /** 生物群系切换 (biomeId 变化) */
     BIOME_CHANGE,
     /** 进入站立点所在结构 (getAllStructuresAt 非空) */
@@ -57,11 +57,8 @@ public enum EnvSignal {
     /** 离开站立点所在结构 */
     STRUCTURE_LEAVE,
 
-    // ── 结构 (低频边沿, 默认每MC天一次) ──
-    /** 附近发现村庄 */
-    VILLAGE_NEARBY,
-    /** 附近发现废弃矿井 */
-    MINESHAFT_NEARBY,
-    /** 附近发现掠夺者前哨站 */
-    OUTPOST_NEARBY
+
+    // ── 节日 (日历驱动, 现实日期口径, v79.47) ──
+    /** 节日状态广播 (stateless: 广播器每轮查表非空即发; 消费端 per-maid 当天首收去重) */
+    FESTIVAL_ENTER
 }

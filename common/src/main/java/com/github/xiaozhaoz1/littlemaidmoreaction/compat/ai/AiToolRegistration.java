@@ -25,7 +25,7 @@ public final class AiToolRegistration {
         register.register(new SwitchLmaTaskTool());
         register.register(new ScanBlocksTool());
         register.register(new WaitTicksTool());
-        // v77.6: Numen 感知工具 (语义网格/实体清单/世界状态/蓝图)
+        // Numen 感知工具 (语义网格/实体清单/世界状态/蓝图)
         register.register(new LookAroundTool());
         register.register(new ScanNearbyEntitiesTool());
         register.register(new GetWorldInfoTool());

@@ -25,7 +25,7 @@ public final class FakePlayerInteract {
     }
 
     /**
-     * v79.6: 带距离判定的右键交互 (UseBlockAction 组合吸收) — distSqr > range² → no-op。
+     * 带距离判定的右键交互 (UseBlockAction 组合吸收) — distSqr > range² → no-op。
      */
     public static boolean rightClick(ServerLevel world, EntityMaid maid, BlockPos pos, Direction face,
                                      double range) {
@@ -34,7 +34,7 @@ public final class FakePlayerInteract {
     }
 
     /**
-     * v79.19c: 纯块放置 (仿 maid_useful_task placeBlock 链) — 无实体交互扫描, 无事件。
+     * 纯块放置 (仿 maid_useful_task placeBlock 链) — 无实体交互扫描, 无事件。
      * 放置路径专用 (PathExecutor PLACE): 点击 pos 的 face 面, 新块落 pos.relative(face)。
      * 距离/方块存在等业务检查由调用方负责。
      *

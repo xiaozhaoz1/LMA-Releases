@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.adapter;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 
 import com.github.tartaricacid.touhoulittlemaid.api.event.MaidTaskEnableEvent;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
@@ -58,14 +59,9 @@ public final class LmaTaskGuiHandler {
             taskType, LmaTaskTypeRegistry.isSimple(taskType));
     }
 
-    /** 检查 PersistentData 中是否有有效任务数据 (AI 或上次遗留) */
+    /** 检查 PersistentData 中是否有有效任务数据 (上次遗留) — FLOW_DATA 死键已删 (v79.61 批2, 只读不写恒默认) */
     static boolean hasTaskData(EntityMaid maid) {
-        CompoundTag data = maid.getPersistentData();
-        // 1. 有活跃任务
-        String task = data.getString(TaskKeys.FLOW_TASK);
-        if (!task.isEmpty() && !"none".equals(task)) return true;
-        // 2. 有 JSON 数据 (上次 AI 设定)
-        String flowData = data.getString(TaskKeys.FLOW_DATA);
-        return flowData != null && !flowData.isEmpty() && !"{}".equals(flowData);
+        String task = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getTask(maid);
+        return !task.isEmpty() && !"none".equals(task);
     }
 }

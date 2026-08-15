@@ -32,6 +32,11 @@ public final class CompatToggle {
     private static final String FILE_NAME = "compat_toggles.json";
     private static final Set<String> DISABLED = ConcurrentHashMap.newKeySet();
 
+    // static{load()} 设计脆性说明: 类加载即读盘 (IO 在 clinit 内)。刻意保留 —
+    // load() 双 catch (IOException + Throwable) 保证任何失败降级全启用, 不毒化类
+    // (错题 #150 同族教训: 静态初始化抛 ExceptionInInitializerError 永久毒化);
+    // 纯 JVM 测试时 FML 未初始化 (FMLPaths.CONFIGDIR 不可用) → clinit 抛被 catch 吞,
+    // 降级全启用 — CompatToggleTest 全绿实证。测试钩子走 loadFrom/saveTo (纯 Path)。
     static { load(); }
 
     // ── enabled ──

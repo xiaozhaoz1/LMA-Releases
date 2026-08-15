@@ -39,11 +39,11 @@ public final class StartupLoader {
             "execution.animation.json", "dodge.animation.json",
             "taunt.animation.json", "parry.animation.json",
             "man.animation.json", "ysm_slashblade.animation.json",
-            "haqi.animation.json", // v79.18: 哈气动画 (ISS 注册 — TLM geckolib 模型播放; YSM 通道走模型包同名动画)
-            "maimeng.animation.json" // v79.20.4: 对主人哈气动画 (YsmAnimInjector 同步注入 YSM 模型包)
+            "haqi.animation.json", // 哈气动画 (ISS 注册 — TLM geckolib 模型播放; YSM 通道走模型包同名动画)
+            "maimeng.animation.json" // 对主人哈气动画 (YsmAnimInjector 同步注入 YSM 模型包)
     };
 
-    // ★ v10: SOUNDS DeferredRegister 已移至 init/LmaSounds.java
+    // ★ SOUNDS DeferredRegister 已移至 init/LmaSounds.java
 
     private static final Set<String> LOADED = new LinkedHashSet<>();
     /** ★ volatile: modloading-worker-0 写入后 Render thread 立即可见。重新赋值而非 clear+put。 */
@@ -162,7 +162,7 @@ public final class StartupLoader {
         return animFiles;
     }
 
-    /** v79.25: 动画目录 (config/littlemaidmoreaction/animations) — YSM 注入/重载监听按文件遍历读取 */
+    /** 动画目录 (config/littlemaidmoreaction/animations) — YSM 注入/重载监听按文件遍历读取 */
     public static Path getAnimDir() {
         return ANIM_DIR;
     }

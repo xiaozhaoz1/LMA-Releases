@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.adapter;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 
 import com.github.tartaricacid.touhoulittlemaid.api.event.MaidTaskEnableEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -50,28 +51,35 @@ public final class TlmEventAdapter {
         if (maid.level().isClientSide()) return;
 
         var data = maid.getPersistentData();
-        String task = data.getString(TaskKeys.FLOW_TASK);
+        // 门面收编 (remove 段保留 — 键常量已有)
+        String task = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getTask(maid);
         if (task.isEmpty()) return;
 
         long now = maid.level().getGameTime();
-        long savedTick = data.getLong(TaskKeys.FLOW_TICK);
+        long savedTick = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getTick(maid);
 
         // 区分场景: 魂符重放置 / 区块加载 (状态完整) vs 跨 session 重启 (tick 失效需清理重提交)
         if (savedTick > 0 && savedTick <= now) {
             LittleMaidMoreAction.LOGGER.info("[LMA/Restore] 魂符恢复任务 '{}' (state={})", task,
                 data.getString(TaskKeys.FLOW_STATE));
+            // v79.53: 魂符/区块卸载期间心跳停 → FLOW_TICK 陈旧 → 恢复首 tick 看门狗
+            // 立即超时 (日志实证 collect_ore 5270t > 1200t, 任务重置丢 KEY_QUEUE/跳过集) →
+            // 清 tick 让心跳重起 (状态保留不重置; 跨 session 分支 L68 已有同款清理)
+            data.remove(TaskKeys.FLOW_TICK);
         } else {
             LittleMaidMoreAction.LOGGER.info("[LMA/Restore] 跨session恢复任务 '{}'", task);
             data.remove(TaskKeys.FLOW_STATE);
             data.remove(TaskKeys.FLOW_TICK);
-            data.remove(TaskKeys.FLOW_STEP);
-            data.remove(TaskKeys.FLOW_TIMEOUT);
             data.remove(TaskKeys.TLM_SWITCH);
             data.remove(TaskKeys.GUI_INIT);
+            // ANIM 运行时键全清 — 跨 session 重启后客户端 lastAnimSeq=0,
+            // 残留 SEQ 会被 provider 视为新请求重播旧动画。
+            for (String key : TaskKeys.ANIM_RUNTIME_KEYS) {
+                data.remove(key);
+            }
         }
 
-        // 恢复 TLM 任务 + 清理链采瞬态
-        LmaFlowTask.restorePreviousTask(maid);
+        // 恢复 TLM 任务 + 清理链采瞬态 (PREV_TASK 链路已删 v79.54 — 写方全死恒 idle, 由下方 findTask 覆盖)
         var tlmTask = com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager
             .findTask(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, "task/" + task))
             .or(() -> com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager

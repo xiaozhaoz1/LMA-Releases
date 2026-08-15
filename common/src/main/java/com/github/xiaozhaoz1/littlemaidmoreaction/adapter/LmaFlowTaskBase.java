@@ -14,7 +14,8 @@ import java.util.List;
  * <p>共享约定:
  * <ul>
  *   <li>createBrainTasks() — 挂 LMA 协调行为 (可变列表, TLM MaidBrain 对返回值做 .add())</li>
- *   <li>enableLookAndRandomWalk() = true — 禁用随机闲逛, 防止覆盖 LMA 设置的 WALK_TARGET</li>
+ *   <li>enableLookAndRandomWalk() = false — 禁用随机闲逛 (v79.44: TLM javadoc 写反,
+ *       以 MaidBrain 谓词调用方语义为准 — true=启用), 防止覆盖 LMA 设置的 WALK_TARGET</li>
  *   <li>enablePanic() = false — 任务期间不慌乱 (战斗由 LMA 处理)</li>
  *   <li>isEnable() = true — 始终可用</li>
  *   <li>onFunctionCallSwitch() = OK — AI 调用切换放行</li>
@@ -35,8 +36,11 @@ public abstract class LmaFlowTaskBase implements IMaidTask {
 
     @Override
     public boolean enableLookAndRandomWalk(EntityMaid maid) {
-        // true=禁用随机闲逛 — 防止覆盖 LMA 设置的 WALK_TARGET
-        return true;
+        // false=禁用随机闲逛 — 防止覆盖 LMA 设置的 WALK_TARGET。
+        // 语义反转修复 — TLM IMaidTask javadoc "@return 是否禁用" 写反,
+        // MaidBrain:145/194 谓词 + MaidRunOne.tryStart 实证: true=启用, false=禁用
+        // (反例: TLM TaskGunAttack / LMA MaidAssemblyTask 均 return false)
+        return false;
     }
 
     @Override

@@ -21,6 +21,21 @@ public final class TaskToggle {
     private static final Path TOGGLE_FILE = LittleMaidMoreAction.CONFIG_DIR.resolve("task_toggles.json");
     private static final Set<String> DISABLED = ConcurrentHashMap.newKeySet();
     private static final Set<String> HIDDEN = ConcurrentHashMap.newKeySet();
+    /** 手写 JSON → Gson (原 indexOf+split 无转义, 含 ,/" 即解析错乱) */
+    private static final com.google.gson.Gson GSON = new com.google.gson.Gson();
+
+    /** Gson 写回 (原 StringBuilder 手拼) */
+    private static void save() {
+        com.google.gson.JsonObject root = new com.google.gson.JsonObject();
+        com.google.gson.JsonArray d = new com.google.gson.JsonArray();
+        DISABLED.forEach(d::add);
+        com.google.gson.JsonArray h = new com.google.gson.JsonArray();
+        HIDDEN.forEach(h::add);
+        root.add("disabled", d);
+        root.add("hidden", h);
+        try { Files.writeString(TOGGLE_FILE, GSON.toJson(root)); }
+        catch (IOException e) { LittleMaidMoreAction.LOGGER.warn("[TaskToggle] save failed", e); }
+    }
 
     static { load(); }
 
@@ -30,50 +45,37 @@ public final class TaskToggle {
         if (v) DISABLED.remove(taskType); else DISABLED.add(taskType); save();
     }
     public static boolean isEnabledFor(EntityMaid maid, String taskType) {
-        return isEnabled(taskType) && !maid.getPersistentData().getBoolean(TaskKeys.TASK_ENABLED_PREFIX + taskType);
+        // per-maid 禁用键无写入方 (死功能) — 简化为全局开关
+        return isEnabled(taskType);
     }
 
-    // ── showInBar (v35.4) ──
+    // ── showInBar ──
     public static boolean isVisible(String taskType) { return !HIDDEN.contains(taskType); }
     public static void setVisible(String taskType, boolean v) {
         if (v) HIDDEN.remove(taskType); else HIDDEN.add(taskType); save();
     }
 
-    public static Set<String> disabledTypes() { return Collections.unmodifiableSet(DISABLED); }
-    public static Set<String> hiddenTypes() { return Collections.unmodifiableSet(HIDDEN); }
-
-    // ── JSON ──
     private static void load() {
         if (!Files.exists(TOGGLE_FILE)) return;
         try {
-            String json = Files.readString(TOGGLE_FILE);
-            loadArray(json, "disabled", DISABLED);
-            loadArray(json, "hidden", HIDDEN);
-        } catch (IOException e) {
+            com.google.gson.JsonObject root = GSON.fromJson(Files.readString(TOGGLE_FILE), com.google.gson.JsonObject.class);
+            if (root != null) {
+                DISABLED.clear(); HIDDEN.clear();
+                com.google.gson.JsonArray d = root.getAsJsonArray("disabled");
+                if (d != null) for (com.google.gson.JsonElement e : d) {
+                    // 逐条容错 (审计 B2): 单个坏条目跳过, 不整表作废
+                    try { DISABLED.add(e.getAsString()); }
+                    catch (Exception ex) { LittleMaidMoreAction.LOGGER.warn("[TaskToggle] skip bad disabled entry", ex); }
+                }
+                com.google.gson.JsonArray h = root.getAsJsonArray("hidden");
+                if (h != null) for (com.google.gson.JsonElement e : h) {
+                    try { HIDDEN.add(e.getAsString()); }
+                    catch (Exception ex) { LittleMaidMoreAction.LOGGER.warn("[TaskToggle] skip bad hidden entry", ex); }
+                }
+            }
+        } catch (Exception e) {
             LittleMaidMoreAction.LOGGER.warn("[TaskToggle] load failed", e);
         }
-    }
-    private static void loadArray(String json, String key, Set<String> target) {
-        int i = json.indexOf("\"" + key + "\"");
-        if (i < 0) return;
-        int s = json.indexOf('[', i), e = json.indexOf(']', s);
-        if (s < 0 || e < 0) return;
-        for (String t : json.substring(s + 1, e).split(",")) {
-            String v = t.trim().replace("\"", "");
-            if (!v.isEmpty()) target.add(v);
-        }
-    }
-    private static void save() {
-        StringBuilder sb = new StringBuilder("{");
-        sb.append("\"disabled\":["); writeArr(sb, DISABLED); sb.append("],");
-        sb.append("\"hidden\":["); writeArr(sb, HIDDEN); sb.append("]");
-        sb.append("}");
-        try { Files.writeString(TOGGLE_FILE, sb.toString()); }
-        catch (IOException e) { LittleMaidMoreAction.LOGGER.warn("[TaskToggle] save failed", e); }
-    }
-    private static void writeArr(StringBuilder sb, Set<String> set) {
-        var it = set.iterator();
-        while (it.hasNext()) { sb.append('"').append(it.next()).append('"'); if (it.hasNext()) sb.append(','); }
     }
 
     private TaskToggle() {}

@@ -19,7 +19,7 @@ import net.minecraft.world.entity.Entity;
  * entity.interact (LmaPlayerSimulator:111 同款实体交互路径)。
  * 权限: AI 操控任务开启。
  */
-public final class InteractEntityTool implements ITool<InteractEntityTool.Result> {
+public final class InteractEntityTool implements GatedMaidTool<InteractEntityTool.Result> {
 
     private static final String ENTITY_ID = "entity_id";
     private static final Codec<Result> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -59,12 +59,6 @@ public final class InteractEntityTool implements ITool<InteractEntityTool.Result
         } finally {
             LmaPlayerSimulator.cleanup(fp, level);   // 样板一致性: syncHand → cleanup (FakePlayerInteract 同款)
         }
-    }
-
-    @Override
-    public boolean trigger(EntityMaid maid,
-                           com.github.tartaricacid.touhoulittlemaid.ai.service.llm.openai.request.ChatCompletion chatCompletion) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AiControlGate.isEnabled(maid);
     }
 
     public record Result(int entityId) {}

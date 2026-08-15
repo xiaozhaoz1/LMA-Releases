@@ -35,10 +35,9 @@ public final class EntityCleanupListener {
 
     @SubscribeEvent
     public static void onEntityLeave(EntityLeaveLevelEvent event) {
+        // 统一卸载清理注册表 (含 PL 内存态 flush + 13 静态缓存 + 2 泄漏修复)
         if (event.getEntity() instanceof EntityMaid maid) {
-            ChainHarvestExecute.clearMaidState(maid);
-            PathingApi.clearNav(maid);
-            GameTickPipelineManager.clearMaidCaches(maid);
+            MaidUnloadRegistry.runAll(maid);
         }
     }
 }

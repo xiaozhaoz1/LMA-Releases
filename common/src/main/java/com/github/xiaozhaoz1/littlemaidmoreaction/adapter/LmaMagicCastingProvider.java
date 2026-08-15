@@ -1,4 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.adapter;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.DataKey;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ItemStackHelper;
 
@@ -63,32 +65,32 @@ public final class LmaMagicCastingProvider implements IMagicCastingAnimationProv
         var data = maid.asEntity().getPersistentData();
         // ★ 仅首次渲染此女仆时记录 — 确认 TLM 调用了 Provider
         if (seenMaids.add(maidId)) {
-            LittleMaidMoreAction.LOGGER.info("[LMA/Provider] FIRST CALL maid={} mode=[{}]", maidId, data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_MODE));
+            LittleMaidMoreAction.LOGGER.info("[LMA/Provider] FIRST CALL maid={} mode=[{}]", maidId, MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_MODE));
         }
-        String mode = data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_MODE);
+        String mode = MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_MODE);
         if (mode.isEmpty()) {
             if (maidStates.containsKey(maidId)) {
                 maidStates.remove(maidId);
             }
             return null;
         }
-        // v79.26 卡顿修复: TLM 每帧调 getMagicCastingState — INFO 日志 = 每帧刷屏日志风暴 (用户实测 419 行/5 秒)
-        LittleMaidMoreAction.LOGGER.debug("[LMA/Provider] getState CALLED maid={} mode={} seq={}", maidId, mode, data.getInt(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_SEQ));
+        // 卡顿修复: TLM 每帧调 getMagicCastingState — INFO 日志 = 每帧刷屏日志风暴 (用户实测 419 行/5 秒)
+        LittleMaidMoreAction.LOGGER.debug("[LMA/Provider] getState CALLED maid={} mode={} seq={}", maidId, mode, MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_SEQ));
 
         MaidAnimState ms = maidStates.computeIfAbsent(maidId, k -> new MaidAnimState());
 
         if ("INSTANT".equals(mode)) {
-            String anim = data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_NAME);
+            String anim = MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_NAME);
             if (anim.isEmpty()) return null;
 
             // ★ 序列号检测 — 避免动画死循环
             // 服务器每次写新的动画请求时递增 lmma_anim_seq
             // Provider 只在序列号变化时返回 INSTANT（仅1帧）
-            int seq = data.getInt(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_SEQ);
+            int seq = MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_SEQ);
             if (seq == ms.lastAnimSeq) {
                 // 已处理过此请求。getAnimationBuilder 已在上一帧调用，
                 // 动画已提交到 TLM 控制器，此时可以安全清理 PersistentData。
-                // 不清理则动画 PersistentData 残留 (v72 Phase 5: 原 RuleEngine 动画护卫已删, 仍按惯例清理)。
+                // 不清理则动画 PersistentData 残留 (原 RuleEngine 动画护卫已删, 仍按惯例清理)。
                 cleanup(maid);
                 maidStates.remove(maidId);
                 return null;
@@ -105,7 +107,7 @@ public final class LmaMagicCastingProvider implements IMagicCastingAnimationProv
             // ★ 序列号检测 — 同 INSTANT，防止 FULL 完成后重播
             //    FULL 的 cleanup() 在客户端执行，PersistentData 中 mode 仍为 "FULL"
             //    不用 seq 则每帧重入 START 阶段
-            int seq = data.getInt(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_SEQ);
+            int seq = MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_SEQ);
             if (seq == ms.lastAnimSeq) {
                 // 已处理过或已完成 — 不重新启动
                 if (ms.fullPhase == CastingPhase.NONE) return null;
@@ -118,7 +120,7 @@ public final class LmaMagicCastingProvider implements IMagicCastingAnimationProv
 
             // 初始化：从 PersistentData 读取 phase + 时长
             if (ms.fullPhase == CastingPhase.NONE) {
-                String dataPhase = data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_PHASE);
+                String dataPhase = MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_PHASE);
                 ms.fullPhase = parsePhase(dataPhase);
                 ms.phaseDuration = readPhaseDuration(data, ms.fullPhase);  // 读用户配置的时长
                 ms.phaseTicks = 0;
@@ -140,7 +142,7 @@ public final class LmaMagicCastingProvider implements IMagicCastingAnimationProv
             }
 
             // 锁定移动
-            if (data.getBoolean(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.LOCK_MOVE)) {
+            if (MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.LOCK_MOVE)) {
                 maid.asEntity().getNavigation().stop();
             }
 
@@ -165,22 +167,22 @@ public final class LmaMagicCastingProvider implements IMagicCastingAnimationProv
     @Override
     public AnimationBuilder getAnimationBuilder(IMaid maid, IMagicCastingState s) {
         int maidId = maid.asEntity().getId();
-        // v79.26 卡顿修复: 同 getState — 每帧调用, DEBUG 级
+        // 卡顿修复: 同 getState — 每帧调用, DEBUG 级
         LittleMaidMoreAction.LOGGER.debug("[LMA/Provider] getAnimationBuilder CALLED maid={} phase={}", maidId, s != null ? s.getCurrentPhase() : "null");
         var data = maid.asEntity().getPersistentData();
-        String mode = data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_MODE);
+        String mode = MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_MODE);
         String animName;
 
         if ("INSTANT".equals(mode)) {
-            animName = data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_NAME);
+            animName = MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_NAME);
         } else if ("FULL".equals(mode)) {
             MaidAnimState ms = maidStates.get(maidId);
             if (ms == null) return null;
             // 根据当前阶段选动画名
             animName = switch (ms.fullPhase) {
-                case START -> data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_START);
-                case CASTING -> data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_CASTING);
-                case END -> data.getString(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.ANIM_END);
+                case START -> MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_START);
+                case CASTING -> MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_CASTING);
+                case END -> MaidData.get((com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid) maid.asEntity(), DataKey.ANIM_END);
                 default -> "";
             };
         } else {
@@ -190,7 +192,7 @@ public final class LmaMagicCastingProvider implements IMagicCastingAnimationProv
         if (animName.isEmpty()) return null;
 
         // TLM wiki: CASTING → LOOP, 其余阶段 → PLAY_ONCE
-        // ⚠ INSTANT 不能用 LOOP — INSTANT→NONE 是"播完为止", LOOP 永播不完 = 停不了 (v79.18 实测, 哈气已改 FULL)
+        // ⚠ INSTANT 不能用 LOOP — INSTANT→NONE 是"播完为止", LOOP 永播不完 = 停不了 (实测, 哈气已改 FULL)
         EDefaultLoopTypes loopType = EDefaultLoopTypes.PLAY_ONCE;
         if ("FULL".equals(mode)) {
             MaidAnimState ms = maidStates.get(maidId);
@@ -209,7 +211,7 @@ public final class LmaMagicCastingProvider implements IMagicCastingAnimationProv
     /** 清理 PersistentData 中的动画请求 */
     private static void cleanup(IMaid maid) {
         var data = maid.asEntity().getPersistentData();
-        // v75.4: 单一来源 = TaskKeys.ANIM_CLEANUP_KEYS (ANIM_RUNTIME_KEYS 去 ANIM_SEQ)
+        // 单一来源 = TaskKeys.ANIM_CLEANUP_KEYS (ANIM_RUNTIME_KEYS 去 ANIM_SEQ)
         for (String key : TaskKeys.ANIM_CLEANUP_KEYS) {
             data.remove(key);
         }

@@ -43,7 +43,7 @@ public final class YsmOutput {
     // ── IO 方法 ──
 
     /**
-     * 播放 YSM 轮盘动画 (v79.18 实战校准 — 哈气动画实证).
+     * 播放 YSM 轮盘动画 (实战校准 — 哈气动画实证).
      *
      * <p><b>播放前提 (三件套缺一不播, OpenYSM 2.6.6 反编译 + 用户实测)</b>:
      * ① 模型包 {@code animations/extra.animation.json} 含同名动画定义 (YsmAnimInjector 注入)
@@ -56,14 +56,14 @@ public final class YsmOutput {
     }
 
     /**
-     * 停止轮盘动画 (仅 YSM 模型时) — v79.18 哈气 onCleanup 实证停止路径:
+     * 停止轮盘动画 (仅 YSM 模型时) — 哈气 onCleanup 实证停止路径:
      * cancelPassive → onCleanup → 本方法 + 清 lma_anim_mode (FULL 循环强制停)。
      */
     public static void stopRoulette(EntityMaid maid) {
         if (maid.isYsmModel()) maid.stopRouletteAnim();
     }
 
-    // ⚠️ 以下 4 个原语未校对 (v73 YsmWriter 迁移遗留, 当前无调用方, 待实际场景验证后再启用)
+    // ⚠️ 以下 4 个原语未校对 (YsmWriter 迁移遗留, 当前无调用方, 待实际场景验证后再启用)
 
     /** ⚠️ 未校对: 禁用 YSM 模型 (恢复默认模型) */
     public static void disableModel(EntityMaid maid) {

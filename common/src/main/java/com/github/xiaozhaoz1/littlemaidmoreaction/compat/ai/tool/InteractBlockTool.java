@@ -17,7 +17,7 @@ import net.minecraft.server.level.ServerLevel;
  * AI 工具: 右键交互方块 (v73) — 委托 FakePlayerInteract.rightClick (完整右键管线:
  * 事件后门 + useOn + 掉落入背包)。权限: AI 操控任务开启。
  */
-public final class InteractBlockTool implements ITool<InteractBlockTool.Result> {
+public final class InteractBlockTool implements GatedMaidTool<InteractBlockTool.Result> {
 
     private static final String X = "x", Y = "y", Z = "z";
     private static final Codec<Result> CODEC = RecordCodecBuilder.create(i -> i.group(
@@ -48,16 +48,11 @@ public final class InteractBlockTool implements ITool<InteractBlockTool.Result> 
             return callback.addToolResult("Failed: not on server", toolCallId);
         }
         BlockPos pos = new BlockPos(result.x(), result.y(), result.z());
-        boolean ok = FakePlayerInteract.rightClick(level, maid, pos, Direction.UP);
+        // 统一走全局右键门面 (获得距离检查, 与 BlockInteractPipeline 一致)
+        boolean ok = com.github.xiaozhaoz1.littlemaidmoreaction.task.service.BlockInteractService.interact(level, maid, pos);
         return callback.addToolResult(ok
                 ? "Interacted with block at (%d, %d, %d)".formatted(result.x(), result.y(), result.z())
                 : "Interact failed at (%d, %d, %d)".formatted(result.x(), result.y(), result.z()), toolCallId);
-    }
-
-    @Override
-    public boolean trigger(EntityMaid maid,
-                           com.github.tartaricacid.touhoulittlemaid.ai.service.llm.openai.request.ChatCompletion chatCompletion) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AiControlGate.isEnabled(maid);
     }
 
     public record Result(int x, int y, int z) {}

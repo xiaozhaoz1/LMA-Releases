@@ -32,6 +32,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Locale;
+import java.util.Set;
 import java.util.function.Supplier;
 
 /**
@@ -54,7 +55,14 @@ public final class AnimFileSyncPacket implements CustomPacketPayload {
     private static final String SUFFIX = ".animation.json";
     /** 单文件大小上限 (512KB) — 防滥用 */
     public static final int MAX_BYTES = 512 * 1024;
-    /** v79.26.2 防抖窗口 (毫秒) — 动画文件包全到齐后再统一 reload */
+    /** 文件名长度上限 — 防超长名写盘失败 */
+    private static final int MAX_NAME_LEN = 64;
+    /** Windows 保留设备名 (含 COM1-9/LPT1-9, 大小写不敏感) — 恶意服务器推此类文件名会写盘失败/命中设备 */
+    private static final Set<String> RESERVED_DEVICE_NAMES = Set.of(
+            "CON", "PRN", "AUX", "NUL",
+            "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+            "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9");
+    /** 防抖窗口 (毫秒) — 动画文件包全到齐后再统一 reload */
     private static final long FLUSH_DELAY_MS = 2000L;
     /** 最近一次落盘时间戳 (0 = 无 pending) — 防抖合并 7 次全量 reload → 1 次 */
     private static long pendingWriteMs = 0L;
@@ -89,9 +97,8 @@ public final class AnimFileSyncPacket implements CustomPacketPayload {
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }
 
-    public static final StreamCodec<ByteBuf, AnimFileSyncPacket> STREAM_CODEC = StreamCodec.of(
-        (ByteBuf buf, AnimFileSyncPacket msg) -> encode(msg, (FriendlyByteBuf) buf),
-        (ByteBuf buf) -> decode((FriendlyByteBuf) buf));
+    public static final StreamCodec<ByteBuf, AnimFileSyncPacket> STREAM_CODEC =
+        PacketCodecs.wrap(AnimFileSyncPacket::encode, AnimFileSyncPacket::decode);
 
     public static void handlePayload(AnimFileSyncPacket msg, IPayloadContext ctx) {
         // 纯 S2C — 拒绝客户端→服务器伪造包
@@ -135,7 +142,7 @@ public final class AnimFileSyncPacket implements CustomPacketPayload {
             LittleMaidMoreAction.LOGGER.error("[LMA/AnimSync] 写入动画文件失败: {}", msg.fileName, e);
             return;
         }
-        // v79.26.2 卡顿修复: 只落盘不立即 reload — 服务端 pushAllTo 一次连发 7 包, 旧实现每包
+        // 卡顿修复: 只落盘不立即 reload — 服务端 pushAllTo 一次连发 7 包, 旧实现每包
         // 全量 reload 链 (StartupLoader + DynamicAnimationResources + remergeAll + YsmInject 528 次
         // 磁盘 IO) 在渲染线程阻塞 ~5.5 秒/包 × 7 = 40 秒 (加载世界卡很久日志实证)。
         // 现: 防抖 2 秒无新包 → flushPending 统一 reload 一次 (由 YsmReloadListener.onClientTick 驱动)。
@@ -144,7 +151,7 @@ public final class AnimFileSyncPacket implements CustomPacketPayload {
     }
 
     /**
-     * v79.26.2: 防抖刷新 — 客户端每 tick 调用 (YsmReloadListener.onClientTick 挂载)。
+     * 防抖刷新 — 客户端每 tick 调用 (YsmReloadListener.onClientTick 挂载)。
      * 落盘后 2 秒无新包 = 全批已到 → 执行一次完整 reload 链 (7 次全量重载 → 1 次)。
      */
     public static void flushPending() {
@@ -161,18 +168,23 @@ public final class AnimFileSyncPacket implements CustomPacketPayload {
             resources.reload();
         }
         AnimationResourceRegistrar.remergeAll();
-        // v79.18: 玩家加入时 YSM 模型包文件必已生成 (构造期存在竞态) → 在此重试 YSM 动画注入 (幂等;
-        // v79.26.2 指纹快检: 源未变零 IO)
+        // 玩家加入时 YSM 模型包文件必已生成 (构造期存在竞态) → 在此重试 YSM 动画注入 (幂等;
+        // 指纹快检: 源未变零 IO)
         com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmAnimInjector.injectHaqiIfNeeded();
         LittleMaidMoreAction.LOGGER.info("[LMA/AnimSync] 动画批量注册完成");
     }
 
     /**
-     * 文件名校验: 白名单后缀 + 禁路径分隔符/.. /冒号 (防路径遍历)。
+     * 文件名校验: 白名单后缀 + 禁路径分隔符/.. /冒号 (防路径遍历) +
+     * 长度上限 + Windows 保留设备名 (防写盘失败/命中设备)。
      */
     static boolean isValidFileName(String name) {
-        if (name == null || !name.toLowerCase(Locale.ROOT).endsWith(SUFFIX)) return false;
-        return !name.contains("\\") && !name.contains("/") && !name.contains("..") && !name.contains(":");
+        if (name == null || name.length() > MAX_NAME_LEN) return false;
+        if (!name.toLowerCase(Locale.ROOT).endsWith(SUFFIX)) return false;
+        if (name.contains("\\") || name.contains("/") || name.contains("..") || name.contains(":")) return false;
+        int dot = name.indexOf('.');
+        String base = dot > 0 ? name.substring(0, dot) : name;
+        return !RESERVED_DEVICE_NAMES.contains(base.toUpperCase(Locale.ROOT));
     }
 
     // ======================== 发送侧 (服务器) ========================

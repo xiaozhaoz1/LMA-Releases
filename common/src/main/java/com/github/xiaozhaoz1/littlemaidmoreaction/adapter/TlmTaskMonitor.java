@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.adapter;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 
 import com.github.tartaricacid.touhoulittlemaid.api.event.MaidTickEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -48,14 +49,14 @@ public final class TlmTaskMonitor {
         ResourceLocation lastTask = LAST_TASK.put(maid.getId(), currentTask);
 
         if (lastTask != null && !lastTask.equals(currentTask)) {
-            // v49: 写 NBT 标记 → TaskTickHandler 轮询 → TaskDispatcher.cancel()
-            maid.getPersistentData().putString(TaskKeys.TLM_SWITCH, currentTask.toString());
+            // 写 NBT 标记 → 轮询消费 (门面收编)
+            com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskMetaData.setTlmSwitch(maid, currentTask.toString());
             LittleMaidMoreAction.LOGGER.debug("[LMA/TaskMonitor] switch detected {} → {}",
                 lastTask, currentTask);
         }
     }
 
-    /** v64: HashMap key 闭环 — 女仆离开世界时清理 */
+    /** HashMap key 闭环 — 女仆离开世界时清理 */
     public static void onMaidLeave(int entityId) {
         LAST_TASK.remove(entityId);
     }

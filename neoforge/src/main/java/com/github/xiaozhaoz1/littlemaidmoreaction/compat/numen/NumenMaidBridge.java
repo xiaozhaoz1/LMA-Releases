@@ -59,8 +59,8 @@ public final class NumenMaidBridge {
 
     /** 石板 NBT LMA 键: companion UUID (交接识别) */
     public static final String SLAB_COMPANION_KEY = "lma_companion";
-    /** 女仆 PD 键: 固定 companion UUID (v75.2 — YSM 按 UUID 分配模型, UUID 恒定则一次设置永久) */
-    private static final String PD_COMPANION_UUID = "lma_companion_uuid";
+    /** 女仆 PD 键: 固定 companion UUID (v75.2 — YSM 按 UUID 分配模型, UUID 恒定则一次设置永久; v79.55 收编 TaskKeys) */
+    private static final String PD_COMPANION_UUID = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.COMPANION_UUID;
     /** maidId → {provider, voice} (v75.3: SHELVED 广播用 — 女仆收石板后读不到 TaskConfigs) */
     private static final Map<UUID, String[]> MAID_AI_CFG = new ConcurrentHashMap<>();
     /** 随机台词表 (v75.3: TLM kaomoji.json core 子集 — 与女仆同款颜文字) */
@@ -182,7 +182,7 @@ public final class NumenMaidBridge {
         }
         if (DELETED.contains(maidId)) {
             DELETED.remove(maidId);
-        MAID_AI_CFG.remove(maidId);   // v75.3: 清理记录 (transform 重开会重新 put)
+            MAID_AI_CFG.remove(maidId);   // v75.3: 清理记录 (transform 重开会重新 put)
         }
         start(maid, level);
     }

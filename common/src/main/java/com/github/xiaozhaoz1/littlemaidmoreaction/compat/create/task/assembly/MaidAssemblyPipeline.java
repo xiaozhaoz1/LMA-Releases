@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.assembly;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ItemStackHelper;
 
@@ -6,7 +7,6 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.simibubi.create.content.kinetics.deployer.DeployerApplicationRecipe;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.TaskResult;
-import com.github.xiaozhaoz1.littlemaidmoreaction.api.io.IExecutor;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
@@ -34,14 +34,13 @@ import java.util.Set;
  * <p>材料来源 (三级): 背包 → 附近容器 → 隙间
  * <p>产物分发 (三级): 槽位 → 背包 → 隙间 → 地上
  */
-public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPipeline.State> {
+public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPipeline.State> implements TaskConfigurable {
 
     enum State { IDLE, TRY_START, ADVANCE, STRIKE, EAT_RESET }
 
     @Override protected Class<State> stateClass() { return State.class; }
     @Override protected State initialState() { return State.IDLE; }
     @Override public String taskType() { return "maid_assembly"; }
-    @Override public boolean needsGameTick() { return true; }
     @Override public boolean enableWorkEat() { return true; }
 
     @Override
@@ -71,7 +70,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
             || (!mat.isEmpty() && ItemStackHelper.isSameItem(st, mat));
     }
 
-    /** v75.1: create 运行时门控双平台 */
+    /** create 运行时门控双平台 */
     private static boolean isCreateLoaded() {
 //? if 1.20.1 {
         return net.minecraftforge.fml.ModList.get().isLoaded("create");
@@ -90,11 +89,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
         return PipelineResult.ok("");
     }
 
-    @Override
-    public IExecutor executor() {
-        // v75.4: 样板壳 → IExecutor.ticker (语义不变)
-        return IExecutor.ticker(this::tick);
-    }
+    // executor/execute 删除 (v79.45) — 执行全归 GMPM tick 驱动
 
     // ── 状态业务逻辑 ──
 
@@ -255,7 +250,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
         return false;
     }
 
-    /** v75.1: 可食判断双平台 (1.21 无 ItemStack.isEdible) */
+    /** 可食判断双平台 (1.21 无 ItemStack.isEdible) */
     private static boolean itemIsFood(ItemStack stack) {
 //? if 1.20.1 {
         return stack.getItem().isEdible();
@@ -264,7 +259,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
 //?}
     }
 
-    /** v75.1: 物品相同判断双平台 (1.21: isSameItemSameTags→isSameItemSameComponents) */
+    /** 物品相同判断双平台 (1.21: isSameItemSameTags→isSameItemSameComponents) */
     private ItemStack getCurrentInput(MaidAssemblyInventory inv) {
         ItemStack inter = inv.getStackInSlot(MaidAssemblyInventory.INTERMEDIATE_SLOT);
         if (!inter.isEmpty()) return inter;

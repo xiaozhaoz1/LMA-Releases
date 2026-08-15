@@ -12,6 +12,8 @@ public final class PassiveRotation {
 
     /** 环形轮转起点 (size ≥ 1 由调用方保证) */
     public static int startIndex(long now, int maidId, int size) {
-        return Math.floorMod(now + maidId, size);
+        // (int) cast 必需: Math.floorMod(long,int) 返回 long — 缺 cast 是编译错误
+        // (javac 实证 long→int 不可隐式收窄; 值域 floorMod ∈ [0,size), int 无损)
+        return (int) Math.floorMod(now + maidId, size);
     }
 }

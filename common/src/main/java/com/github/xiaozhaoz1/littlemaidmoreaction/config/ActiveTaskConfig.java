@@ -24,8 +24,8 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec ACTIVE_SPEC;
 //?}
 
-    // ── 连锁采集 (v36) ──
-    // v36.2: 破坏间隔改为按挖掘等级查表 (ToolJudge.harvestIntervalTicks)，不再配置
+    // ── 连锁采集 ──
+    // 破坏间隔改为按挖掘等级查表 (ToolJudge.harvestIntervalTicks)，不再配置
 //? if 1.20.1 {
     public static final ForgeConfigSpec.IntValue CHAIN_MAX_BLOCKS;
 //?} else {
@@ -36,7 +36,7 @@ public final class ActiveTaskConfig {
 //?} else {
     public static final ModConfigSpec.BooleanValue CHAIN_WOOD_NATURE_CHECK;
 //?}
-    // v67.4: 硬编码常量 → 配置
+    // 硬编码常量 → 配置
 //? if 1.20.1 {
     public static final ForgeConfigSpec.IntValue CHAIN_SCAN_INTERVAL;
 //?} else {
@@ -47,9 +47,9 @@ public final class ActiveTaskConfig {
 //?} else {
     public static final ModConfigSpec.IntValue CHAIN_MAX_DISTANCE;
 //?}
-    // v79.26.6: 挖矿兜底行为参数配置化 — 垂直挖穿/导航看门狗
+    // 挖矿兜底行为参数配置化 — 垂直挖穿/导航看门狗
     // (原 ChainHarvestExecute 行内魔法数 + 类内常量);
-    // v79.26.8e: 垫柱触发 (CHAIN_PILLAR_TRIGGER)/面前挖穿 (CHAIN_FRONT_DIG_DIST) 退役 —
+    // 垫柱触发 (CHAIN_PILLAR_TRIGGER)/面前挖穿 (CHAIN_FRONT_DIG_DIST) 退役 —
     // 垫柱链删 (用户裁定), 面前挖穿删, 桥/阶梯由 BridgeCoordinator 固定逻辑无配置
 //? if 1.20.1 {
     public static final ForgeConfigSpec.IntValue CHAIN_DIG_DOWN_DEPTH;
@@ -61,15 +61,9 @@ public final class ActiveTaskConfig {
 //?} else {
     public static final ModConfigSpec.IntValue CHAIN_NAV_TIMEOUT;
 //?}
-    // v79.26.8d: 卡方块自救 (maid_useful_task MaidSelfRescueBehavior 移植)
-//? if 1.20.1 {
-    public static final ForgeConfigSpec.BooleanValue CHAIN_SELF_RESCUE;
-//?} else {
-    public static final ModConfigSpec.BooleanValue CHAIN_SELF_RESCUE;
-//?}
-    // v79.26.7: CHAIN_SKIP_TTL 退役 — 跳过集刷新分档死值 (TLM 60t / 激进 1s, 用户裁定), 见 ChainHarvestExecute
+    // CHAIN_SKIP_TTL 退役 — 跳过集刷新分档死值 (TLM 60t / 激进 1s, 用户裁定), 见 ChainHarvestExecute
 
-    // ── 右键交互 (v67.2) ──
+    // ── 右键交互 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.ConfigValue<String> BI_MARK_ITEM;
 //?} else {
@@ -81,9 +75,27 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.ConfigValue<String> BI_BIND_ITEM;
 //?}
 //? if 1.20.1 {
+    // ── 女仆好感度双乘区 (MaidFavorability — 效率/消耗, 管线自己乘) ──
+    public static final ForgeConfigSpec.BooleanValue MAID_FAVORABILITY_ENABLED;
+    public static final ForgeConfigSpec.DoubleValue FAVOR_SPEED_L1;
+    public static final ForgeConfigSpec.DoubleValue FAVOR_SPEED_L2;
+    public static final ForgeConfigSpec.DoubleValue FAVOR_SPEED_L3;
+    public static final ForgeConfigSpec.DoubleValue FAVOR_COST_L1;
+    public static final ForgeConfigSpec.DoubleValue FAVOR_COST_L2;
+    public static final ForgeConfigSpec.DoubleValue FAVOR_COST_L3;
     public static final ForgeConfigSpec.DoubleValue BI_INTERACT_DISTANCE;
+    public static final ForgeConfigSpec.BooleanValue REPAIR_AUTO_ENABLED;
 //?} else {
+    // ── 女仆好感度双乘区 (MaidFavorability — 效率/消耗, 管线自己乘) ──
+    public static final ModConfigSpec.BooleanValue MAID_FAVORABILITY_ENABLED;
+    public static final ModConfigSpec.DoubleValue FAVOR_SPEED_L1;
+    public static final ModConfigSpec.DoubleValue FAVOR_SPEED_L2;
+    public static final ModConfigSpec.DoubleValue FAVOR_SPEED_L3;
+    public static final ModConfigSpec.DoubleValue FAVOR_COST_L1;
+    public static final ModConfigSpec.DoubleValue FAVOR_COST_L2;
+    public static final ModConfigSpec.DoubleValue FAVOR_COST_L3;
     public static final ModConfigSpec.DoubleValue BI_INTERACT_DISTANCE;
+    public static final ModConfigSpec.BooleanValue REPAIR_AUTO_ENABLED;
 //?}
 //? if 1.20.1 {
     public static final ForgeConfigSpec.DoubleValue BI_TRIGGER_RANGE;
@@ -96,7 +108,7 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.IntValue BI_TIMER_DEFAULT_INTERVAL;
 //?}
 
-    // ── 合成任务 (v67.2/v67.3) ──
+    // ── 合成任务 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.ConfigValue<String> CRAFT_DEFAULT_PRODUCT;
 //?} else {
@@ -108,7 +120,7 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.IntValue CRAFT_MAX_PRODUCTS;
 //?}
 
-    // ── 熔炉 (v67.2/v67.3) ──
+    // ── 熔炉 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> FURNACE_BLACKLIST;
 //?} else {
@@ -120,7 +132,7 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.ConfigValue<List<? extends String>> FURNACE_WHITELIST;
 //?}
 
-    // ── 唱片机 (v67.3) ──
+    // ── 唱片机 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.IntValue JUKEBOX_WAIT_TICKS;
 //?} else {
@@ -137,7 +149,7 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.ConfigValue<List<? extends String>> JUKEBOX_WHITELIST;
 //?}
 
-    // ── 搬运 (v67.3) ──
+    // ── 搬运 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> ARM_BLACKLIST;
 //?} else {
@@ -149,7 +161,7 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.ConfigValue<List<? extends String>> ARM_WHITELIST;
 //?}
 
-    // ── 敲钟 (v67.5) ──
+    // ── 敲钟 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.DoubleValue BELL_VOLUME;
 //?} else {
@@ -166,7 +178,7 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.IntValue BELL_RING_INTERVAL;
 //?}
 
-    // ── AI 操控 (v74) ──
+    // ── AI 操控 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.ConfigValue<String> AI_LLM_PROVIDER;
 //?} else {
@@ -178,7 +190,7 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.ConfigValue<String> AI_VOICE;
 //?}
 
-    // ── 连锁采集方块黑白名单 (v67.3, 方块 id) ──
+    // ── 连锁采集方块黑白名单 (方块 id) ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.ConfigValue<List<? extends String>> COLLECT_BLACKLIST;
 //?} else {
@@ -190,7 +202,7 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.ConfigValue<List<? extends String>> COLLECT_WHITELIST;
 //?}
 
-    /** v67.11: 本段 ConfigValue 句柄注册表 (path → value, 前缀 "active.") — 配置同步用 */
+    /** 本段 ConfigValue 句柄注册表 (path → value, 前缀 "active.") — 配置同步用 */
 //? if 1.20.1 {
     public static final Map<String, ForgeConfigSpec.ConfigValue<?>> ACTIVE_VALUES = new HashMap<>();
 //?} else {
@@ -218,16 +230,29 @@ public final class ActiveTaskConfig {
                 .comment("采集距离上限 (格): 连锁 BFS 搜索与整脉破坏范围 (v67.4)")
                 .defineInRange("max_distance_blocks", 32, 4, 128);
         CHAIN_DIG_DOWN_DEPTH = b
-                .comment("垂直挖穿深度 (格): 目标矿在脚下≤此深度时挖脚下石头逐层下, 头顶≤同深度时向上挖穿矿正下方整列 (v79.26.8e: 3→6; v79.26.8g: 上下双向; v79.19o 原硬编码 3)")
+                .comment("头顶挖穿深度 (格): 头顶≤此深度的裸露矿 TLM 不可达时向上挖穿矿正下方整列 (v79.26.8e: 3→6; v79.57: 脚下挖穿退役, 仅头顶; v79.19o 原硬编码 3)")
                 .defineInRange("dig_down_depth", 6, 1, 8);
         CHAIN_NAV_TIMEOUT = b
                 .comment("导航看门狗超时 (tick): 寻路超时未达目标则跳过重试 (v79.26.6 配置化, 原 NAV_TIMEOUT_TICKS 常量; 默认 240 = 12 秒)")
                 .defineInRange("nav_timeout_ticks", 240, 40, 2400);
-        CHAIN_SELF_RESCUE = b
-                .comment("卡方块自救: 女仆被埋/卡住时自动瞬破窒息方块脱困 (v79.26.8d 参考 maid_useful_task)")
-                .define("self_rescue", true);
-        // v79.26.8e: 垫柱触发高度/面前挖穿距离配置退役 (用户: "不用垫方块了, 只要挖上下能挖到的就行了" —
+        // 垫柱触发高度/面前挖穿距离配置退役 (用户: "不用垫方块了, 只要挖上下能挖到的就行了" —
         // 垫柱链全删, 面前挖穿删 — 走路全 TLM, 只挖垂直; 桥/阶梯固定逻辑无配置)
+        b.pop();
+
+        // ── 女仆好感度双乘区 (MaidFavorability — 效率/消耗, 管线自己乘) ──
+        b.push("maid_favorability");
+        MAID_FAVORABILITY_ENABLED = b
+                .comment("好感度双乘区总开关: 效率 (等级越高工作越快) + 消耗 (等级越高消耗越低) (v79.39)")
+                .define("enabled", true);
+        FAVOR_SPEED_L1 = b.comment("效率线 Lv1 速度倍率 (间隔 = 基准 / 倍率)").defineInRange("speed_level_1", 1.1, 1.0, 5.0);
+        FAVOR_SPEED_L2 = b.comment("效率线 Lv2 速度倍率").defineInRange("speed_level_2", 1.25, 1.0, 5.0);
+        FAVOR_SPEED_L3 = b.comment("效率线 Lv3 速度倍率").defineInRange("speed_level_3", 1.5, 1.0, 5.0);
+        FAVOR_COST_L1 = b.comment("消耗线 Lv1 消耗倍率 (消耗 × 倍率, 越低越省)").defineInRange("cost_level_1", 0.9, 0.1, 1.0);
+        FAVOR_COST_L2 = b.comment("消耗线 Lv2 消耗倍率").defineInRange("cost_level_2", 0.75, 0.1, 1.0);
+        FAVOR_COST_L3 = b.comment("消耗线 Lv3 消耗倍率").defineInRange("cost_level_3", 0.5, 0.1, 1.0);
+        REPAIR_AUTO_ENABLED = b
+                .comment("自动修复总开关: 女仆随时间用经验慢慢修装备 (1 点/约 5 秒, 4 XP/点 × 好感度消耗乘区, v79.48)")
+                .define("auto_repair_enabled", true);
         b.pop();
 
         b.push("chain_harvest_filter");
@@ -326,13 +351,20 @@ public final class ActiveTaskConfig {
         b.pop();
 
         ACTIVE_SPEC = b.build();
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", MAID_FAVORABILITY_ENABLED);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", REPAIR_AUTO_ENABLED);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", FAVOR_SPEED_L1);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", FAVOR_SPEED_L2);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", FAVOR_SPEED_L3);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", FAVOR_COST_L1);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", FAVOR_COST_L2);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", FAVOR_COST_L3);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CHAIN_MAX_BLOCKS);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CHAIN_WOOD_NATURE_CHECK);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CHAIN_SCAN_INTERVAL);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CHAIN_MAX_DISTANCE);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CHAIN_DIG_DOWN_DEPTH);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CHAIN_NAV_TIMEOUT);
-        MoreActionConfig.reg(ACTIVE_VALUES, "active", CHAIN_SELF_RESCUE);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", COLLECT_BLACKLIST);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", COLLECT_WHITELIST);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", BI_MARK_ITEM);

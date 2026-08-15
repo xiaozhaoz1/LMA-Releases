@@ -16,16 +16,12 @@ import java.util.Map;
  * 可能在两次扫描间死亡/卸载，消费方使用前必须 {@code isAlive()} 复核。
  *
  * @param gameTime      扫描时的 gameTime
- * @param blockHits     分类id → 命中方块（按距离排序）
  * @param entityHits    分类id → 命中实体（按距离排序）
  * @param world         世界状态快照
- * @param worldSignals  本轮触发的边沿信号 (v72: String 信号 id)
  */
 public record EnvSnapshot(long gameTime,
-                          Map<String, List<BlockPos>> blockHits,
                           Map<String, List<LivingEntity>> entityHits,
-                          WorldInfo world,
-                          List<String> worldSignals) {
+                          WorldInfo world) {
 
     /**
      * 世界状态快照 — 温度/降水判定与 TLM 对齐。
@@ -44,18 +40,10 @@ public record EnvSnapshot(long gameTime,
                             String precipitation, long dayTime, String timeSegment,
                             String biomeId, String structuresAt) {}
 
-    /** 指定分类的命中方块（无命中返回空列表） */
-    public List<BlockPos> blocks(String category) {
-        return blockHits != null ? blockHits.getOrDefault(category, List.of()) : List.of();
-    }
-
-    /** 指定分类的命中实体（无命中返回空列表） */
+    /** 指定分类的命中实体（无命中返回空列表） — blockHits/worldSignals 死字段已删 */
     public List<LivingEntity> entities(String category) {
         return entityHits != null ? entityHits.getOrDefault(category, List.of()) : List.of();
     }
 
     /** 指定分类本轮是否命中（方块/实体/世界信号任一） */
-    public boolean hit(String category) {
-        return !blocks(category).isEmpty() || !entities(category).isEmpty();
-    }
 }

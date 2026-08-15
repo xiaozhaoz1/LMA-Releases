@@ -139,6 +139,10 @@ public final class CannonLoadService {
                             stack = bp.insertItem(j, stack, false);
                         }
                     }
+                    // v79.50b: 双背包全满 → 掉落兜底 (同 tryLoadOne 退还链路, 无静默丢弃)
+                    if (!stack.isEmpty()) {
+                        maid.spawnAtLocation(stack);  // 全满 → 掉女仆脚下 (保底不丢)
+                    }
                 }
                 BigCannonBlock.writeAndSyncMultipleBlockData(Set.of(pos), entity, cannon);
                 cleared = true;

@@ -27,8 +27,8 @@ import net.neoforged.neoforge.registries.DeferredRegister;
 import java.util.function.Supplier;
 
 /**
- * NeoForge 1.21.1 入口 — 对应 forge 侧 {@code LmaForgeEntry}。
- * <p>payload 网络 + 4 MenuType (MaidAssembly 1.20.1 专属) + 3 config 注册。</p>
+ * NeoForge 1.21.1 入口 — 对应 forge 侧 {@code LittleMaidMoreAction} (@Mod 主入口)。
+ * <p>payload 网络 + 6 MenuType + 3 config 注册。</p>
  */
 @Mod(LittleMaidMoreAction.MOD_ID)
 public final class LmaNeoForgeEntry {
@@ -76,8 +76,8 @@ public final class LmaNeoForgeEntry {
         LmaRegistrar.registerItems(modBus);
         MENU_TYPES.register(modBus);
 
-        // 网络发送注入 (无注册依赖)
-        LmaNetwork.sender = new NeoNetworkSender();
+        // 网络发送注入 (无注册依赖) — M-4: 统一走 setSender 记注入状态日志
+        LmaNetwork.setSender(new NeoNetworkSender());
 
         // 网络 payload 注册 (MOD 总线)
         modBus.addListener(NeoNetworkHandler::registerPacket);
@@ -101,7 +101,7 @@ public final class LmaNeoForgeEntry {
     }
 
     private void onServerStarting(ServerStartingEvent event) {
-        MoreActionAPI.loadServerDurations();
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationDurationManager.loadServerDurations();
     }
 
     private void commonSetup(net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent event) {

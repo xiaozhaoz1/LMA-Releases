@@ -4,7 +4,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ItemStackHe
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.movement.BrainHelper;
-import com.github.xiaozhaoz1.littlemaidmoreaction.core.model.LmaAnimationDef;
+import com.github.xiaozhaoz1.littlemaidmoreaction.resource.LmaAnimationDef;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.LmaAnimSyncMessage;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationDurationManager;
 import com.github.xiaozhaoz1.littlemaidmoreaction.storage.LmaAnimationStorage;
@@ -19,6 +19,9 @@ import java.util.concurrent.ThreadLocalRandom;
  * 动画播放编排 — 委托 PlayAnimAction (241行→本类)。
  * <p>INSTANT: 单动画 → PersistentData → magic_casting 驱动
  * FULL: 三阶段动画 → tick 驱动阶段切换 (由客户端 LmaMagicCastingProvider 执行)
+ *
+ * <p>v79.61x 定级 (两轴表): 通用动画播放 (无业务语义, 多域复用: 哈气/咏唱) →
+ * io 原语级 (通用复合 — 写 NBT 驱动客户端); 留 execute 包 (历史位置, 搬 = churn)。
  */
 public final class AnimExecute {
     private AnimExecute() {}
@@ -82,7 +85,7 @@ public final class AnimExecute {
         String casting = pickRandom(animCasting);
         String end = pickRandom(animEnd);
 
-        // v79.18: YSM 分流 (executeInstant 同款) — YSM 模型渲染不吃 TLM ISS 动画,
+        // YSM 分流 (executeInstant 同款) — YSM 模型渲染不吃 TLM ISS 动画,
         // FULL 语义 = 循环播放 → YsmOutput.playRoulette (循环由动画文件 loop 决定, YSM 管理停止)
         if (maid.isYsmModel()) {
             com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmOutput.playRoulette(maid, start);
@@ -134,12 +137,13 @@ public final class AnimExecute {
         return valid.size() == 1 ? valid.get(0) : valid.get(ThreadLocalRandom.current().nextInt(valid.size()));
     }
 
-    private static int parseInt(String s, int def) {
-        try { return Integer.parseInt(s.isEmpty() ? String.valueOf(def) : s); }
+    static int parseInt(String s, int def) {
+        if (s == null || s.isEmpty()) return def;
+        try { return Integer.parseInt(s); }
         catch (NumberFormatException e) { return def; }
     }
 
-    private static int safeIncrementSeq(int current) {
+    static int safeIncrementSeq(int current) {
         return current >= Integer.MAX_VALUE - 1 ? 1 : current + 1;
     }
 

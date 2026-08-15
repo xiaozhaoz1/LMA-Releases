@@ -62,7 +62,7 @@ public class MaidListButton extends Button implements ITooltipButton {
     @Override
     public void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partialTicks) {
         RenderSystem.enableDepthTest();
-        // 背景: SIDE 始终绘制 (v79.25 用户裁定 "加右侧按钮背景" — 侧栏按钮必须可见);
+        // 背景: SIDE 始终绘制 (用户裁定 "加右侧按钮背景" — 侧栏按钮必须可见);
         // TAB 仅非激活态绘制 (与 TLM MaidSideTabButton 一致 — 激活态由 TLM 自身背景承载)
         if (kind == Kind.SIDE || !this.active) {
             graphics.blit(SIDE_TEXTURE, this.getX() + kind.bgX, this.getY(),

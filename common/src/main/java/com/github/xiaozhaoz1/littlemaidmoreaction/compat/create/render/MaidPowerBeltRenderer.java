@@ -37,7 +37,7 @@ public class MaidPowerBeltRenderer implements BlockEntityRenderer<MaidPowerBeltB
     @Override
     public void render(MaidPowerBeltBlockEntity be, float partialTicks, PoseStack ms,
                         MultiBufferSource buffer, int light, int overlay) {
-        // v4.4: 不用supportsVisualization检查→BER永远渲染
+        // 不用supportsVisualization检查→BER永远渲染
         BlockState blockState = be.getBlockState();
 
         BeltSlope beltSlope = blockState.getValue(BeltBlock.SLOPE);

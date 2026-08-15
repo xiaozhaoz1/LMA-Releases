@@ -1,4 +1,9 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.sense;
+//? if 1.20.1 {
+import net.minecraft.world.level.chunk.ChunkStatus;
+//?} else {
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+//?}
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.VanillaConstants;
@@ -61,7 +66,7 @@ public final class EnvScanner {
     }
 
     /**
-     * 站立点所在结构 (v79.3, 零成本 — getAllStructuresAt 瞬时查询, 与 24000t 最近结构通道互补)。
+     * 站立点所在结构 (零成本 — getAllStructuresAt 瞬时查询, 与 1200t 最近结构通道互补)。
      * 返回排序逗号连接的 structure registry id; 空串 = 不在任何结构。
      * public — SenseApi.structuresAt 暴露。
      */
@@ -117,7 +122,7 @@ public final class EnvScanner {
         List<BlockPos> found = new ArrayList<>();
         BlockPos.MutableBlockPos mPos = new BlockPos.MutableBlockPos();
         int cx = center.getX(), cy = center.getY(), cz = center.getZ();
-        int vert = 4;
+        int vert = com.github.xiaozhaoz1.littlemaidmoreaction.api.VanillaConstants.SEARCH_VERTICAL;
         for (int y = -vert; y <= vert; y++) {
             for (int x = -radius; x <= radius; x++) {
                 for (int z = -radius; z <= radius; z++) {
@@ -133,21 +138,54 @@ public final class EnvScanner {
         return found;
     }
 
-    /** 扫描附近红石灯 */
-    public static List<BlockPos> scanRedstoneLamps(ServerLevel level, BlockPos center, int radius) {
-        List<BlockPos> found = new ArrayList<>();
-        BlockPos.MutableBlockPos mPos = new BlockPos.MutableBlockPos();
-        int cx = center.getX(), cy = center.getY(), cz = center.getZ();
-        for (int y = -4; y <= 4; y++) {
-            for (int x = -radius; x <= radius; x++) {
-                for (int z = -radius; z <= radius; z++) {
-                    mPos.set(cx + x, cy + y, cz + z);
-                    if (level.getBlockState(mPos).is(net.minecraft.world.level.block.Blocks.REDSTONE_LAMP)) {
-                        found.add(mPos.immutable());
-                    }
+    /**
+     * 扫描半径内所有已生成结构 (v79.58 新方案 — ChunkAccess.getAllStarts 一次遍历, 替代逐 tag findNearestMapStructure)。
+     * 返回 结构 registry id → 结构中心位置 (未加载 chunk 跳过 — 接近才加载, 符合附近感知语义)。
+     */
+    public static java.util.Map<String, BlockPos> scanAllStructures(ServerLevel level, BlockPos center, int radius) {
+        java.util.Map<String, BlockPos> found = new java.util.LinkedHashMap<>();
+        int chunkRadius = Math.max(1, (radius + 15) / 16);
+        int cx = center.getX() >> 4, cz = center.getZ() >> 4;
+        for (int dx = -chunkRadius; dx <= chunkRadius; dx++) {
+            for (int dz = -chunkRadius; dz <= chunkRadius; dz++) {
+                var chunk = level.getChunk(cx + dx, cz + dz, ChunkStatus.FULL, false);
+                if (chunk == null) continue;
+                var registry = level.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.STRUCTURE);
+                for (var e : chunk.getAllStarts().entrySet()) {
+                    var start = e.getValue();
+                    if (start == null || !start.isValid()) continue;
+                    String id = registry.getResourceKey(e.getKey())
+                            .map(k -> k.location().toString())
+                            .orElse("unknown");
+                    var bb = start.getBoundingBox();
+                    found.putIfAbsent(id, new BlockPos(bb.getCenter().getX(), bb.getCenter().getY(), bb.getCenter().getZ()));
                 }
             }
         }
         return found;
     }
+
+    /** 相对方位 (8 方向 + 距离格数) — 纯逻辑可 JVM 测 (v79.58) */
+    public static String directionLabel(BlockPos from, BlockPos to) {
+        double dx = to.getX() + 0.5 - (from.getX() + 0.5);
+        double dz = to.getZ() + 0.5 - (from.getZ() + 0.5);
+        int dist = (int) Math.round(Math.sqrt(dx * dx + dz * dz));
+        return directionWord(from, to) + " " + dist + " 格";
+    }
+
+    /** 相对方位纯词 (8 方向, 无距离) — v79.60 结构气泡 (用户裁定: 方向词文案, 无距离数字) */
+    public static String directionWord(BlockPos from, BlockPos to) {
+        double dx = to.getX() + 0.5 - (from.getX() + 0.5);
+        double dz = to.getZ() + 0.5 - (from.getZ() + 0.5);
+        double angle = Math.toDegrees(Math.atan2(dz, dx));
+        if (angle < -157.5 || angle >= 157.5) return "西";
+        if (angle < -112.5) return "西北";
+        if (angle < -67.5) return "北";
+        if (angle < -22.5) return "东北";
+        if (angle < 22.5) return "东";
+        if (angle < 67.5) return "东南";
+        if (angle < 112.5) return "南";
+        return "西南";
+    }
+
 }

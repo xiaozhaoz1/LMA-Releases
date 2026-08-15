@@ -1,10 +1,9 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.gui;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.RequestTaskConfigPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.network.TaskConfigActionPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.AiControlPipeline;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -34,22 +33,15 @@ public class AiControlConfigScreen extends LmaTaskConfigScreen<AiControlConfigMe
         return "ai_control";
     }
 
-    // ── renderBg: TLM 基类渲染完整框架, LMA 控件叠加 ──
-
-    @Override
-    protected void renderBg(GuiGraphics g, float partialTick, int x, int y) {
-        super.renderBg(g, partialTick, x, y);
-    }
-
-    // ── initAdditionWidgets: 请求配置 + 文本框 + 保存按钮 (TLM 标准钩子) ──
+    // ── initAdditionWidgets: 请求配置 + 文本框 + 保存按钮 (TLM 标准钩子; renderBg 基类默认委托) ──
 
     @Override
     protected void initAdditionWidgets() {
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), getTaskType());
 
-        int cx = leftPos + 88;
-        int y = topPos + 34;
+        int cx = contentX();
+        int y = contentY();
 
         providerBox = new EditBox(font, cx, y, 120, 18, Component.literal("LLM 模型名称"));
         providerBox.setMaxLength(64);
@@ -69,7 +61,7 @@ public class AiControlConfigScreen extends LmaTaskConfigScreen<AiControlConfigMe
                 .pos(cx + 84, y).size(90, 20).build());
         y += 24;
 
-        // v75.1: 变成假人 — 任务运行中点击 → 生成假人 + 自动设模型/同步状态 + 女仆收石板
+        // 变成假人 — 任务运行中点击 → 生成假人 + 自动设模型/同步状态 + 女仆收石板
         addRenderableWidget(Button.builder(Component.literal("变成假人 (AI 操控)"), b -> transformToFake())
                 .pos(cx, y).size(120, 20).build());
     }
@@ -79,8 +71,8 @@ public class AiControlConfigScreen extends LmaTaskConfigScreen<AiControlConfigMe
     @Override
     protected void renderAddition(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
         CompoundTag cfg = getMenu().getConfig();
-        int cx = leftPos + 88;
-        int y = topPos + 136;   // v75.1: 下移避开按钮区 (编辑框 34/56, 按钮 80/104)
+        int cx = contentX();
+        int y = topPos + 136;   // 下移避开按钮区 (编辑框 34/56, 按钮 80/104)
         String p = cfg.getString(AiControlPipeline.KEY_PROVIDER);
         if (p.isEmpty()) p = ActiveTaskConfig.AI_LLM_PROVIDER.get();
         String v = cfg.getString(AiControlPipeline.KEY_VOICE);
@@ -112,17 +104,11 @@ public class AiControlConfigScreen extends LmaTaskConfigScreen<AiControlConfigMe
     private void sendString(EntityMaid m, String key, String value) {
         CompoundTag cfg = getMenu().getConfig();
         cfg.putString(key, value);
-        CompoundTag payload = new CompoundTag();
-        payload.putString("key", key);
-        payload.putString("value", value);
-        TaskConfigActionPacket.send(m.getId(), getTaskType(), TaskPipeline.ACTION_SET_STRING, payload);
+        sendSetString(key, value);
     }
 
-    /** v75.1: 变成假人按钮 — 服务端校验任务运行中 (gate on) 后执行变身 */
+    /** 变成假人按钮 — 服务端校验任务运行中 (gate on) 后执行变身 */
     private void transformToFake() {
-        EntityMaid m = getMaid();
-        if (m == null) return;
-        TaskConfigActionPacket.send(m.getId(), getTaskType(),
-                AiControlPipeline.ACTION_TRANSFORM, new CompoundTag());
+        sendAction(AiControlPipeline.ACTION_TRANSFORM, new CompoundTag());
     }
 }

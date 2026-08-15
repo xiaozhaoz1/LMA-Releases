@@ -24,7 +24,7 @@ public final class LmaEnvSenseContext {
         register.registerCategory(CATEGORY, SUMMARY, false);
         register.registerContext(CATEGORY, new EnvContext());
         register.registerContext(CATEGORY, new NearbyEntitiesContext());
-        // v77.6: Numen 感知原语 — 语义网格 + 实体清单
+        // Numen 感知原语 — 语义网格 + 实体清单
         register.registerContext(CATEGORY, new LookAroundContext());
         register.registerContext(CATEGORY, new NearbyEntitiesDetailContext());
     }
@@ -75,7 +75,7 @@ public final class LmaEnvSenseContext {
         }
     }
 
-    /** v77.6: 自我中心语义网格 (LookAroundGrid — 字符地形图, LLM 空间推理) */
+    /** 自我中心语义网格 (LookAroundGrid — 字符地形图, LLM 空间推理) */
     private static final class LookAroundContext extends AbstractMaidContext {
         LookAroundContext() {
             super("maid_look_around", "女仆周围地形图: 字符网格, 每格一个方块, 移动可行性语义.");
@@ -90,7 +90,7 @@ public final class LmaEnvSenseContext {
         }
     }
 
-    /** v77.6: 附近实体清单 (EntityScan — id/距离/hp/分类, 20 上限) */
+    /** 附近实体清单 (EntityScan — id/距离/hp/分类, 20 上限) */
     private static final class NearbyEntitiesDetailContext extends AbstractMaidContext {
         NearbyEntitiesDetailContext() {
             super("maid_nearby_entities_detail", "女仆周围实体清单: id/类型/距离/hp/分类 (按距离排序).");

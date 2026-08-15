@@ -17,8 +17,20 @@ public final class TaskGroup {
 
     private static final Path GROUP_FILE = LittleMaidMoreAction.CONFIG_DIR.resolve("task_groups.json");
     private static final List<GroupDef> GROUPS = new ArrayList<>();
+    /** 手写 JSON → Gson (原 indexOf+split 无转义, 含 ,/" 即解析错乱) */
+    private static final com.google.gson.Gson GSON = new com.google.gson.Gson();
+    private static final java.lang.reflect.Type GROUP_LIST_TYPE =
+            new com.google.gson.reflect.TypeToken<List<GroupDef>>() {}.getType();
 
     static { loadDefaults(); load(); }
+
+    /** Gson 写回 (原 StringBuilder 手拼) */
+    private static void save() {
+        com.google.gson.JsonObject root = new com.google.gson.JsonObject();
+        root.add("groups", GSON.toJsonTree(GROUPS));
+        try { Files.writeString(GROUP_FILE, GSON.toJson(root)); }
+        catch (IOException e) { LittleMaidMoreAction.LOGGER.warn("[TaskGroup] save failed", e); }
+    }
 
     public record GroupDef(String id, String label, List<String> tasks) {}
 
@@ -49,67 +61,23 @@ public final class TaskGroup {
     private static void load() {
         if (!Files.exists(GROUP_FILE)) { save(); return; }
         try {
-            String json = Files.readString(GROUP_FILE);
-            GROUPS.clear();
-            int arrStart = json.indexOf('[');
-            int arrEnd = json.lastIndexOf(']');
-            if (arrStart < 0 || arrEnd <= arrStart) return;
-            String inner = json.substring(arrStart + 1, arrEnd);
-            for (String obj : inner.split("\\},\\s*\\{")) {
-                obj = obj.replace("{", "").replace("}", "").trim();
-                String id = extract(obj, "id");
-                String label = extract(obj, "label");
-                List<String> tasks = extractList(obj, "tasks");
-                if (id != null && label != null) {
-                    GROUPS.add(new GroupDef(id, label, tasks != null ? tasks : List.of()));
-                }
+            List<GroupDef> list = List.of();
+            com.google.gson.JsonObject root = GSON.fromJson(Files.readString(GROUP_FILE), com.google.gson.JsonObject.class);
+            if (root != null && root.has("groups")) {
+                list = GSON.fromJson(root.get("groups"), GROUP_LIST_TYPE);
+            }
+            // 审计 B2: 损坏/空配置保留默认分组 (原 GROUPS.clear() 后解析失败 → 默认组全丢)
+            if (list != null && !list.isEmpty()) {
+                GROUPS.clear();
+                GROUPS.addAll(list);
             }
         } catch (Exception e) {
             LittleMaidMoreAction.LOGGER.warn("[TaskGroup] load failed", e);
         }
     }
 
-    private static void save() {
-        StringBuilder sb = new StringBuilder("{\"groups\":[");
-        var it = GROUPS.iterator();
-        while (it.hasNext()) {
-            var g = it.next();
-            sb.append("{\"id\":\"").append(g.id()).append("\",\"label\":\"").append(g.label())
-              .append("\",\"tasks\":[");
-            var ti = g.tasks().iterator();
-            while (ti.hasNext()) { sb.append('"').append(ti.next()).append('"'); if (ti.hasNext()) sb.append(','); }
-            sb.append("]}");
-            if (it.hasNext()) sb.append(",\n");
-        }
-        sb.append("]}");
-        try { Files.writeString(GROUP_FILE, sb.toString()); }
-        catch (IOException e) { LittleMaidMoreAction.LOGGER.warn("[TaskGroup] save failed", e); }
-    }
 
-    private static String extract(String obj, String key) {
-        int i = obj.indexOf("\"" + key + "\":");
-        if (i < 0) return null;
-        if (obj.charAt(i + key.length() + 2) == '[') return null; // array, handled by extractList
-        int start = obj.indexOf('"', i + key.length() + 3);
-        int end = obj.indexOf('"', start + 1);
-        if (start < 0 || end < 0) return null;
-        return obj.substring(start + 1, end);
-    }
 
-    private static List<String> extractList(String obj, String key) {
-        int i = obj.indexOf("\"" + key + "\":");
-        if (i < 0) return null;
-        int arrStart = obj.indexOf('[', i);
-        int arrEnd = obj.indexOf(']', arrStart);
-        if (arrStart < 0 || arrEnd < 0) return null;
-        String inner = obj.substring(arrStart + 1, arrEnd);
-        List<String> list = new ArrayList<>();
-        for (String s : inner.split(",")) {
-            String t = s.trim().replace("\"", "");
-            if (!t.isEmpty()) list.add(t);
-        }
-        return list;
-    }
 
     private TaskGroup() {}
 }

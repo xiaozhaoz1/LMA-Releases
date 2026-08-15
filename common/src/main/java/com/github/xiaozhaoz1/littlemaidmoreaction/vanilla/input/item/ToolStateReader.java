@@ -15,8 +15,7 @@ import javax.annotation.Nullable;
  *
  * <p>高层判断（如"镐能否挖此矿"）放在计算层
  * {@link com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ToolJudge}，
- * 本类只提供原子事实。耐久/附魔基础读取见
- * {@link com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.item.ItemOutput}。
+ * 本类只提供原子事实。
  */
 public final class ToolStateReader {
 
@@ -49,7 +48,7 @@ public final class ToolStateReader {
         return stack.getItem() instanceof AxeItem;
     }
 
-    /** 是否为铲 (v79.19p — 泥土/沙/沙砾等软质方块合适工具) */
+    /** 是否为铲 (泥土/沙/沙砾等软质方块合适工具) */
     public static boolean isShovel(ItemStack stack) {
         return stack.getItem() instanceof ShovelItem;
     }

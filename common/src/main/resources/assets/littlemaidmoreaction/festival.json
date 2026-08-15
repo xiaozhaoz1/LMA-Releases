@@ -1,0 +1,13 @@
+{
+  "festivals": [
+    { "id": "new_year", "name": "新年", "month": 1, "day": 1, "text": "新年快乐！新的一年也要好好干活哦~" },
+    { "id": "spring_festival", "name": "春节", "month": 1, "day": 1, "lunar": true, "text": "春节快乐！红包拿来~" },
+    { "id": "valentine", "name": "情人节", "month": 2, "day": 14, "text": "巧克力…要试试吗？" },
+    { "id": "girls_day", "name": "女儿节", "month": 3, "day": 3, "text": "人偶都摆好了，好看吗？" },
+    { "id": "dragon_boat", "name": "端午节", "month": 5, "day": 5, "lunar": true, "text": "粽子好吃，划龙舟去！" },
+    { "id": "qixi", "name": "七夕", "month": 7, "day": 7, "lunar": true, "text": "牛郎织女相会的日子…" },
+    { "id": "mid_autumn", "name": "中秋节", "month": 8, "day": 15, "lunar": true, "text": "赏月吃月饼，主人也一起来吧" },
+    { "id": "halloween", "name": "万圣节", "month": 10, "day": 31, "text": "不给糖，就捣蛋！" },
+    { "id": "christmas", "name": "圣诞节", "month": 12, "day": 25, "text": "圣诞快乐！雪人堆好啦" }
+  ]
+}
