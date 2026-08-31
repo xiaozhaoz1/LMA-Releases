@@ -28,9 +28,6 @@ public final class AutoCropHandler implements ISpecialCropHandler {
 
     @Override
     public void harvest(EntityMaid maid, BlockPos cropPos, BlockState cropState, boolean isDestroyMode) {
-        // 恢复收割事件 — 无条件 post (恢复裁撤前旧逻辑, 覆盖所有调用路径)
-        postHarvestEvent(maid, cropPos, cropState.getBlock());
-
         Block cropBlock = cropState.getBlock();
 
         if (!isEnabled(maid)) {
@@ -80,14 +77,4 @@ public final class AutoCropHandler implements ISpecialCropHandler {
         LAST_CROP.remove(uuid);
     }
 
-    /** post 收割事件 — 双平台事件总线 (忽略返回值, 事件不可取消) */
-    private static void postHarvestEvent(EntityMaid maid, BlockPos cropPos, Block cropBlock) {
-//? if 1.20.1 {
-        net.minecraftforge.common.MinecraftForge.EVENT_BUS.post(
-                new com.github.xiaozhaoz1.littlemaidmoreaction.event.MaidHarvestCropEvent(maid, cropPos, cropBlock));
-//?} else {
-        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.post(
-                new com.github.xiaozhaoz1.littlemaidmoreaction.event.MaidHarvestCropEvent(maid, cropPos, cropBlock));
-//?}
     }
-}

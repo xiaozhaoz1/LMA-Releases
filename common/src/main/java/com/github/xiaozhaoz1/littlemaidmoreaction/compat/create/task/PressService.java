@@ -31,7 +31,6 @@ import java.util.Optional;
  */
 public final class PressService {
     private static final int SEARCH_RANGE = 3;
-    static final int PRESS_DURATION = 100; // 5秒 = 100 tick
 
     private PressService() {}
 
@@ -44,6 +43,27 @@ public final class PressService {
         return findBlock(level, center, BasinBlockEntity.class);
     }
 
+    /** 螺旋序收集全部 Depot + Basin (近→远, v79.61x — 跳过集"换目标"用) */
+    public static java.util.List<BlockPos> findTargets(Level level, BlockPos center) {
+        java.util.List<BlockPos> found = new java.util.ArrayList<>();
+        for (int dr = 0; dr <= SEARCH_RANGE; dr++) {
+            for (int dx = -dr; dx <= dr; dx++) {
+                for (int dz = -dr; dz <= dr; dz++) {
+                    if (Math.abs(dx) != dr && Math.abs(dz) != dr) continue;
+                    BlockPos pos = center.offset(dx, 0, dz);
+                    for (int dy = -1; dy <= 1; dy++) {
+                        BlockPos p = pos.offset(0, dy, 0);
+                        BlockEntity be = level.getBlockEntity(p);
+                        if (be instanceof DepotBlockEntity || be instanceof BasinBlockEntity) {
+                            found.add(p.immutable());
+                        }
+                    }
+                }
+            }
+        }
+        return found;
+    }
+
     /** 从 Depot 读取 heldItem (副本) */
     public static ItemStack readHeldItem(Level level, BlockPos pos) {
         if (pos == null) return ItemStack.EMPTY;
@@ -54,13 +74,7 @@ public final class PressService {
         return ItemStack.EMPTY;
     }
 
-    /** Basin 是否可继续处理 (outputBuffer 非空则 false) */
-    public static boolean canBasinProcess(Level level, BlockPos pos) {
-        if (pos == null) return false;
-        BlockEntity be = level.getBlockEntity(pos);
-        if (!(be instanceof BasinBlockEntity basin)) return false;
-        return basin.canContinueProcessing();
-    }
+    /** Basin 是否可继续处理 (outputBuffer 非空则 false) — 已删 (v79.61x 死方法: 零调用方, hasBasinRecipe 内部直判 canContinueProcessing) */
 
     // ── Compute ──
 

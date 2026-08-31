@@ -66,4 +66,20 @@ public interface BlockTargetNavigation {
     default boolean arrived(EntityMaid maid, BlockPos target) {
         return NavigationUtil.arrived(maid, target);
     }
+
+    // ── 导航跳过集 (v79.61x — 卡死目标临时跳过, 对齐 ChainHarvest SKIP_TTL 语义) ──
+    // 委托 {@link NavSkipSet} (api/pathing 通用门面 — CannonLoad 等非本接口管线复用);
+    // 状态存 pipelineData (pl), 任务终结随 pl 自动清理
+
+    /** 目标是否在跳过集内 (有效期内) */
+    default boolean isSkipped(EntityMaid maid, BlockPos pos, long now) {
+        return com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavSkipSet
+                .isSkipped(maid, taskType(), pos, now);
+    }
+
+    /** 目标加入跳过集 (去重 + 过期清理 + 容量淘汰) */
+    default void addSkip(EntityMaid maid, BlockPos pos, long now) {
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavSkipSet
+                .addSkip(maid, taskType(), pos, now);
+    }
 }

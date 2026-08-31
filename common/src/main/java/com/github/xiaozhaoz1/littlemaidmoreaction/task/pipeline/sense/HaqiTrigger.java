@@ -36,9 +36,12 @@ public final class HaqiTrigger {
 
     private HaqiTrigger() {}
 
-    /** 每 20t 调 — TaskTickHandler 挂载; 遍历维度内女仆触发 */
+    /** 每周期调 — TaskTickHandler 挂载; 遍历维度内女仆触发 */
     public static void tick(ServerLevel level) {
-        if (level.getGameTime() % 20 != 0) return;
+        // v79.61x: ENVSENSE 开时独立通道降频 60t (与 200t 广播互补, 仅兜底 per-maid 关闭的女仆);
+        // 关时 20t 保底 (独立通道是唯一触发源 — v79.11 历史根因)
+        int period = PassiveTaskConfig.ENVSENSE_ENABLED.get() ? 60 : 20;
+        if (level.getGameTime() % period != 0) return;
         // 总开关 + 对主人二级开关, 任一开则扫描 (tryTrigger 内部分别门控)
         if (!PassiveTaskConfig.HAQI_ENABLED.get() && !PassiveTaskConfig.HAQI_ENABLED_TO_OWNER.get()) return;
         if (TaskRegistry.get("haqi") == null) return;
@@ -69,6 +72,7 @@ public final class HaqiTrigger {
             data.putString(HaqiPipeline.KEY_TARGET_TYPE, HaqiPipeline.TARGET_MAID);
             data.putString(HaqiPipeline.KEY_STATE, "MOVE");
             data.putInt(HaqiPipeline.KEY_TIMER, 0);
+            data.putInt(HaqiPipeline.KEY_MOVE_TICKS, 0);
             TaskDispatcher.submitPassive(maid, "haqi");
             return;
         }
@@ -83,6 +87,8 @@ public final class HaqiTrigger {
      * 只续女仆 — 对主人哈气结束正常停 (用户裁定范围)。
      */
     public static boolean tryContinue(ServerLevel level, EntityMaid maid) {
+        // v79.61x: 运行中关配置即停 (原续哈气无视 HAQI_ENABLED — 配置不即时生效)
+        if (!PassiveTaskConfig.HAQI_ENABLED.get()) return false;
         EntityMaid target = scanNearestMaid(maid);
         if (target == null) return false;
         var data = HaqiPipeline.stateData(maid);
@@ -90,6 +96,7 @@ public final class HaqiTrigger {
         data.putString(HaqiPipeline.KEY_TARGET_TYPE, HaqiPipeline.TARGET_MAID);
         data.putString(HaqiPipeline.KEY_STATE, "MOVE");
         data.putInt(HaqiPipeline.KEY_TIMER, 0);
+        data.putInt(HaqiPipeline.KEY_MOVE_TICKS, 0);
         return true;
     }
 
@@ -129,6 +136,7 @@ public final class HaqiTrigger {
         data.putString(HaqiPipeline.KEY_TARGET_TYPE, HaqiService.TARGET_OWNER);
         data.putString(HaqiPipeline.KEY_STATE, "MOVE");
         data.putInt(HaqiPipeline.KEY_TIMER, 0);
+        data.putInt(HaqiPipeline.KEY_MOVE_TICKS, 0);
         TaskDispatcher.submitPassive(maid, "haqi");
     }
 }

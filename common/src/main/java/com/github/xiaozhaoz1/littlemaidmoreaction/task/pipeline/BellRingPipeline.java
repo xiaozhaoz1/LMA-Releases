@@ -54,7 +54,7 @@ public final class BellRingPipeline extends WorkStationPipeline implements TaskC
             return TaskResult.SUCCESS; // 原语义: 非钟时 execute false 被忽略, 仍计数
         }
         bell.attemptToRing(m, w, p, null);
-        w.playSound(null, p, SoundEvents.BELL_BLOCK, SoundSource.BLOCKS,
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.SoundOutput.playAt(w, p, SoundEvents.BELL_BLOCK, SoundSource.BLOCKS,
                 com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.BELL_VOLUME.get().floatValue(),
                 com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.BELL_PITCH.get().floatValue());
         return TaskResult.SUCCESS;

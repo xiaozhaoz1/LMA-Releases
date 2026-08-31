@@ -175,6 +175,11 @@ public final class LmaPlayerSimulator {
         if (!stack.isEmpty() && event.getUseItem() != TriState.FALSE) {
 //?}
             if (stack.useOn(ctx).consumesAction()) return true;
+            // 1.20.1 桶族物品不覆写 useOn (返回 PASS), 水桶倒/装逻辑在 use() 内由
+            // 视线射线 (getPlayerPOVHitResult) 驱动 — 假人默认视线水平打不到目标,
+            // 必须先看向目标格中心 (MLG 双平台实测: 不看 = use 恒 pass, 水放不出)
+            player.setYRot(yawToward(player, targetPos));
+            player.setXRot(pitchToward(player, targetPos));
             var result = stack.use(world, player, hand);
             if (result.getResult().consumesAction()) {
                 player.setItemInHand(hand, result.getObject());
@@ -356,6 +361,21 @@ public final class LmaPlayerSimulator {
     }
 
     // ── 工具方法 ──
+
+    /** 面向目标格中心的 yaw (MC 角: 0=南 +Z) */
+    private static float yawToward(net.minecraft.world.entity.player.Player player, BlockPos target) {
+        Vec3 eye = player.getEyePosition();
+        Vec3 t = Vec3.atCenterOf(target);
+        return (float) (Math.toDegrees(Math.atan2(-(t.x - eye.x), t.z - eye.z)));
+    }
+
+    /** 面向目标格中心的 pitch (MC 角: 上负下正) */
+    private static float pitchToward(net.minecraft.world.entity.player.Player player, BlockPos target) {
+        Vec3 eye = player.getEyePosition();
+        Vec3 t = Vec3.atCenterOf(target);
+        double horiz = Math.sqrt((t.x - eye.x) * (t.x - eye.x) + (t.z - eye.z) * (t.z - eye.z));
+        return (float) (Math.toDegrees(-Math.atan2(t.y - eye.y, horiz)));
+    }
 
     /** 构建射线命中结果 */
     private static BlockHitResult buildHitResult(BlockPos pos, Direction face) {

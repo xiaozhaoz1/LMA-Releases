@@ -29,10 +29,10 @@ import java.util.Set;
  * <p>点亮后 tick 自检 (不依赖 CLEAR 信号): 亮度恢复 (>= darkness_threshold) 且
  * 周围 5 格无怪 → 火把换回背包 (防黑暗守夜)。副手被占用 (非火把/提灯) 时不覆盖。
  *
- * <p>2026-08-11c (#9 用户裁定): 恢复时周围有怪 → 火把拿回后从背包补盾 (原拿回后
- * 副手空 — 有怪却无盾; 有盾女仆 onSignal 本就不被换, 无盾女仆被换火把后恢复裸奔)。
+ * <p>2026-08-11c (#9 用户裁定): 恢复仅在「亮度恢复且 5 格无怪」时发生 — 有怪时
+ * 保持火把防黑暗守夜 (原注释声称"拿回后补盾", 代码无补盾实现, 注释已修正对齐)。
  */
-public final class TorchLightPipeline implements PassiveSignalSkeleton {
+public final class TorchLightPipeline implements PassiveSignalSkeleton, com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable {
 
     /** 副手占用的灯类物品 — 火把/灵魂火把/提灯/灵魂提灯 (点亮判定 + 换回判定) */
     private static boolean isLightItem(ItemStack s) {
@@ -56,6 +56,10 @@ public final class TorchLightPipeline implements PassiveSignalSkeleton {
 
     /** 重新点火节流 (tick) — v79.58 用户裁定: 黑暗时每 100t 检测副手, 空才点火 (防火把↔食物来回抖动) */
     private static final int REPICK_INTERVAL = 100;
+    /** 无灯重试间隔 (tick) — v79.61x: 背包无灯时 300t 重扫 (有灯路径 100t; 拿到灯 DARKNESS 边沿会重新触发) */
+    private static final int NO_LIGHT_INTERVAL = 300;
+    /** no_light 标记键 (pipelineData — cancelPassive 自动清理) */
+    private static final String KEY_NO_LIGHT = "no_light";
 
     /** 点火 — 背包找火把/提灯 → 副手 (v79.58 提取: onSignal 首次 + tick 被顶后自愈共用) */
     private static boolean lightUp(ServerLevel world, EntityMaid maid) {
@@ -86,6 +90,25 @@ public final class TorchLightPipeline implements PassiveSignalSkeleton {
     /** 点亮后需每 tick 自检恢复条件 (亮度/怪) — 长运行 */
     @Override public boolean isLongRunning() { return true; }
 
+    /** v79.61x #6: 禁用/取消清理兜底 — 副手灯插回背包 (原 cancel 只清 pipelineData,
+     *  火把留在副手; tick 恢复路径灯已回, 此处兜异常取消/开关禁用场景) */
+    @Override
+    public void onCleanup(EntityMaid maid) {
+        ItemStack off = maid.getOffhandItem();
+        if (isLightItem(off)) {
+            var inv = maid.getAvailableBackpackInv();
+            ItemStack leftover = off;
+            for (int i = 0; i < inv.getSlots() && !leftover.isEmpty(); i++) {
+                leftover = inv.insertItem(i, leftover, false);
+            }
+            if (leftover.isEmpty()) {
+                maid.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
+            }
+            // 背包全满 → 火把继续拿 (保底不丢, tick 恢复逻辑同款语义)
+        }
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.api.PassiveSignalSkeleton.super.onCleanup(maid);
+    }
+
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
         return okSignals(Set.of(Signals.ENV_DARKNESS));
@@ -104,20 +127,23 @@ public final class TorchLightPipeline implements PassiveSignalSkeleton {
 
         // 副手已是灯类 (上次触发残留/玩家手动装备) → 已点亮, 跳过换新 —
         // 防 setItemInHand 直接覆盖销毁旧火把 (每次重复 DARKNESS 边沿销毁 1 根, 堆叠 N 根损失 N-1)
-        lightUp(world, maid);
+        // v79.61x: 无灯标记同步 (DARKNESS 边沿重触发时重置)
+        pipelineData(maid).putBoolean(KEY_NO_LIGHT, !lightUp(world, maid));
     }
 
     @Override
     public void tick(ServerLevel world, EntityMaid maid) {
         // v79.58 (用户裁定修订): 整个检查 100t 节流 (非每 tick — 亮度/副手状态)
+        // v79.61x: 背包无灯 → 300t 重试降频 (no_light 标记)
+        long interval = pipelineData(maid).getBoolean(KEY_NO_LIGHT) ? NO_LIGHT_INTERVAL : REPICK_INTERVAL;
         if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
-                .shouldFire(maid, "torch_check", REPICK_INTERVAL)) {
+                .shouldFire(maid, "torch_check", interval)) {
             return;
         }
         ItemStack off = maid.getOffhandItem();
         // 黑暗持续判定 (对齐 DARKNESS 阈值; v79.58 用户裁定: 黑暗时管线自轮询维护 —
         // 被进食顶掉火把后自动重新点火, 不再依赖边沿重发)
-        boolean dark = world.getMaxLocalRawBrightness(maid.blockPosition())
+        boolean dark = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.LightQuery.getBrightness(world, maid.blockPosition())
                 < com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig.ENV_DARKNESS_THRESHOLD.get();
         boolean monsterNearby = !world.getEntitiesOfClass(Monster.class,
                 AABB.ofSize(maid.position(), 10, 10, 10)).isEmpty();
@@ -137,8 +163,9 @@ public final class TorchLightPipeline implements PassiveSignalSkeleton {
             }
             if (leftover.isEmpty()) {
                 maid.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
-                // 2026-08-11c (#9 用户裁定): 周围有怪 → 火把拿回后从背包补盾 —
-                // v79.48 修复 #10.1②: 恢复完成 → cancelPassive 闭环 (终止任务, 下次 DARKNESS 再触发)
+                // 恢复完成 → cancelPassive 闭环 (终止任务, 下次 DARKNESS 再触发)
+                // (2026-08-11c #9 曾声称"有怪补盾" — 代码无补盾实现; 有怪走 L151
+                // 保火把分支不达此处, 注释已修正)
                 com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher.cancelPassive(maid, taskType());
             }
             return;
@@ -148,8 +175,8 @@ public final class TorchLightPipeline implements PassiveSignalSkeleton {
             return;  // 已点亮
         }
         if (off.isEmpty() || isFood(off)) {
-            // 副手空或食物 → 顶 (食物放回背包, lightUp 内部腾) + 点火; 背包无灯 → 下轮 100t 再试
-            lightUp(world, maid);
+            // 副手空或食物 → 顶 (食物放回背包, lightUp 内部腾) + 点火; 背包无灯 → 标记 + 下轮 300t 再试
+            pipelineData(maid).putBoolean(KEY_NO_LIGHT, !lightUp(world, maid));
             return;
         }
         // 其他占用 (盾/工具等) → 不替换 (用户裁定保留)

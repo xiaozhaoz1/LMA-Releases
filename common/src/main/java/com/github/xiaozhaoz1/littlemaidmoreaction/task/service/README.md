@@ -8,7 +8,7 @@
 
 **依赖方向**: vanilla/io + task/data + MC; 被 pipeline/execute 调用; 不反向依赖 pipeline。
 
-**代表**: FurnaceService (决策+单拍双型) / ToolJudge / ItemFilters / CraftService / PressService / HaqiService / JukeboxService / ArmTransferService / MaterialChecker+MaterialReport (材料充足性检查)
+**代表**: FurnaceService (决策+单拍双型) / ItemFilters / CraftService / PressService / HaqiService / JukeboxService / ArmTransferService / MaterialChecker+MaterialReport (材料充足性检查)
 
 **修改注意**:
 1. 纯逻辑抽纯类进纯 JVM 测试 (ItemFilters/ToolJudge 先例)

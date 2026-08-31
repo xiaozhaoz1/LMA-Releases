@@ -2,6 +2,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.tlm;
 
 import com.github.tartaricacid.touhoulittlemaid.inventory.container.task.TaskConfigContainer;
 import net.minecraft.world.entity.player.Player;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -16,6 +17,11 @@ import static org.junit.jupiter.api.Assertions.*;
  *   <li>实现 TLM 任务接口并覆写默认方法 (错题 #8 同族)</li>
  * </ol>
  * 编译通过即证明映射一致, 测试可直接继承/覆盖 TLM 类。
+ *
+ * <p><b>测试性质说明 (NEW-H2)</b>: 本测试的真实价值在<b>编译期</b> — 映射不一致时
+ * 编译直接失败 (v67 错题 #4/#8 场景)。运行期断言仅做防退化守卫, 不重复编译期结论:
+ * 旧版 {@code assertNotNull(getDeclaredMethods())} 恒真 (JLS 保证 getDeclaredMethods
+ * 永非 null), 制造假绿 — 已改写为具体覆写方法存在性检查。
  */
 class TlmMappingOverrideTest {
 
@@ -60,11 +66,18 @@ class TlmMappingOverrideTest {
     }
 
     @Test
+    @DisplayName("容器覆写编译冒烟: 覆写方法 stillValid(Player) 仍保留 (防删改假绿)")
     void tlmContainerOverrideCompiles() {
-        assertNotNull(TlmChildContainer.class.getDeclaredMethods());
+        // NEW-H2: 删恒真 assertNotNull(getDeclaredMethods()) — 改写为具体方法存在性检查
+        // (编译期冒烟价值在类加载本身, 运行期断言只防"覆写被删/改名后仍绿"的假象)
+        java.lang.reflect.Method[] methods = TlmChildContainer.class.getDeclaredMethods();
+        boolean hasStillValidOverride = java.util.Arrays.stream(methods)
+                .anyMatch(m -> "stillValid".equals(m.getName()) && m.getParameterCount() == 1);
+        assertTrue(hasStillValidOverride, "TlmChildContainer 应保留覆写方法 stillValid(Player)");
     }
 
     @Test
+    @DisplayName("任务接口覆写冒烟: getUid 返回固定 ID (named 映射运行期可用)")
     void tlmTaskOverrideCompiles() {
         TlmTaskImpl task = new TlmTaskImpl();
         assertEquals("tlm_mapping", task.getUid().getPath());

@@ -12,10 +12,6 @@ public final class ScanFilters {
 
     private ScanFilters() {}
 
-    /** 雪层 (BlockTags.SNOW — SnowLayer/PowderSnow/TopSnow, 与 EnvScanner.scanSnowBlocks 同源) */
-    public static final Predicate<BlockState> SNOW =
-            s -> s.is(net.minecraft.tags.BlockTags.SNOW);
-
     /** 红石灯 */
     public static final Predicate<BlockState> REDSTONE_LAMP =
             s -> s.is(Blocks.REDSTONE_LAMP);

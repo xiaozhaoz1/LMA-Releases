@@ -32,43 +32,6 @@ public final class RunningBeltService {
 
     private RunningBeltService() {}
 
-    // ── Input ──
-
-    public static BlockPos findNearestBelt(Level level, BlockPos center) {
-        for (int dr = 0; dr <= SEARCH_RANGE; dr++) {
-            for (int dx = -dr; dx <= dr; dx++) {
-                for (int dz = -dr; dz <= dr; dz++) {
-                    if (Math.abs(dx) != dr && Math.abs(dz) != dr) continue;
-                    BlockPos pos = center.offset(dx, 0, dz);
-                    for (int dy = -1; dy <= 1; dy++) {
-                        BlockPos p = pos.offset(0, dy, 0);
-                        BlockState state = level.getBlockState(p);
-                        if (isBelt(state) && state.getValue(BeltBlock.SLOPE) == BeltSlope.HORIZONTAL) {
-                            return p.immutable();
-                        }
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    public static BlockPos getBeltControllerPos(Level level, BlockPos segmentPos) {
-        BeltBlockEntity segment = BeltHelper.getSegmentBE(level, segmentPos);
-        if (segment == null) return null;
-        BeltBlockEntity controller = BeltHelper.getControllerBE(level, segment.getBlockPos());
-        return controller != null ? controller.getBlockPos() : null;
-    }
-
-    /** 找皮带链中点 — 让女仆导航到中间不冲过头 */
-    public static BlockPos findBeltMidpoint(Level level, BlockPos segmentPos) {
-        BlockPos controllerPos = getBeltControllerPos(level, segmentPos);
-        if (controllerPos == null) return segmentPos;
-        List<BlockPos> chain = BeltBlock.getBeltChain(level, controllerPos);
-        if (chain.size() < 2) return segmentPos;
-        return chain.get(chain.size() / 2);
-    }
-
     // ── Compute ──
 
     public static boolean isMaidOnBelt(net.minecraft.world.entity.Entity maid, BlockPos pos) {

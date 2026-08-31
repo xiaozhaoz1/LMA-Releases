@@ -10,6 +10,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 import net.minecraft.world.entity.ai.memory.MemoryModuleType;
 import net.minecraft.world.entity.ai.memory.WalkTarget;
+import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
 import java.util.concurrent.ConcurrentHashMap;
@@ -77,6 +78,9 @@ public final class PathingApi {
     public static void clearNav(EntityMaid maid) {
         maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
         NAV_START.remove(maid.getId());
+        // v79.62.2 注意: 不清 NAV_ATTEMPT/NAV_CD — 超时路径先 clearNav 再记 attempt,
+        // 若在此清 attempt → 2 次尝试永不达成 (attempt 永远从 1 开始). attempt/CD 由
+        // navigate 自己管理 (FAILED/REACHED 时清).
     }
 
     /**
@@ -194,42 +198,54 @@ public final class PathingApi {
         if (DigThroughCoordinator.digUp(world, maid, target)) {
             return NavOutcome.DIGGING;
         }
-        // 头顶斜上目标 (digUp 水平门外) — 导航目标改矿正下方可站格 (v79.58 用户裁定
-        // "走到下面然后进行 6 格头顶挖矿"): 原导航目标=矿格 (高空实心) TLM 走不到 →
-        // 240t 看门狗 FAILED 且 canReachNear 不含正下方 → 直接 FAILED 零机会;
-        // 走到矿下 → 下轮 digUp 水平门归零自然触发
-        BlockPos under = null;
-        if (target.getY() > maid.blockPosition().getY()) {
-            under = standUnder(maid, target);
-        }
-        BlockPos navGoal = under != null ? under : target;
+        // v79.62.2 用户裁定: 全部矿统一尝试「走到目标上方」— navGoal = target.above()
+        // (不再 standUnder 矿下/矿格本身 — 实心目标 TLM 走不到, 用户实证 5 格地表矿原地).
+        // 走到上方 → 4 格内 nearPass 命中开脉 (垂直 1 格 3D 距离 = 1 格 ≤ 4).
+        BlockPos navGoal = target.above();
         if (reached(maid, navGoal, VanillaConstants.ONE_AWAY_DIST_SQR)) {
             clearNav(maid);
+            NAV_ATTEMPT.remove(maid.getId());   // v79.62.2 到达清尝试计数 (防残留影响下个目标)
+            NAV_CD.remove(maid.getId());
             alignToCenter(maid);
             return NavOutcome.REACHED;
         }
-        // TLM 导航段: 幂等导航 + 看门狗; 可达预检只在目标切换时做一次 (每 tick 预检
-        // = 每 tick 全 BFS 浪费; 预检目标改矿旁可站立格 — TLM canPathReach
-        // 对实心目标格语义脆弱 (BFS 只访问行走格 — 矿格本身不可行走 → 水平矿误判
-        // 不可达 → 跳过 → 女仆不走过去); 矿旁可站即走过去; 头顶斜上矿矿下可站也算
-        // 可达 (canReachNear 含正下方列, v79.58))
+        // TLM 导航段: 幂等导航 + 看门狗 (v79.62.2 用户裁定重试语义):
+        // 看门狗超时 = 1 次尝试失败 → 5 秒 CD (100t, 期间不导航) → 再试;
+        // 2 次尝试失败 → FAILED (调用方 failAndSkip 进跳过集 10 秒).
         long now = world.getGameTime();
         int id = maid.getId();
         BlockPos cur = navTarget(maid);
+        // 5 秒 CD: 上次超时后 100t 内不重设导航目标 (女仆原地等, 防每 tick 重导航)
+        long cdUntil = NAV_CD.getOrDefault(id, 0L);
+        if (cdUntil > now) {
+            return NavOutcome.WALKING;   // CD 中, 等
+        }
         if (cur == null || !cur.equals(navGoal)) {
-            if (!canReachNear(maid, target)) {
-                clearNav(maid);
-                // 只用 TLM 寻路 — 桥/阶梯 (BridgeCoordinator) 删, 垂直挖穿
-                // 保留。TLM 不可达 → FAILED → 跳过集 60t 过期重试
-                return NavOutcome.FAILED;
-            }
+            NAV_ATTEMPT.remove(id);   // v79.62.2 目标切换清尝试计数 (新目标重新 2 次机会)
+            NAV_CD.remove(id);
             navigateTo(maid, navGoal, 0.5F);
             NAV_START.put(id, now);
         }
         if (now - NAV_START.getOrDefault(id, now) >= ActiveTaskConfig.CHAIN_NAV_TIMEOUT.get()) {
             clearNav(maid);
-            return NavOutcome.FAILED;
+            int attempt = NAV_ATTEMPT.merge(id, 1, Integer::sum);
+            if (attempt >= 2) {
+                // 2 次尝试失败 → FAILED → 调用方进跳过集 (SKIP_TTL 10 秒)
+                NAV_ATTEMPT.remove(id);
+                NAV_CD.remove(id);
+                return NavOutcome.FAILED;
+            }
+            // 第 1 次失败 → 5 秒 CD 后重试
+            NAV_CD.put(id, now + NAV_RETRY_CD_TICKS);
+            return NavOutcome.WALKING;
         }
         return NavOutcome.WALKING;
     }
+
+    /** v79.62.2 导航重试: 失败后 2 秒 CD (tick) — 用户裁定 (原 5 秒改 2 秒) */
+    private static final int NAV_RETRY_CD_TICKS = 40;
+    /** per-maid 导航失败尝试次数 (超时算 1 次; ≥2 → FAILED 进跳过集) */
+    private static final ConcurrentMap<Integer, Integer> NAV_ATTEMPT = new ConcurrentHashMap<>();
+    /** per-maid 导航重试 CD 截止 tick (0=无 CD) */
+    private static final ConcurrentMap<Integer, Long> NAV_CD = new ConcurrentHashMap<>();
 }

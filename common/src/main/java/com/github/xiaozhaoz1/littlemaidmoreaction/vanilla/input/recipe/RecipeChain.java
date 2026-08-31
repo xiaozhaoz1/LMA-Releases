@@ -38,7 +38,8 @@ public record RecipeChain(
         Item output,
         int outputCount,
         int craftCount,
-        Set<Item> dependsOn
+        Set<Item> dependsOn,
+        java.util.List<Item> selectedInputs
     ) {
         /** 本步总产出数量 = outputCount × craftCount。 */
         public int totalOutput() { return outputCount * craftCount; }

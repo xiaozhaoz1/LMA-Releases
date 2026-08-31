@@ -14,7 +14,7 @@ import javax.annotation.Nullable;
  * 工具状态读取 — 原子只读 IO，零判断逻辑 (v36)。
  *
  * <p>高层判断（如"镐能否挖此矿"）放在计算层
- * {@link com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ToolJudge}，
+ * {@link ToolJudge}，
  * 本类只提供原子事实。
  */
 public final class ToolStateReader {

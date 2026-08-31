@@ -46,6 +46,8 @@ public final class MaidChatBubbleApi {
 
     /** 触发气泡节流 (tick, 5秒) — 镜像 MaidEmojiApi.EMOJI_THROTTLE_TICKS 防刷屏 */
     public static final int TRIGGER_THROTTLE_TICKS = 100;
+    /** 气泡全局公共 CD (tick, 5秒) — 2026-08-16 用户裁定: 同女仆任意气泡间至少隔 5s, 同时只有 1 格气泡 */
+    public static final int BUBBLE_GLOBAL_CD_TICKS = 100;
 
     /** 进度条背景/前景色 */
     private static final int BAR_BG = 0xFF333333;
@@ -68,9 +70,24 @@ public final class MaidChatBubbleApi {
         showInfo(maid, msg, INFO_TICK);
     }
 
-    /** 普通信息气泡 (自定义持续时间) — 无节流 */
+    /** 普通信息气泡 (Component — 客户端按语言翻译, 结构气泡双语 v79.6x) */
+    public static void showInfo(EntityMaid maid, Component msg) {
+        showInfo(maid, msg, INFO_TICK);
+    }
+
+    /** 普通信息气泡 (自定义持续时间) — 统一走 Component 版 (公共 CD 3s) */
     public static void showInfo(EntityMaid maid, String msg, int duration) {
-        add(maid, TextChatBubbleData.create(duration, Component.literal(msg),
+        showInfo(maid, Component.literal(msg), duration);
+    }
+
+    /** 普通信息气泡 (Component, 自定义持续时间) — 公共 CD 3s (2026-08-16 用户裁定:
+     *  同女仆任意气泡间至少隔 3s, 同时只有 1 格气泡; 与 showFail 30s/showTrigger 5s 独立叠加) */
+    public static void showInfo(EntityMaid maid, Component msg, int duration) {
+        if (throttled(maid, com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.BUBBLE_GLOBAL_TICK,
+                BUBBLE_GLOBAL_CD_TICKS)) {
+            return;
+        }
+        add(maid, TextChatBubbleData.create(duration, msg,
                 IChatBubbleData.TYPE_2, IChatBubbleData.DEFAULT_PRIORITY));
     }
 
@@ -90,6 +107,13 @@ public final class MaidChatBubbleApi {
     public static void showTrigger(EntityMaid maid, String msg) {
         if (!throttled(maid, KEY_LAST_TRIGGER_TICK, TRIGGER_THROTTLE_TICKS)) {
             showInfo(maid, "§e⚠ " + msg);
+        }
+    }
+
+    /** 规则触发气泡 (Component — 结构气泡双语 v79.6x), 橙色 §e⚠ 前缀 + 5秒节流 */
+    public static void showTrigger(EntityMaid maid, Component msg) {
+        if (!throttled(maid, KEY_LAST_TRIGGER_TICK, TRIGGER_THROTTLE_TICKS)) {
+            showInfo(maid, Component.literal("§e⚠ ").append(msg));
         }
     }
 

@@ -23,7 +23,7 @@ task/
 ├── sense/        环境信号 (扫描/边沿/常量; 与 pipeline/sense 被动配对)
 ├── gui/          任务树 + 配置屏 (无独立 README, 见下方「写一个新Pipeline」与 api/)
 ├── behavior/     Brain 默认行为 (吃/收集)
-├── pipeline/     任务实现 (8 主动 + sense 7 被动)
+├── pipeline/     任务实现 (8 主动 + sense 6 被动)
 └── service/      业务算法服务 (配方/名单/工具/乘区/执行细节)
 ```
 
@@ -55,7 +55,7 @@ task/
 | `TaskKeys.java` / `DataKey.java` | 键表: TaskKeys 字符串常量 + DataKey 类型化键 (~40, 引 TaskKeys) + CLEAR_ALL_KEYS 终结清理集合 |
 | `MaidData.java` | 数据门面: get/put/has/remove (类型化) + PL 内存态 (pl/flushPl) + CFG 直读 |
 | `FlowTaskData.java` / `TaskMetaData.java` | 便捷门面 (lma_flow_* / lma_task_*, 内部走 MaidData) |
-| `TaskToggle.java` | 启停/可视 (task_toggles.json, Gson) + isEnabledFor |
+| `TaskToggle.java` | 启停/可视 (task_toggles.json, Gson) |
 | `PipelineContext.java` / `PipelineResult.java` | 验证输入/输出 (record) |
 
 > **数据管理完整约定**: `docs/conventions/data-management.md` — MaidData 门面 + DataKey + MaidUnloadRegistry + 写代码规则。**新增 DataKey 键必须声明清理归属** (DataKeyConsistencyTest 守护)。
@@ -64,7 +64,6 @@ task/
 | 文件 | 什么 |
 |------|------|
 | `MaidFavorability.java` | 好感度双乘区: `workSpeedMultiplier` (效率) / `costMultiplier` (消耗) / `workTicks(maid, base)` (效率计时, v79.61x 收敛 4 处) — 管线自己乘, 每级可配 |
-| `ToolJudge.java` | 工具判断: suitableToolType / canHarvest / isToolUsable / 挖掘速度表 |
 | `ItemFilters.java` | 黑白名单过滤 + `effectivePair(cfg, gBlack, gWhite)` (v79.61x 收敛 pair 解析) |
 | `TaskConfigs.java` | 管线配置读取 (get(maid, taskType)) |
 | `HarvestTarget.java` | 采集目标定义 (含 TOOL_RESERVE_DURABILITY) |
@@ -73,7 +72,7 @@ task/
 | `FurnaceService.java` | 熔炉配方扫描/原料解析/生效名单 (validateSmelt 返回失败文案) |
 | `HaqiService.java` | 哈气执行细节 (挥击 doHit/音效 playSound + 音频清单常量) |
 | `BlockInteractService.java` | 全局右键门面 (距离+交互) |
-| `NearbyContainerService.java` / `RecipeResolver.java` | 容器 / 配方 |
+| `RecipeResolver.java` | 配方链解析 |
 | `MaterialChecker.java` / `MaterialReport.java` | 材料充足性检查 (required vs available → 缺口 report; CraftChainPipeline.validate 消费) |
 
 ### 全局工具 (vanilla/input/maid/)
@@ -166,6 +165,6 @@ LMAT.register(new MyStateMachine());
 
 ## 全局能力清单 (新功能优先复用)
 
-MaidData (数据) / ToolJudge (工具) / PathingApi (导航) / MaidChatBubbleApi (气泡) / MaidEmojiApi (表情) /
+MaidData (数据) / (工具判断 → vanilla/input/item/ToolJudge) / PathingApi (导航) / MaidChatBubbleApi (气泡) / MaidEmojiApi (表情) /
 SenseApi (扫描) / MaidFavorability (好感度乘区) / ThrottleUtil (节流 CD) / BlockInteractService (右键门面) /
-MaidUnloadRegistry (卸载清理) / CombatOutput (输出原语) / ContainerOutput/NearbyContainerService (容器)
+MaidUnloadRegistry (卸载清理) / CombatOutput (输出原语) / (容器 → vanilla/input/container/NearbyContainerScanner 扫 + vanilla/output/container/ContainerOutput 写)

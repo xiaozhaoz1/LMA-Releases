@@ -161,6 +161,132 @@ public final class TaskSettingsScreen {
                         .setTooltip(Component.literal("假人随机播放女仆语音包音频 (需女仆在 TLM 配置选择语音包)"))
                         .setSaveConsumer(PassiveTaskConfig.COMPANION_VOICE_ENABLED::set).build());
             }
+            // v79.62.1 哈气/奶开关迁至管线子界面 (从 ClothSettingsScreen 主屏全局分类迁入)
+            case "haqi" -> {
+                cat.addEntry(eb.startBooleanToggle(Component.literal("哈气任务总开关"),
+                                PassiveTaskConfig.HAQI_ENABLED.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_ENABLED.getDefault())
+                        .setTooltip(Component.literal("默认关闭; 开启后女仆靠近其他女仆时概率触发"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_ENABLED::set).build());
+                cat.addEntry(eb.startDoubleField(Component.literal("触发概率"),
+                                PassiveTaskConfig.HAQI_CHANCE.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_CHANCE.getDefault())
+                        .setMin(0.0).setMax(1.0)
+                        .setTooltip(Component.literal("2 格内有其他女仆时的触发概率, 默认 0.1 = 10%"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_CHANCE::set).build());
+                cat.addEntry(eb.startIntField(Component.literal("基础看着时长 (tick)"),
+                                PassiveTaskConfig.HAQI_DURATION_TICKS.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_DURATION_TICKS.getDefault())
+                        .setMin(20).setMax(1200)
+                        .setTooltip(Component.literal("60 = 3 秒; 总看着时长 = 基础 + 音频实际时长"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_DURATION_TICKS::set).build());
+                cat.addEntry(eb.startDoubleField(Component.literal("音频音量"),
+                                PassiveTaskConfig.HAQI_VOLUME.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_VOLUME.getDefault())
+                        .setMin(0.0).setMax(2.0)
+                        .setTooltip(Component.literal("哈气音频播放音量, 默认 1.0"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_VOLUME::set).build());
+                cat.addEntry(eb.startDoubleField(Component.literal("挥击概率"),
+                                PassiveTaskConfig.HAQI_HIT_CHANCE.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_HIT_CHANCE.getDefault())
+                        .setMin(0.0).setMax(1.0)
+                        .setTooltip(Component.literal("LOOK 期间概率挥击目标一下, 默认 0.3 = 30%"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_HIT_CHANCE::set).build());
+                cat.addEntry(eb.startDoubleField(Component.literal("挥击伤害"),
+                                PassiveTaskConfig.HAQI_HIT_DAMAGE.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_HIT_DAMAGE.getDefault())
+                        .setMin(0.0).setMax(100.0)
+                        .setTooltip(Component.literal("挥击伤害, 默认 1.0 = 一点血"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_HIT_DAMAGE::set).build());
+                cat.addEntry(eb.startBooleanToggle(Component.literal("哈气对主人开关"),
+                                PassiveTaskConfig.HAQI_ENABLED_TO_OWNER.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_ENABLED_TO_OWNER.getDefault())
+                        .setTooltip(Component.literal("默认关闭; 需哈气总开关开启; 只控制对主人哈气"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_ENABLED_TO_OWNER::set).build());
+                cat.addEntry(eb.startDoubleField(Component.literal("对主人触发概率"),
+                                PassiveTaskConfig.HAQI_CHANCE_TO_OWNER.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_CHANCE_TO_OWNER.getDefault())
+                        .setMin(0.0).setMax(1.0)
+                        .setTooltip(Component.literal("旁边无女仆时对 2 格内主人的触发概率, 默认 0.1"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_CHANCE_TO_OWNER::set).build());
+                cat.addEntry(eb.startIntField(Component.literal("对主人看着时长 (tick)"),
+                                PassiveTaskConfig.HAQI_DURATION_TICKS_TO_OWNER.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_DURATION_TICKS_TO_OWNER.getDefault())
+                        .setMin(20).setMax(1200)
+                        .setTooltip(Component.literal("60 = 3 秒"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_DURATION_TICKS_TO_OWNER::set).build());
+                cat.addEntry(eb.startDoubleField(Component.literal("对主人音频音量"),
+                                PassiveTaskConfig.HAQI_VOLUME_TO_OWNER.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_VOLUME_TO_OWNER.getDefault())
+                        .setMin(0.0).setMax(2.0)
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_VOLUME_TO_OWNER::set).build());
+                cat.addEntry(eb.startDoubleField(Component.literal("对主人挥击概率"),
+                                PassiveTaskConfig.HAQI_HIT_CHANCE_TO_OWNER.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_HIT_CHANCE_TO_OWNER.getDefault())
+                        .setMin(0.0).setMax(1.0)
+                        .setTooltip(Component.literal("LOOK 期间概率拍主人一下, 默认 0.3"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_HIT_CHANCE_TO_OWNER::set).build());
+                cat.addEntry(eb.startDoubleField(Component.literal("对主人挥击伤害"),
+                                PassiveTaskConfig.HAQI_HIT_DAMAGE_TO_OWNER.get())
+                        .setDefaultValue(PassiveTaskConfig.HAQI_HIT_DAMAGE_TO_OWNER.getDefault())
+                        .setMin(0.0).setMax(100.0)
+                        .setTooltip(Component.literal("挥击伤害, 默认 1.0; 主人不反击"))
+                        .setSaveConsumer(PassiveTaskConfig.HAQI_HIT_DAMAGE_TO_OWNER::set).build());
+            }
+            case "void_excavation" -> {
+                // v79.62.1 挖空置域: 全局默认区块数 (区域 = 起点为中心 N×N 区块)
+                cat.addEntry(eb.startIntField(
+                                Component.literal("默认区块数"), ActiveTaskConfig.VOID_DEFAULT_CHUNKS.get())
+                        .setDefaultValue(ActiveTaskConfig.VOID_DEFAULT_CHUNKS.getDefault())
+                        .setMin(1).setMax(256)
+                        .setTooltip(Component.literal("起点为中心 N×N 区块全挖 (垂直基岩上到世界最高); 单女仆区块数可在 TLM 任务设置覆盖"))
+                        .setSaveConsumer(ActiveTaskConfig.VOID_DEFAULT_CHUNKS::set).build());
+                // v79.62.1 用户裁定 (黑名单→销毁名单): 名单内物品挖出即销毁; 关寻路 (全局默认, 单女仆 TLM 可覆盖)
+                cat.addEntry(eb.startStrList(
+                                Component.literal("销毁名单 (物品id)"),
+                                new ArrayList<>(ActiveTaskConfig.VOID_DESTROY_LIST.get()))
+                        .setDefaultValue(new ArrayList<>(ActiveTaskConfig.VOID_DESTROY_LIST.getDefault()))
+                        .setTooltip(Component.literal("名单内物品挖出即销毁消失 (不进背包不落地); 其余进背包→输出箱; 背包满停止"))
+                        .setSaveConsumer(ActiveTaskConfig.VOID_DESTROY_LIST::set).build());
+                cat.addEntry(eb.startBooleanToggle(
+                                Component.literal("关闭寻路"),
+                                ActiveTaskConfig.VOID_NO_PATHFIND.get())
+                        .setDefaultValue(ActiveTaskConfig.VOID_NO_PATHFIND.getDefault())
+                        .setTooltip(Component.literal("开启后不 BFS 寻路, 传送到区块中间直接挖 (避免寻路卡顿)"))
+                        .setSaveConsumer(ActiveTaskConfig.VOID_NO_PATHFIND::set).build());
+            }
+            case "jiuhu_milk" -> {
+                cat.addEntry(eb.startBooleanToggle(Component.literal("酒狐奶自动喂食"),
+                                PassiveTaskConfig.JIUHU_MILK_AUTO_FEED.get())
+                        .setDefaultValue(PassiveTaskConfig.JIUHU_MILK_AUTO_FEED.getDefault())
+                        .setTooltip(Component.literal("主人受伤 (<70%血量) 时自动喂奶 (清负面+buff)"))
+                        .setSaveConsumer(PassiveTaskConfig.JIUHU_MILK_AUTO_FEED::set).build());
+                cat.addEntry(eb.startBooleanToggle(Component.literal("奶主开关"),
+                                com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TOGGLE_ENABLED.get())
+                        .setDefaultValue(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TOGGLE_ENABLED.getDefault())
+                        .setTooltip(Component.literal("空桶右键女仆挤奶"))
+                        .setSaveConsumer(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TOGGLE_ENABLED::set).build());
+                cat.addEntry(eb.startBooleanToggle(Component.literal("野生奶副开关"),
+                                com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TOGGLE_WILD_EXTRA.get())
+                        .setDefaultValue(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TOGGLE_WILD_EXTRA.getDefault())
+                        .setTooltip(Component.literal("开=未驯服产野生酒狐奶, 关=未驯服也产酒狐奶桶"))
+                        .setSaveConsumer(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TOGGLE_WILD_EXTRA::set).build());
+                cat.addEntry(eb.startIntField(Component.literal("奶桶抗性时长 (tick)"),
+                                com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TAMED_RESISTANCE_TICKS.get())
+                        .setDefaultValue(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TAMED_RESISTANCE_TICKS.getDefault())
+                        .setMin(20).setMax(12000)
+                        .setSaveConsumer(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TAMED_RESISTANCE_TICKS::set).build());
+                cat.addEntry(eb.startIntField(Component.literal("奶桶恢复时长 (tick)"),
+                                com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TAMED_REGENERATION_TICKS.get())
+                        .setDefaultValue(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TAMED_REGENERATION_TICKS.getDefault())
+                        .setMin(20).setMax(12000)
+                        .setSaveConsumer(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.TAMED_REGENERATION_TICKS::set).build());
+                cat.addEntry(eb.startIntField(Component.literal("野生奶恢复时长 (tick)"),
+                                com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.WILD_REGENERATION_TICKS.get())
+                        .setDefaultValue(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.WILD_REGENERATION_TICKS.getDefault())
+                        .setMin(20).setMax(12000)
+                        .setSaveConsumer(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.WILD_REGENERATION_TICKS::set).build());
+            }
             default -> cat.addEntry(eb.startTextDescription(
                     Component.literal("该任务暂无自定义设置")).build());
         }

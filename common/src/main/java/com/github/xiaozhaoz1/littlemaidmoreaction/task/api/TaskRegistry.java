@@ -1,6 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.api;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.TaskRegistryManifest;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
 import net.minecraft.server.level.ServerLevel;
@@ -56,11 +57,19 @@ public final class TaskRegistry {
         }
 
 //? if 1.20.1 {
-        // ── Create Big Cannons 速射炮闩装填 (1.20.1 仅) ──
+        // ── Create Big Cannons 速射炮闩装填 ──
         // CompatToggle 开关 (可 GUI 关闭)
         // ★ 门控镜像 CompatRegistry.MODULES 模块表 (GUI/开关单一事实源) — 2026-08-11c
         if (com.github.xiaozhaoz1.littlemaidmoreaction.compat.CompatToggle.isModuleEnabled("createbigcannons")
                 && net.minecraftforge.fml.ModList.get().isLoaded("createbigcannons")) {
+            for (TaskRegistryManifest.TaskSpec s : TaskRegistryManifest.CBC) {
+                register(s.taskType(), s.factory().get());
+            }
+        }
+//?} else {
+        // ── Create Big Cannons 速射炮闩装填 (1.21.1 移植 2026-08-16) ──
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.compat.CompatToggle.isModuleEnabled("createbigcannons")
+                && net.neoforged.fml.ModList.get().isLoaded("createbigcannons")) {
             for (TaskRegistryManifest.TaskSpec s : TaskRegistryManifest.CBC) {
                 register(s.taskType(), s.factory().get());
             }
@@ -96,6 +105,19 @@ public final class TaskRegistry {
     }
 
     /**
+     * 注册纯触发型被动 (v79.61x 脱管线 — 无 pipeline 占位条目, 用户裁定)。
+     * 条目仅供任务树可见 + TaskToggle 开关; 执行经 {@code PassiveDispatcher} (task/passive),
+     * 不经 GMPM tick (从不写 in_progress 键)。
+     */
+    public static void registerPassive(String taskType) {
+        if (HANDLERS.containsKey(taskType)) {
+            throw new IllegalStateException("[LMA] 被动任务重复注册: " + taskType);
+        }
+        HANDLERS.put(taskType, new TaskHandler(taskType, null, false));
+        rebuildPassiveCache();
+    }
+
+    /**
      * 注册完整性 fail-fast (v79.61 批 3c C3) — 无条件任务必须全注册,
      * 漂移 (改名/漏注册) 启动即炸 (PacketRegistry.validatePlatformNames 同款防线)。
      */
@@ -111,6 +133,7 @@ public final class TaskRegistry {
                                           String target, int targetCount) {
         TaskHandler handler = HANDLERS.get(taskType);
         if (handler == null) return PipelineResult.failed("未知任务类型: " + taskType);
+        if (handler.pipeline() == null) return PipelineResult.failed("无管道任务: " + taskType);
         if (!(maid.level() instanceof ServerLevel level)) return PipelineResult.failed("仅在服务端可用");
         return handler.pipeline().validate(level, maid, new PipelineContext(target, targetCount, taskId));
     }
@@ -129,6 +152,6 @@ public final class TaskRegistry {
         return passiveCache;
     }
 
-    /** executor 字段删除 — 执行归管线 (GMPM tick / WorkStationPipeline) */
+    /** executor 字段删除 — 执行归管线 (GMPM tick / WorkStationPipeline); pipeline 可空 (纯触发型占位) */
     public record TaskHandler(String taskType, TaskPipeline pipeline, boolean showInBar) {}
 }

@@ -17,13 +17,15 @@ public final class AutoRepairBehavior extends MaidCheckRateTask {
 
     public AutoRepairBehavior() {
         super(Map.of(), 200);   // 2 参构造 (Map, duration) — 双平台同签名 (javap 实证)
-        setMaxCheckRate(100);   // ≈ 5 秒 1 点
+        setMaxCheckRate(400);   // v79.62 用户裁定: 20 秒 1 点
     }
 
     @Override
     protected void start(ServerLevel worldIn, EntityMaid owner, long gameTimeIn) {
         if (com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.REPAIR_AUTO_ENABLED.get()) {
-            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.MaidStateWriter.repairOneWithXp(owner);
+            // v79.62: 好感度消耗乘区由 task 域计算传入 (vanilla/output 不反向依赖 task/service — B3 结构批 #6)
+            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.MaidStateWriter.repairOneWithXp(
+                    owner, com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.costMultiplier(owner));
         }
     }
 }

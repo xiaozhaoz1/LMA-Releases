@@ -12,9 +12,9 @@ import java.util.Map;
 /**
  * 野生酒狐奶 / 酒狐奶桶配置段 (v79.6x) — {@code config/littlemaidmoreaction/kitsune_milk.toml}。
  *
- * <p>8 项: 主/副开关 + 三种效果时长 + 耐久 + 无敌时长 + CD。
+ * <p>9 项: 主/副开关 + 三种效果时长 + 耐久 + 无敌时长 + CD + 音量。
  * 加好感 CD (5 分钟) 不进配置 (用户裁定) — {@code KitsuneMilkInteract} 硬编码常量。
- * 攻击伤害读哈气管线 {@code PassiveTaskConfig.HAQI_HIT_DAMAGE} (用户裁定)。
+ * 未驯服挤奶不打人不哈气不加好感 (用户裁定)。
  */
 public final class WildKitsuneMilkConfig {
 
@@ -51,6 +51,12 @@ public final class WildKitsuneMilkConfig {
     public static final ForgeConfigSpec.IntValue WILD_REGENERATION_TICKS;
 //?} else {
     public static final ModConfigSpec.IntValue WILD_REGENERATION_TICKS;
+//?}
+    // ── 饮用行为 ──
+//? if 1.20.1 {
+    public static final ForgeConfigSpec.BooleanValue CLEAR_NEGATIVE;
+//?} else {
+    public static final ModConfigSpec.BooleanValue CLEAR_NEGATIVE;
 //?}
 
     // ── 饰品 ──
@@ -108,6 +114,9 @@ public final class WildKitsuneMilkConfig {
         WILD_REGENERATION_TICKS = b
                 .comment("野生酒狐奶饮用生命恢复 I 时长 (tick, 默认 600 = 30s)")
                 .defineInRange("wild_regeneration_ticks", 600, 20, 12000);
+        CLEAR_NEGATIVE = b
+                .comment("饮用时移除全部负面效果 (原版牛奶语义; 酒狐奶与野生奶共用, 先清后加)")
+                .define("clear_negative", true);
         b.pop();
 
         b.push("bauble");
@@ -137,6 +146,8 @@ public final class WildKitsuneMilkConfig {
                 KITSUNE_VALUES, "kitsune_milk", TAMED_REGENERATION_TICKS);
         com.github.xiaozhaoz1.littlemaidmoreaction.config.MoreActionConfig.reg(
                 KITSUNE_VALUES, "kitsune_milk", WILD_REGENERATION_TICKS);
+        com.github.xiaozhaoz1.littlemaidmoreaction.config.MoreActionConfig.reg(
+                KITSUNE_VALUES, "kitsune_milk", CLEAR_NEGATIVE);
         com.github.xiaozhaoz1.littlemaidmoreaction.config.MoreActionConfig.reg(
                 KITSUNE_VALUES, "kitsune_milk", BAUBLE_DURABILITY);
         com.github.xiaozhaoz1.littlemaidmoreaction.config.MoreActionConfig.reg(

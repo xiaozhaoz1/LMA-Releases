@@ -28,6 +28,8 @@ public final class ForgePacketRegistrar {
                     InteractTriggerPacket::encode, InteractTriggerPacket::decode, InteractTriggerPacket::handle, dir(def.direction()))),
             Map.entry("task_config_action", (ch, def) -> ch.registerMessage(def.id(), TaskConfigActionPacket.class,
                     TaskConfigActionPacket::encode, TaskConfigActionPacket::decode, TaskConfigActionPacket::handle, dir(def.direction()))),
+            Map.entry("patpat_reaction", (ch, def) -> ch.registerMessage(def.id(), PatPatReactionPacket.class,
+                    PatPatReactionPacket::encode, PatPatReactionPacket::decode, PatPatReactionPacket::handle, dir(def.direction()))),
             Map.entry("request_task_config", (ch, def) -> ch.registerMessage(def.id(), RequestTaskConfigPacket.class,
                     RequestTaskConfigPacket::encode, RequestTaskConfigPacket::decode, RequestTaskConfigPacket::handle, dir(def.direction()))),
             Map.entry("reply_task_config", (ch, def) -> ch.registerMessage(def.id(), ReplyTaskConfigPacket.class,
@@ -50,7 +52,17 @@ public final class ForgePacketRegistrar {
             Map.entry("maid_codex_screen", (ch, def) -> ch.registerMessage(def.id(), MaidCodexScreenPacket.class,
                     MaidCodexScreenPacket::encode, MaidCodexScreenPacket::decode, MaidCodexScreenPacket::handle, dir(def.direction()))),
             Map.entry("maid_env_sense_toggle", (ch, def) -> ch.registerMessage(def.id(), MaidEnvSenseTogglePacket.class,
-                    MaidEnvSenseTogglePacket::encode, MaidEnvSenseTogglePacket::decode, MaidEnvSenseTogglePacket::handle, dir(def.direction())))
+                    MaidEnvSenseTogglePacket::encode, MaidEnvSenseTogglePacket::decode, MaidEnvSenseTogglePacket::handle, dir(def.direction()))),
+            Map.entry("farm_region_edit", (ch, def) -> ch.registerMessage(def.id(), FarmRegionEditPacket.class,
+                    FarmRegionEditPacket::encode, FarmRegionEditPacket::decode, FarmRegionEditPacket::handle, dir(def.direction()))),
+            Map.entry("farm_region_sync", (ch, def) -> ch.registerMessage(def.id(), FarmRegionSyncPacket.class,
+                    FarmRegionSyncPacket::encode, FarmRegionSyncPacket::decode, FarmRegionSyncPacket::handle, dir(def.direction()))),
+            Map.entry("farm_container_bind", (ch, def) -> ch.registerMessage(def.id(), FarmContainerBindPacket.class,
+                    FarmContainerBindPacket::encode, FarmContainerBindPacket::decode, FarmContainerBindPacket::handle, dir(def.direction()))),
+            Map.entry("farm_region_bind", (ch, def) -> ch.registerMessage(def.id(), FarmRegionBindPacket.class,
+                    FarmRegionBindPacket::encode, FarmRegionBindPacket::decode, FarmRegionBindPacket::handle, dir(def.direction()))),
+            Map.entry("smithing_craft", (ch, def) -> ch.registerMessage(def.id(), SmithingCraftPacket.class,
+                    SmithingCraftPacket::encode, SmithingCraftPacket::decode, SmithingCraftPacket::handle, dir(def.direction())))
     );
 
     /** 清单驱动注册 — commonSetup enqueueWork 内调用; 漂移 (缺/幽灵条目) fail-fast */

@@ -2,7 +2,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla;
 import net.minecraft.core.Holder;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.xiaozhaoz1.littlemaidmoreaction.compat.TlmVersion;
+import com.github.xiaozhaoz1.littlemaidmoreaction.init.TlmVersion;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;

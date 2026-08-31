@@ -15,12 +15,9 @@ public final class VanillaConstants {
     public static final int CRAFT_BATCH_SIZE = 1;
 
     // === 唱片机 ===
-    public static final int JUKEBOX_PLAY_TICKS = 6000;   // 5 分钟
     public static final int JUKEBOX_PICKUP_TICKS = 20;    // 1 秒
 
     // === 熔炉 ===
-    public static final int FURNACE_INPUT_LIMIT = 8;
-    public static final int FURNACE_FUEL_LIMIT = 64;
 
     // === 导航 ===
     public static final int NAV_CHECK_INTERVAL = 100;     // Brain 行为检查间隔 (tick)
@@ -39,6 +36,4 @@ public final class VanillaConstants {
     public static final double DIG_DIRECT_DIST_SQR = 16.0; // 4 格球 — 扫描目标直接开脉 (v79.58 跟随
                                                            // 破块门 — 4 格内直接挖, 不走寻路)
 
-    // === 任务 ===
-    public static final int TASK_DEFAULT_TIMEOUT = 1200;  // 60 秒
 }

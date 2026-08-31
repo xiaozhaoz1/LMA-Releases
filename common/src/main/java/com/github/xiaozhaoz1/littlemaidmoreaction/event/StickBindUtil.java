@@ -77,15 +77,13 @@ public final class StickBindUtil {
     }
 
     /**
-     * 检查女仆当前任务类型 — 不匹配时给玩家发提示并返回 false。
-     */
+     * 检查女仆当前任务类型 — 不匹配时返回 false (v79.62.1 修重复消息:
+     *  ArmTransfer/BlockInteract 等多个 SetupHandler 都监听 InteractMaidEvent, 不匹配时
+     *  各自发"不支持"提示 → 同一右键刷 3 条 (日志实证). 改为静默 — "当前任务不是本 handler
+     *  的任务"是正常情况, 由匹配的 handler 处理; 不匹配无提示 (消重). */
     public static boolean checkTaskType(EntityMaid maid, String expected, Player player) {
         String taskType = LmaTaskTypeRegistry.extractTaskType(maid.getTask().getUid().getPath());
-        if (expected.equals(taskType)) return true;
-        String name = taskType != null ? taskType : "idle";
-        player.sendSystemMessage(
-            Component.literal("§c物品(木棍)不支持设置该任务(" + name + ")"));
-        return false;
+        return expected.equals(taskType);
     }
 
     /**

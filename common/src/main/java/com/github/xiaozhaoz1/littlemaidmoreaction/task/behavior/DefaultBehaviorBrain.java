@@ -28,11 +28,14 @@ public enum DefaultBehaviorBrain implements IExtraMaidBrain {
 
     @Override
     public List<Pair<Integer, BehaviorControl<? super EntityMaid>>> getCoreBehaviors() {
+        java.util.List<Pair<Integer, BehaviorControl<? super EntityMaid>>> list = new java.util.ArrayList<>();
+        // v79.62 空闲可爱动作 (借鉴 soulcraft-mcbot): 蹲起/挥手/歪头/回头 — 优先级 15
+        list.add(Pair.of(15, new MaidCuteIdleBehavior()));
         // v79.48: 自动修复 — core 所有 activity 都跑 (工作/战斗/发呆, 慢慢修); 优先级 5 低
-        if (!com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.REPAIR_AUTO_ENABLED.get()) {
-            return List.of();
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.REPAIR_AUTO_ENABLED.get()) {
+            list.add(Pair.of(5, new AutoRepairBehavior()));
         }
-        return List.of(Pair.of(5, new AutoRepairBehavior()));
+        return list;
     }
 
     /** 从当前任务的 Pipeline 获取收集过滤器 */

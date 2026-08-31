@@ -1,6 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.data;
 
-import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 
 import java.io.IOException;
@@ -37,16 +36,13 @@ public final class TaskToggle {
         catch (IOException e) { LittleMaidMoreAction.LOGGER.warn("[TaskToggle] save failed", e); }
     }
 
+    // v79.62.1 haqi/jiuhu_milk 启用迁移至管线 per-maid 配置 (PassiveConfigUtil), 不再用全局 TaskToggle
     static { load(); }
 
     // ── enabled ──
     public static boolean isEnabled(String taskType) { return !DISABLED.contains(taskType); }
     public static void setEnabled(String taskType, boolean v) {
         if (v) DISABLED.remove(taskType); else DISABLED.add(taskType); save();
-    }
-    public static boolean isEnabledFor(EntityMaid maid, String taskType) {
-        // per-maid 禁用键无写入方 (死功能) — 简化为全局开关
-        return isEnabled(taskType);
     }
 
     // ── showInBar ──

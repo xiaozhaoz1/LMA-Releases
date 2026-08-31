@@ -47,7 +47,7 @@ public final class MaidFavorability {
 
     /**
      * 效率乘区计时 (v79.61x 重复抽取) — 等级高干得快: {@code workTicks = max(1, (int)(base / speed))}。
-     * 收敛 4 处同形重复 (Press/Mix 冲压搅拌 100t / SnowShovel 铲雪 40t / MaidAssemblyService 装配时长)。
+     * 收敛 3 处同形重复 (Press/Mix 冲压搅拌 100t / MaidAssemblyService 装配时长; v79.62: SnowShovel 随清雪移除)。
      */
     public static int workTicks(EntityMaid maid, int baseTicks) {
         return workTicks(baseTicks, workSpeedMultiplier(maid));

@@ -24,10 +24,20 @@ public final class TaskTree {
         for (String taskType : TaskRegistry.taskTypes()) {
             TaskRegistry.TaskHandler handler = TaskRegistry.get(taskType);
             if (handler == null) continue;
-            nodes.add(new TaskNode(taskType,
-                handler.pipeline().getClass().getSimpleName().replace("Pipeline", ""),
+            // v79.61x: 纯触发型被动无 pipeline — 类名兜底 taskType (用户裁定), steps 空
+            TaskPipeline pipeline = handler.pipeline();
+            // v79.62.2 显示名走翻译键 (task.littlemaidmoreaction.<type>, 如 dam_fill=填坝) — 找不到回退类名
+            String label = pipeline == null ? taskType
+                    : net.minecraft.network.chat.Component.translatable(
+                            "task." + com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.MOD_ID + "." + taskType)
+                        .getString();
+            if (label.startsWith("task.") || label.equals(taskType)) {
+                label = pipeline.getClass().getSimpleName().replace("Pipeline", "");
+            }
+            List<TaskPipeline.TaskStep> steps = pipeline == null ? List.of() : pipeline.steps();
+            nodes.add(new TaskNode(taskType, label,
                 LmaTaskTypeRegistry.getIcon(taskType),
-                handler.pipeline().steps(),
+                steps,
                 TaskToggle.isEnabled(taskType),
                 TaskToggle.isVisible(taskType),
                 !handler.showInBar()));

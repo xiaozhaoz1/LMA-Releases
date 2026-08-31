@@ -2,10 +2,13 @@ package com.github.xiaozhaoz1.littlemaidmoreaction;
 
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigMenu;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BellRingConfigMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BlockInteractConfigMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.CraftChainConfigMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.ItemListConfigMenu;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.PassiveToggleConfigMenu;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu;
 import net.minecraft.world.inventory.MenuType;
 
 /**
@@ -25,7 +28,14 @@ public final class LmaMenus {
     public static MenuType<BellRingConfigMenu> BELL_RING_CONFIG_MENU;
     /** v74: AI 操控配置菜单 (LLM 模型/声线名称) */
     public static MenuType<AiControlConfigMenu> AI_CONTROL_CONFIG_MENU;
-    /** v76 Phase 6: FSM 任务自动配置菜单 (参数契约驱动) */
+    /** v79.62.1: 通用被动管线开关配置菜单 (haqi/jiuhu_milk 共用) */
+    public static MenuType<PassiveToggleConfigMenu> PASSIVE_TOGGLE_CONFIG_MENU;
+    /** v79.62.1: 锻造容器菜单 (原版锻造台样式, 无模板) */
+    public static MenuType<MaidSmithingMenu> SMITHING_MENU;
+    /** v79.62: 挖空置域单女仆区块数配置菜单 */
+    public static MenuType<VoidExcavationConfigMenu> VOID_EXCAVATION_CONFIG_MENU;
+    /** v79.62.2: dam_fill config menu (drain toggle) */
+    public static MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigMenu> DAM_FILL_CONFIG_MENU;
 
     private LmaMenus() {
     }

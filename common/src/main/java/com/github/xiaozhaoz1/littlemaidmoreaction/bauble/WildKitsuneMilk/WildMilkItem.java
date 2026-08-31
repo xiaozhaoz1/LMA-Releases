@@ -68,6 +68,10 @@ public final class WildMilkItem extends Item {
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!level.isClientSide && entity instanceof Player player) {
+            // 清负面 (共用开关, 默认开; 必须先清后加 — removeAllEffects 会连刚加的正面 buff 一起删)
+            if (WildKitsuneMilkConfig.CLEAR_NEGATIVE.get()) {
+                player.removeAllEffects();
+            }
             int regen = WildKitsuneMilkConfig.WILD_REGENERATION_TICKS.get();
             player.addEffect(new MobEffectInstance(MobEffects.REGENERATION, regen, 0)); // I
             // 喝奶音效 (原版 GENERIC_DRINK)

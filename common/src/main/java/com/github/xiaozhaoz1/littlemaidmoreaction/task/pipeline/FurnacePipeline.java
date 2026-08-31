@@ -66,7 +66,12 @@ public final class FurnacePipeline extends TaskStateMachine<FurnacePipeline.Phas
 
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
-        String reason = FurnaceService.validateSmelt(level, maid, ctx.target());
+        // v79.62.1 炉子类型动态配方: 熔炉 SMELTING / 烟熏炉 SMOKING / 高炉 BLASTING
+        // 与 gateTarget 同款: TARGET_POS 记忆直接 get() 取 PositionTracker (var 推断)
+        var mem = maid.getBrain().getMemory(com.github.tartaricacid.touhoulittlemaid.init.InitEntities.TARGET_POS.get());
+        net.minecraft.core.BlockPos pos = mem.isEmpty() ? null : mem.get().currentBlockPosition();
+        var recipeType = FurnaceService.recipeTypeFor(level, pos);
+        String reason = FurnaceService.validateSmelt(level, maid, ctx.target(), recipeType);
         return reason == null ? PipelineResult.ok("") : PipelineResult.failed(reason);
     }
 
@@ -78,10 +83,16 @@ public final class FurnacePipeline extends TaskStateMachine<FurnacePipeline.Phas
     @Override
     protected Phase tick(Phase phase, ServerLevel world, EntityMaid maid) {
         BlockPos target = gateTarget(maid);
-        String ingredientKey = FurnaceService.resolveSmeltIngredient(world, maid);
+        // v79.62.1 炉子类型动态配方: 熔炉 SMELTING / 烟熏炉 SMOKING / 高炉 BLASTING
+        var recipeType = FurnaceService.recipeTypeFor(world, target);
+        String ingredientKey = FurnaceService.resolveSmeltIngredient(world, maid, recipeType);
         if (ingredientKey.isEmpty()) {
-            LittleMaidMoreAction.LOGGER.debug("[LMA/Furnace] no ingredient, stay {}", phase);
-            com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, "furnace 失败");
+            // v79.61x S1-F2 (用户裁定): 无料不每拍刷失败气泡 — 1200t 冷却后重查 + 气泡提醒
+            // (与看门狗同周期; 时间戳自过期, 料补上后自然恢复; 原每拍气泡 = 600t 节流刷屏)
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                    .shouldFire(maid, "furnace_no_ingredient", 1200)) {
+                com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, "furnace 失败");
+            }
             return null;
         }
         if (!(world.getBlockEntity(target) instanceof AbstractFurnaceBlockEntity furnace)) {

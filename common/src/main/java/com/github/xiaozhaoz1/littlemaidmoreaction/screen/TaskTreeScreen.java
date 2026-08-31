@@ -84,8 +84,9 @@ public final class TaskTreeScreen extends Screen {
             else if (hov) g.fill(lx + 3, ry, lx + LEFT_W - 3, ry + ROW_H, 0x33333333);
             // 双 withStyle 颜色覆盖 (后者赢) - 合并为单次计算 (启用绿/禁用红, 隐藏降灰)
             int rowColor = !n.visible() ? 0x888888 : (n.enabled() ? 0x55FF55 : 0xFF5555);
-            g.drawString(font, Component.literal("● " + n.taskType())
-                    .withStyle(s -> s.withColor(rowColor)),
+            g.drawString(font, Component.literal("● ").withStyle(s -> s.withColor(rowColor))
+                    .append(Component.translatable("task." + com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.MOD_ID + "." + n.taskType())
+                            .withStyle(s -> s.withColor(rowColor))),
                     lx + 8, ry + 2, 0xFFFFFF);
             g.drawString(font, Component.literal(n.steps().size() + "步骤" + (n.visible() ? "" : " 隐藏"))
                     .withStyle(s -> s.withColor(0xAAAAAA)), lx + 12, ry + 16, 0xFFFFFF);
@@ -97,7 +98,8 @@ public final class TaskTreeScreen extends Screen {
         if (selectedIdx >= 0 && selectedIdx < nodes.size()) {
             var n = nodes.get(selectedIdx);
             int dy = ly;
-            g.drawString(font, Component.literal(n.taskType()).withStyle(s -> s.withColor(0xFFD700)), dx, dy, 0xFFFFFF); dy += 16;
+            g.drawString(font, Component.translatable("task." + com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.MOD_ID + "." + n.taskType())
+                    .withStyle(s -> s.withColor(0xFFD700)), dx, dy, 0xFFFFFF); dy += 16;
             g.drawString(font, Component.literal("启用: ")
                     .withStyle(s -> s.withColor(0xAAAAAA))
                     .append(Component.literal(n.enabled() ? "是" : "否")

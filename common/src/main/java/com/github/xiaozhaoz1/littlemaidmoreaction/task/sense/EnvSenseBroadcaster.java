@@ -9,6 +9,9 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskToggle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanCache;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StructureScanCache;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -43,6 +46,14 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
 public final class EnvSenseBroadcaster {
 
     /** entityId → 上次快照（边沿检测基线） */
+    /** 混合分流阈值 (v79.6x 用户裁定): eligible 女仆 ≤2 直扫, ≥3 预热+区块缓存共享 (成本模型: 预热 9 区块全高扫描 ≈ 5-10 次近身扫描) */
+    private static final int MIN_MAIDS_FOR_CACHE = 3;
+
+    /** 分流判定纯函数 (JVM 可测): eligible 女仆 ≥3 走缓存, ≤2 直扫 */
+    static boolean shouldUseCache(int eligibleCount) {
+        return eligibleCount >= MIN_MAIDS_FOR_CACHE;
+    }
+
     private static final Map<Integer, EnvSnapshot> PREV_SNAPSHOTS = new HashMap<>();
 
     private EnvSenseBroadcaster() {}
@@ -62,32 +73,45 @@ public final class EnvSenseBroadcaster {
         if (PassiveTaskConfig.ENVSENSE_ENABLED.get()) {
             long now = level.getGameTime();
 
+
+            // v79.6x 混合分流 (用户裁定): 先收集 eligible 女仆 — ≤2 直扫 (家庭场景, 缓存预热反而更贵),
+            // ≥3 预热主人区块 + 区块缓存共享 (多女仆场景)
+            int gateRadius = PassiveTaskConfig.ENV_PLAYER_GATE_RADIUS.get();
+            List<EntityMaid> eligible = new ArrayList<>();
             for (var e : level.getAllEntities()) {
                 if (!(e instanceof EntityMaid maid)) continue;
                 if (!maid.isAlive()) continue;
-
                 // per-maid 环境感知开关 (v79.47 解锁, 默认开 — 无键视为开; 显式 false = 关, GUI 可切)
                 if (maid.getPersistentData().contains(TaskKeys.ENVSENSE_ENABLED)
                         && !maid.getPersistentData().getBoolean(TaskKeys.ENVSENSE_ENABLED)) continue;
-
                 // 玩家门控
-                int gateRadius = PassiveTaskConfig.ENV_PLAYER_GATE_RADIUS.get();
                 if (gateRadius > 0
                         && !level.hasNearbyAlivePlayer(maid.getX(), maid.getY(), maid.getZ(), gateRadius)) {
                     continue;
                 }
+                eligible.add(maid);
+            }
+            boolean useCache = shouldUseCache(eligible.size());
+            if (useCache) {
+                // 预热: 主人区块先入缓存 (独立 2ms 预算不挤占广播 pass 8ms)
+                long preheatDeadline = System.nanoTime() + EntityScanCache.SCAN_BUDGET_NANOS;
+                for (var player : level.players()) {
+                    EntityScanCache.GLOBAL.warm(level, player.blockPosition(),
+                            PassiveTaskConfig.ENV_DEFAULT_RADIUS.get(), now, preheatDeadline);
+                }
+            }
 
+            int radius = PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();   // v79.6x 统一半径 (缓存 key 不带半径)
+            for (EntityMaid maid : eligible) {
                 // 预算耗尽 → 停止本轮刷新 (边沿只延后不误报 — 旧快照保留下轮对比)
                 if (pass.exhausted(System.nanoTime())) break;
 
                 // 读取世界状态（轻量 — 所有女仆共享同一个 WorldInfo 快照合并）
                 EnvSnapshot.WorldInfo world = EnvScanner.readWorld(level, maid.blockPosition());
-                int radius = maid.hasRestriction()
-                        ? Math.max(4, (int) maid.getRestrictRadius())
-                        : PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
-                Map<String, List<net.minecraft.world.entity.LivingEntity>> entities =
-                        EnvScanner.scanEntities(level, maid, radius, PassiveTaskConfig.ENV_MAX_HITS.get());
-
+                Map<String, List<net.minecraft.world.entity.LivingEntity>> entities = useCache
+                        ? EntityScanCache.GLOBAL.scanAround(level, maid.blockPosition(), radius, maid,
+                                PassiveTaskConfig.ENV_MAX_HITS.get(), now, pass.deadlineNanos())
+                        : EntityScanner.scanEntities(level, maid, radius, PassiveTaskConfig.ENV_MAX_HITS.get());
                 EnvSnapshot snap = new EnvSnapshot(now, entities, world);
                 EnvSnapshot prev = PREV_SNAPSHOTS.get(maid.getId());
 
@@ -97,25 +121,32 @@ public final class EnvSenseBroadcaster {
                 // 后保留到下轮, 哈气结束重新检测 → 重发 (原无条件更新 → 边沿永久丢失:
                 // TempAdapt 冷地永不取暖 / TorchLight 错过整夜); 分发照走 (纯信号管线不受
                 // 互斥影响); 边沿最多延迟 200t (用户裁定 A 方案)
+                // v79.61x S1-1.6-1 (用户裁定增强): 哈气期间连分发一起冻结 — 边沿信号
+                // 整体不消费 (原照常 dispatch → onSignal 里 submitPassive 被拒 = 无效调用
+                // + DEBUG 噪音); 哈气结束下轮重检测重放; 结构/节日事件信号走 flushPending
+                // 独立通道不受影响
                 boolean haqiActive = TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData()
                         .getString(TaskKeys.passiveKey("haqi")));
                 if (!haqiActive) {
                     PREV_SNAPSHOTS.put(maid.getId(), snap);
-                }
 
-                // 分发
-                if (!signals.isEmpty()) {
-                    dispatch(maid, snap, signals, needsCache);
+                    // 分发
+                    if (!signals.isEmpty()) {
+                        dispatch(maid, snap, signals, needsCache);
+                    }
                 }
             }
-            // ── 结构信号 (v79.60: per-player 独立通道 — 玩家为中心扫 1 次, 发主人女仆选 1 个) ──
+            // ── 结构信号 (v79.60 per-player 独立通道; v79.6x 预算 P: 2ms 墙钟预算跨玩家共享) ──
             StructureSense.sweep(level);
+            long structureDeadline = System.nanoTime() + StructureScanCache.SCAN_BUDGET_NANOS;
             for (var player : level.players()) {
-                StructureSense.detect(level, player);
+                StructureSense.detect(level, player, structureDeadline);
             }
         }
         // 节日 stateless 状态广播 (现实日期口径, 与 env 扫描开关无关; 消费端当天首收去重)
         detectFestivalSignal(level);
+        // v79.62.1 稀有群系 stateless 广播 (当前在稀有群系即发; 消费端每群系去重)
+        detectRareBiomeSignal(level);
         // 事件信号统一分发 — 不受 ENVSENSE_ENABLED 门控 (事件信号与扫描开关无关)
         flushPending(needsCache);
     }
@@ -129,6 +160,7 @@ public final class EnvSenseBroadcaster {
     /** 女仆卸载清理 (ScanScheduler.cancelFor — 任务句柄悬空烧预算, 必堵口; 结构缓存为 player 维度由 sweep 管) */
     public static void onMaidUnload(int entityId) {
         PREV_SNAPSHOTS.remove(entityId);
+        EntityScanCache.GLOBAL.onEntityRemoved(entityId);   // v79.6x per-查询漂移缓存闭环
         com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ScanScheduler.cancelFor(entityId);
     }
 
@@ -151,8 +183,8 @@ public final class EnvSenseBroadcaster {
     private static EnvEdgeDetector.EntityPresence presenceOf(@Nullable EnvSnapshot snap) {
         if (snap == null) return EnvEdgeDetector.EntityPresence.NONE;
         return new EnvEdgeDetector.EntityPresence(
-                !snap.entities(EnvScanner.CAT_FRIENDLY).isEmpty(),
-                !snap.entities(EnvScanner.CAT_MAID).isEmpty());
+                !snap.entities(EntityScanner.CAT_FRIENDLY).isEmpty(),
+                !snap.entities(EntityScanner.CAT_MAID).isEmpty());
     }
 
     // ── 节日 stateless 状态广播 (v79.47) ──
@@ -160,7 +192,7 @@ public final class EnvSenseBroadcaster {
     /**
      * 节日状态广播 — 每轮查表 (现实日期 LocalDate.now()) 非空 → FESTIVAL_ENTER 全女仆 emit。
      * 无日期对比基线 (stateless): 女仆错过广播后上线/回主人旁 → 下一轮首收即触发;
-     * 重复 emit 由消费端 (FestivalPipeline) per-maid 当天首收去重兜住。
+     * 重复 emit 由消费端 (FestivalPassiveTask) per-maid 当天首收去重兜住。
      */
     private static void detectFestivalSignal(ServerLevel level) {
         if (FestivalTable.lookup(java.time.LocalDate.now()) == null) return;
@@ -169,6 +201,51 @@ public final class EnvSenseBroadcaster {
                 emit(level, maid, Signals.envOf(EnvSignal.FESTIVAL_ENTER));
             }
         }
+    }
+
+    /**
+     * 稀有群系 per-player 检测 (v79.62.1 用户裁定: 跟结构一致 — 玩家为中心扫 1 次, 发主人女仆).
+     * 女仆跟随玩家, 通报给玩家看 → 查玩家所在 biome 即可, 无需每女仆查 (省 O(女仆数)).
+     * 每玩家节流 (interval) + 门控 (无主人女仆不扫) + 信号半径选 1 女仆.
+     * 重复 emit 由消费端 (RareBiomePassiveTask) per-maid 每群系去重兜住.
+     */
+    private static final Map<UUID, Long> RARE_BIOME_LAST = new HashMap<>();
+
+    private static void detectRareBiomeSignal(ServerLevel level) {
+        if (!PassiveTaskConfig.ENV_RARE_BIOME_ENABLED.get()) return;
+        long now = level.getGameTime();
+        int interval = PassiveTaskConfig.ENV_RARE_BIOME_INTERVAL.get();
+        int radius = PassiveTaskConfig.ENV_RARE_BIOME_SIGNAL_RADIUS.get();
+        for (var player : level.players()) {
+            UUID pid = player.getUUID();
+            long last = RARE_BIOME_LAST.getOrDefault(pid, 0L);
+            if (last != 0 && now >= last && now - last < interval) continue;   // 时钟回退守卫
+            RARE_BIOME_LAST.put(pid, now);
+            // 门控: 无附近主人女仆不扫 (信号必须有接收者)
+            EntityMaid maid = pickOwnerMaid(level, player, radius);
+            if (maid == null) continue;
+            // 查玩家所在群系 (女仆跟随玩家 → 等价; 扫 1 次)
+            String biomeId = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.WorldStateReader
+                    .getBiome(level, player.blockPosition());
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.impl.RareBiomePassiveTask
+                    .isRareBiome(biomeId)) {
+                emit(level, maid, Signals.envOf(EnvSignal.RARE_BIOME));
+            }
+        }
+    }
+
+    /** 玩家附近的主人女仆中选 1 个 (随机/最近 — 复用结构感知语义; 无 → null) */
+    private static EntityMaid pickOwnerMaid(ServerLevel level, net.minecraft.server.level.ServerPlayer player, int radius) {
+        double r2 = (double) radius * radius;
+        java.util.UUID owner = player.getUUID();
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(player.blockPosition()).inflate(radius);
+        java.util.List<EntityMaid> near = new java.util.ArrayList<>();
+        for (EntityMaid maid : level.getEntitiesOfClass(EntityMaid.class, box,
+                m -> m.isAlive() && owner.equals(m.getOwnerUUID()))) {
+            if (maid.distanceToSqr(player) <= r2) near.add(maid);
+        }
+        if (near.isEmpty()) return null;
+        return near.get(level.random.nextInt(near.size()));
     }
 
     // ── 分发 ──
@@ -181,17 +258,31 @@ public final class EnvSenseBroadcaster {
     }
 
     /**
-     * 信号分发到被动管线 — dispatch (环境信号) 与 flushPending (事件信号) 共用。
-     * 仅声明了该信号需求的管线收到回调; 管线自身 TaskToggle 检查先行。
-     * needsSignals pass 作用域缓存 (每管线一次; 异常 → 空集哨兵, 只 log 一次)。
+     * 信号分发到被动 — dispatch (环境信号) 与 flushPending (事件信号) 共用。
+     * 仅声明了该信号需求的条目收到回调; 条目自身 TaskToggle 检查先行。
+     * needsSignals pass 作用域缓存 (每条目一次; 异常 → 空集哨兵, 只 log 一次)。
+     *
+     * <p>v79.61x 脱管线: 无 pipeline 占位条目 (纯触发型) 走 {@link PassiveDispatcher} 通道 —
+     * needsSignals 声明面 + exec 四道闸 (注册/开关/ha qi 覆盖/冷却), 不经管线 validate/onSignal。
      */
     private static void dispatchToPipelines(EntityMaid maid, String signalId, @Nullable EnvSnapshot snap,
                                             Map<String, Set<String>> needsCache) {
         for (TaskRegistry.TaskHandler h : TaskRegistry.passiveTasksList()) {
-            TaskPipeline pipeline = h.pipeline();
-            if (!TaskToggle.isEnabled(h.taskType()) || !TaskToggle.isEnabledFor(maid, h.taskType())) {
+            if (!TaskToggle.isEnabled(h.taskType())) {
                 continue;
             }
+            if (h.pipeline() == null) {
+                // 纯触发型 — PassiveDispatcher 通道
+                com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveTask pt =
+                        com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveDispatcher.get(h.taskType());
+                if (pt == null) continue;
+                Set<String> needs = needsCache.computeIfAbsent(h.taskType(), tt -> pt.needsSignals());
+                if (!signalMatches(signalId, needs)) continue;
+                com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveDispatcher.exec(
+                        maid, h.taskType(), signalId);
+                continue;
+            }
+            TaskPipeline pipeline = h.pipeline();
             // pass 作用域缓存 — 每管线一次 validate (原每信号×每管线)
             Set<String> needs = needsCache.computeIfAbsent(h.taskType(), tt -> {
                 try {
@@ -204,17 +295,7 @@ public final class EnvSenseBroadcaster {
                     return Set.of();   // 异常哨兵: 空集 = 本轮不分发
                 }
             });
-            // v79.58: 通配订阅支持 (结构动态信号 env:structure:* — 管线 validate 声明前缀 + "*")
-            boolean matches = !needs.isEmpty() && needs.contains(signalId);
-            if (!matches) {
-                for (String n : needs) {
-                    if (n.endsWith("*") && signalId.startsWith(n.substring(0, n.length() - 1))) {
-                        matches = true;
-                        break;
-                    }
-                }
-            }
-            if (!matches) continue;
+            if (!signalMatches(signalId, needs)) continue;
 
             try {
                 // 信号维度拆分 — 未实现 TaskSignalListener 的管线忽略信号
@@ -226,6 +307,18 @@ public final class EnvSenseBroadcaster {
                         h.taskType(), signalId, ex);
             }
         }
+    }
+
+    /** 信号匹配 — 精确 + 通配前缀 (v79.58: 结构动态信号 env:structure:* 通配订阅) */
+    private static boolean signalMatches(String signalId, Set<String> needs) {
+        if (needs.isEmpty()) return false;
+        if (needs.contains(signalId)) return true;
+        for (String n : needs) {
+            if (n.endsWith("*") && signalId.startsWith(n.substring(0, n.length() - 1))) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ── 事件信号入口 ──
@@ -245,16 +338,16 @@ public final class EnvSenseBroadcaster {
      * <p>不适用 {@code ENVSENSE_ENABLED}/玩家门控 (事件信号与扫描开关无关);
      * 被动管线自身的 TaskToggle 检查在 {@link #dispatchToPipelines} 内保留。
      *
-     * <p>flush 时按前缀路由 — {@code event:} → {@code TaskScreeningService.fire}
-     * (无 cancel 消费 — <b>需取消的事件桥必须直连 fire 拿返回值</b>, 见 event/bridge/*);
-     * {@code env:} → 被动管线分发。
+     * <p>flush 时统一走 {@link #dispatchToPipelines} (v77.4 后无 event: 前缀路由 —
+     * 事件链直调 TaskDispatcher, 本队列只剩 env: 动态结构信号)。
      */
     public static void emit(ServerLevel level, EntityMaid maid, String signalId) {
+
         if (maid == null || !maid.isAlive()) return;
         PENDING.add(new PendingSignal(maid, signalId));
     }
 
-    /** 分发瞬态队列 — 按前缀路由: event: → 筛选服务 (同步入口); 其余 (env:) → 管线分发 */
+    /** 分发瞬态队列 — 统一走被动管线分发 (v77.4 后无 event: 前缀路由; 无快照也分发, 管线自行容错) */
     private static void flushPending(Map<String, Set<String>> needsCache) {
         PendingSignal p;
         while ((p = PENDING.poll()) != null) {

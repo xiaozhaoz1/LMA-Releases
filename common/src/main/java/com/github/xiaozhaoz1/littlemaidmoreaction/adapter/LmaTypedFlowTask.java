@@ -3,6 +3,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.adapter;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigGuiFactory;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskTypeUid;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.resources.ResourceLocation;

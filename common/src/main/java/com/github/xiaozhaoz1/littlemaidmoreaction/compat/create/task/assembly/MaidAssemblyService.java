@@ -177,7 +177,7 @@ public final class MaidAssemblyService {
         var bp = maid.getAvailableBackpackInv();
         for (int s = 0; s < bp.getSlots(); s++) { ItemStack st = bp.getStackInSlot(s); if (!st.isEmpty()) all.add(st.copy()); }
         if (maid.level() != null) all.addAll(
-            com.github.xiaozhaoz1.littlemaidmoreaction.task.service.NearbyContainerService.scanItems(maid.level(), maid.blockPosition(), SEARCH_RADIUS));
+            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.container.NearbyContainerScanner.scanItems(maid.level(), maid.blockPosition(), SEARCH_RADIUS));
         if (includeWireless) {
             var w = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.container.WirelessChestSpace.getWirelessHandler(maid);
             if (w != null) for (int s = 0; s < w.getSlots(); s++) {
@@ -188,7 +188,7 @@ public final class MaidAssemblyService {
     }
 
     public static ItemStack extractNearbyItem(Level level, BlockPos pos, ItemStack target) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.service.NearbyContainerService.extractItem(
+        return com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.container.NearbyContainerScanner.extractItem(
             level, pos, SEARCH_RADIUS, st -> ItemStackHelper.isSameItem(st, target), java.util.Set.of());
     }
 

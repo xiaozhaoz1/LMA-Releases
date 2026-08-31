@@ -160,33 +160,60 @@ public class MaidPowerBeltBlock extends HorizontalKineticBlock
         if (!isEntityOnBeltSurface(pos, entity))
             return;
 
-        // sprint时用固定模拟速度(女仆原地跑→位置不变→不用位置差)
-        float surfaceSpeed;
+        // v79.62.1 蛋糕加成 (用户裁定 0→1024 / 1→2048 / 2→4096):
+        //   直接设最终输出, 绕开表面速度采样/双通道累加链路.
+        //   0/1/2 蛋糕 → RPM 96/192/256, 应力 1024/2048/4096.
         if (maid.isSprinting()) {
-            surfaceSpeed = 0.2f; // 4 m/s sprint → ~96 RPM
-        } else {
-            Vec3 beltAxis = Vec3.atLowerCornerOf(state.getValue(HORIZONTAL_FACING).getNormal());
-            Vec3 tickMovement = entity.position().subtract(entity.xo, entity.yo, entity.zo);
-            Vec3 motion = entity.getDeltaMovement();
-            double movedSurfaceSpeed = tickMovement.x * beltAxis.x + tickMovement.z * beltAxis.z;
-            double motionSurfaceSpeed = motion.x * beltAxis.x + motion.z * beltAxis.z;
-            surfaceSpeed = (float)(Math.abs(movedSurfaceSpeed) >= MaidPowerBeltBlockEntity.MIN_SURFACE_SPEED
-                    ? movedSurfaceSpeed : motionSurfaceSpeed);
+            // 蛋糕检测: 女仆前方 1~3 格 × 横向 ±1 (蛋糕放女仆面前地上)
+            net.minecraft.core.Direction maidFacing = net.minecraft.core.Direction.fromYRot(maid.getYRot());
+            int cakes = Math.min(countCakesAround(level, maid.blockPosition(), maidFacing), 2);
+            float rpm = cakes == 0 ? 96f : (cakes == 1 ? 192f : 256f);
+            float stress = cakes == 0 ? 1024f : (cakes == 1 ? 2048f : 4096f);
+            if (level.isClientSide) return;
+            BlockEntity blockEntity = level.getBlockEntity(pos);
+            if (blockEntity instanceof MaidPowerBeltBlockEntity powerBelt) {
+                LittleMaidMoreAction.LOGGER.info("[MaidPowerBeltBlock] direct rpm={} stress={} cakes={} at {}", rpm, stress, cakes, pos);
+                powerBelt.setDirectOutput(rpm, stress);
+            }
+            return;
         }
+        // 非 sprint (女仆走/被推) — 保持旧表面速度链路
+        Vec3 beltAxis = Vec3.atLowerCornerOf(state.getValue(HORIZONTAL_FACING).getNormal());
+        Vec3 tickMovement = entity.position().subtract(entity.xo, entity.yo, entity.zo);
+        Vec3 motion = entity.getDeltaMovement();
+        double movedSurfaceSpeed = tickMovement.x * beltAxis.x + tickMovement.z * beltAxis.z;
+        double motionSurfaceSpeed = motion.x * beltAxis.x + motion.z * beltAxis.z;
+        float surfaceSpeed = (float)(Math.abs(movedSurfaceSpeed) >= MaidPowerBeltBlockEntity.MIN_SURFACE_SPEED
+                ? movedSurfaceSpeed : motionSurfaceSpeed);
         if (Math.abs(surfaceSpeed) < MaidPowerBeltBlockEntity.MIN_SURFACE_SPEED)
             return;
 
-        // 去掉位置修正 — 女仆自己走路，不是被皮带运输
         entity.hurtMarked = true;
-
-        if (level.isClientSide)
-            return;
-
+        if (level.isClientSide) return;
         BlockEntity blockEntity = level.getBlockEntity(pos);
         if (blockEntity instanceof MaidPowerBeltBlockEntity powerBelt) {
-            LittleMaidMoreAction.LOGGER.info("[MaidPowerBeltBlock] capture speed={} at {}", surfaceSpeed, pos);
             powerBelt.addSurfaceMovement(surfaceSpeed);
         }
+    }
+
+    /** 统计女仆前方蛋糕数 (v79.62.1 用户裁定) —
+     *  从女仆面前 1~3 格 × 横向 ±1 的 3×3 平面 (蛋糕放女仆视角前方地上, 不含脚下).
+     *  上限 2 块 (调用方 Math.min(cakes,2) 截断). */
+    public static int countCakesAround(Level level, BlockPos maidPos, net.minecraft.core.Direction front) {
+        int count = 0;
+        net.minecraft.core.Direction left = front.getCounterClockWise();
+        for (int dist = 1; dist <= 3; dist++) {
+            for (int side = -1; side <= 1; side++) {
+                BlockPos p = maidPos
+                        .relative(front, dist)
+                        .relative(left, side);
+                if (!level.isLoaded(p)) continue;
+                if (level.getBlockState(p).getBlock() instanceof net.minecraft.world.level.block.CakeBlock) {
+                    count++;
+                }
+            }
+        }
+        return count;
     }
 
     private static boolean isEntityOnBeltSurface(BlockPos pos, Entity entity) {

@@ -55,20 +55,18 @@ public final class TaskKeys {
     public static final String DUR_START       = "lma_dur_start";
     public static final String DUR_CASTING     = "lma_dur_casting";
     public static final String DUR_END         = "lma_dur_end";
-    /** 只写不读键 (审计实证: 全 common 无读取方) — 随任务清理删除 */
-    public static final String WAIT_TICKS      = "lma_wait_ticks";
 
     /** 动画运行时全部键 — clearAll 统一清理源 (防错题 #67 类跨 session 残留) */
     public static final List<String> ANIM_RUNTIME_KEYS = List.of(
             ANIM_MODE, ANIM_TICK, ANIM_DUR, ANIM_NAME,
             ANIM_SEQ, ANIM_PHASE, ANIM_START, ANIM_CASTING, ANIM_END,
-            ANIM_PRIORITY, LOCK_MOVE, DUR_START, DUR_CASTING, DUR_END, WAIT_TICKS);
+            ANIM_PRIORITY, LOCK_MOVE, DUR_START, DUR_CASTING, DUR_END);
 
     /** 客户端渲染清理键 = ANIM_RUNTIME_KEYS 去 ANIM_SEQ (SEQ 保留供新请求对比, 见 LmaMagicCastingProvider.cleanup) */
     public static final List<String> ANIM_CLEANUP_KEYS = List.of(
             ANIM_MODE, ANIM_TICK, ANIM_DUR, ANIM_NAME,
             ANIM_PHASE, ANIM_START, ANIM_CASTING, ANIM_END,
-            ANIM_PRIORITY, LOCK_MOVE, DUR_START, DUR_CASTING, DUR_END, WAIT_TICKS);
+            ANIM_PRIORITY, LOCK_MOVE, DUR_START, DUR_CASTING, DUR_END);
 
     // ── 唱片机 ──
     public static final String JUKEBOX_TICK  = "lma_jukebox_tick";
@@ -91,6 +89,9 @@ public final class TaskKeys {
     public static final String ARM_TAKE = "lma_arm_take";
     public static final String ARM_DEPOSIT = "lma_arm_deposit";
     public static final String ARM_ITEM = "lma_arm_item";
+    // v79.62 作物区域: 种子源箱 / 收获目标箱 (女仆 PD 键 — 容器菜单绑定)
+    public static final String FARM_SEED_CONT = "lma_farm_seed_cont";
+    public static final String FARM_HARVEST_CONT = "lma_farm_harvest_cont";
 
     // ── 女仆属性 ──
     public static final String RESIST_PREFIX = "lma_resist_";
@@ -110,14 +111,18 @@ public final class TaskKeys {
     /** 气泡节流时间戳 (MaidChatBubbleApi) */
     public static final String BUBBLE_FAIL_TICK = "lma_bubble_fail_tick";
     public static final String BUBBLE_TRIGGER_TICK = "lma_bubble_trigger_tick";
+    /** 气泡全局公共 CD (2026-08-16 用户裁定: 公共 CD 3s — 同女仆任意气泡间至少隔 3 秒, 同时只有 1 格) */
+    public static final String BUBBLE_GLOBAL_TICK = "lma_bubble_global_tick";
     /** 连锁采集队列/蓄力结束 (ChainHarvestExecute) */
     public static final String CHAIN_QUEUE = "lma_chain_queue";
     public static final String CHAIN_CHARGE_END = "lma_chain_charge_end";
     /** 连锁采集相位 (v79.61x 状态机化: SCAN/CHARGE — 入队单点写 CHARGE, 队列闭环单点清;
      *  仅 phaseOf() 读, 用于旧档兼容判据: 无 phase 键时队列存在 = CHARGE) */
     public static final String CHAIN_PHASE = "lma_chain_phase";
-    /** 节日跨天去重 (FestivalPipeline) */
+    /** 节日跨天去重 (FestivalPassiveTask, v79.61x 脱管线) */
     public static final String FESTIVAL_DAY = "lma_festival_day";
+    /** 稀有群系通报去重: 上次通报群系 (biomeId) — 每群系一次 (RareBiomePassiveTask) */
+    public static final String RARE_BIOME_LAST = "lma_rare_biome_last";
     /** 女仆图鉴击杀计数 (MaidCodexKillListener) */
     public static final String CODEX = "lma_codex";
     /** 假人绑定 UUID (NumenMaidBridge) */

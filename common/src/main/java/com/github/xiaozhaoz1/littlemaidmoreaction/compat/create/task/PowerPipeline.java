@@ -27,7 +27,7 @@ public final class PowerPipeline extends MoveToBlockStateMachine<PowerPipeline.S
     protected Map<State, Set<State>> transitions() {
         return Map.of(
             State.SEARCHING,  Set.of(State.NAVIGATING),
-            State.NAVIGATING, Set.of(State.POWERING),
+            State.NAVIGATING, Set.of(State.POWERING, State.SEARCHING),
             State.POWERING,   Set.of(State.SEARCHING, State.NAVIGATING)
         );
     }
@@ -55,22 +55,46 @@ public final class PowerPipeline extends MoveToBlockStateMachine<PowerPipeline.S
 
     @Override
     protected State tick(State s, ServerLevel world, EntityMaid maid) {
+        long now = world.getGameTime();
         return switch (s) {
             case SEARCHING -> {
-                BlockPos target = PowerService.findTarget(world, maid.blockPosition());
-                if (target == null) yield null;
+                // v79.61x: 多目标收集 + 跳过集过滤 (卡死目标 60t 不重选) + 无目标气泡
+                BlockPos target = PowerService.findTargets(world, maid.blockPosition())
+                        .stream().filter(p -> !isSkipped(maid, p, now)).findFirst().orElse(null);
+                if (target == null) {
+                    if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                            .shouldFire(maid, "power_no_target", 600)) {
+                        com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
+                                .showFail(maid, "附近没有可提供动力的机器");
+                    }
+                    yield null;
+                }
+                com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
                 writeTarget(maid, target);
                 navigateTo(maid, target);
                 yield State.NAVIGATING;
             }
             case NAVIGATING -> {
                 BlockPos target = readTarget(maid);
-                if (target == null) yield State.SEARCHING;
-                if (!PowerService.isTargetBlock(world.getBlockState(target).getBlock()))
+                if (target == null) {
+                    com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
                     yield State.SEARCHING;
+                }
+                if (!PowerService.isTargetBlock(world.getBlockState(target).getBlock())) {
+                    com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
+                    yield State.SEARCHING;
+                }
                 if (arrived(maid, target)) {
-                    PowerService.providePower(world, target, getRpm(maid));
+                    com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
+                    PowerService.providePower(world, target, PowerService.DEFAULT_RPM);
                     yield State.POWERING;
+                }
+                // v79.61x 导航守护: 卡死 → 跳过集 + 重搜
+                com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.track(maid, target, now);
+                if (com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.isStuck(maid, now)) {
+                    addSkip(maid, target, now);
+                    com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.reset(maid);
+                    yield State.SEARCHING;
                 }
                 navigateTo(maid, target);
                 yield null;
@@ -82,16 +106,11 @@ public final class PowerPipeline extends MoveToBlockStateMachine<PowerPipeline.S
                     stopPower(maid); yield State.SEARCHING;
                 }
                 if (!arrived(maid, target)) { stopPower(maid); yield State.NAVIGATING; }
-                PowerService.providePower(world, target, getRpm(maid));
+                PowerService.providePower(world, target, PowerService.DEFAULT_RPM);
                 com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, 20);
                 yield null;
             }
         };
-    }
-
-    private float getRpm(EntityMaid maid) {
-        return pipelineData(maid).contains("rpm")
-            ? pipelineData(maid).getFloat("rpm") : PowerService.DEFAULT_RPM;
     }
 
     private void stopPower(EntityMaid maid) {

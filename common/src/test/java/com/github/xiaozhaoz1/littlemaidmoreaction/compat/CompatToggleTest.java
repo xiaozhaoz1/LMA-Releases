@@ -84,10 +84,11 @@ class CompatToggleTest {
     @DisplayName("未知 id 惰性存储, 不影响已知模块")
     void loadFrom_unknownId_inert() throws IOException {
         Path f = tmp.resolve("u.json");
-        Files.writeString(f, "{\"disabled\":[\"slashblade\"]}");
+        // v79.62: 测试模块名从 slashblade 改 test_module (SlashBlade 兼容已清理 — 无逻辑联动, 只留动画资产)
+        Files.writeString(f, "{\"disabled\":[\"test_module\"]}");
         CompatToggle.loadFrom(f);
-        assertFalse(CompatToggle.isModuleEnabled("slashblade"));
+        assertFalse(CompatToggle.isModuleEnabled("test_module"));
         assertTrue(CompatToggle.isModuleEnabled("create"));
-        assertTrue(CompatToggle.disabledModules().contains("slashblade"));
+        assertTrue(CompatToggle.disabledModules().contains("test_module"));
     }
 }

@@ -39,9 +39,11 @@ dependencies {
     compileOnly files(
             rootProject.file("libs/create-1.21.1-6.0.10.jar"),
             rootProject.file("libs/create-aeronautics-bundled-1.21.1-1.3.0.jar"),
+            rootProject.file("libs/createbigcannons-5.11.7-mc.1.21.1-neoforge.jar"),
             rootProject.file("libs/sable-neoforge-1.21.1-2.0.3.jar"),
             rootProject.file("libs/ysm-2.6.5-neoforge+mc1.21.1-release.jar"),
             rootProject.file("libs/openysm-neoforge-1.21.1-2.6.6-r5-neoforge+mc1.21.1.jar"),   // v75.3: OpenYSM 开源 API (假人模型直接设置)
+            rootProject.file("libs/patpat-1.2.4+1.21.1+neoforge.jar"),                        // v79.61x: PatPat 抚摸兼容 (运行时门控)
             rootProject.file("libs/flywheel-neoforge-1.21.1.jar"),
             rootProject.file("libs/catnip-neoforge-1.21.1.jar"),
             // v73: ponder 从 create jar 内嵌提取 (jarjar/ponder-neoforge-1.0.82) — BlockEntity 继承链接口
@@ -67,6 +69,12 @@ tasks.register('copyResourcesToClasses', Copy) {
     dependsOn('processResources')
 }
 tasks.named('runClient') {
+    dependsOn('copyResourcesToClasses')
+}
+// runGameTestServer 也需结构/资源 (game_test.nbt 在 resources) — clean 后 classes 无资源
+// 否则模板未加载 → 结构错位坐标 (gametest 基建, 2026-08-18 实测)
+// matching/configureEach: NeoGradle run 任务延迟注册, tasks.named 过早会 not found
+tasks.matching { it.name == 'runGameTestServer' }.configureEach {
     dependsOn('copyResourcesToClasses')
 }
 

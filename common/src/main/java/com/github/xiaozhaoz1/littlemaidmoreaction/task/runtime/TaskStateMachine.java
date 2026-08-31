@@ -2,7 +2,6 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskProgressDisplay;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.TaskResult;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
@@ -25,9 +24,9 @@ import java.util.Set;
  * <ul>
  *   <li>状态存储 (v79.31 内存化) — {@code MaidData.pl(maid, "<type>.fsm")} 的 FSM_KEY，零 NBT</li>
  *   <li>转换合法性验证 — {@link #transitions()} 图，非法转换被拦截 + 日志</li>
- *   <li>取消检测 — 每 tick 入口检查 {@link TaskKeys#STATE_CANCELLED}</li>
  *   <li>进入/退出钩子 — {@link #onEnter(Enum, ServerLevel, EntityMaid)} / {@link #onExit(Enum, EntityMaid)}</li>
  *   <li>执行 — 子类覆写 {@link #tick(Enum, ServerLevel, EntityMaid)}, GameTick 驱动</li>
+ *   <li>取消检测已删 (2026-08-16 实证: cancel 同帧 clearAll, FLOW_STATE 零残留 — 原检查不可达)</li>
  * </ul>
  *
  * <h3>任务终结</h3>
@@ -224,11 +223,9 @@ public abstract class TaskStateMachine<S extends Enum<S>> implements TaskPipelin
             clearState(maid);
             return;
         }
-        // 1. 取消检测
-        if (TaskKeys.STATE_CANCELLED.equals(FlowTaskData.getState(maid))) {
-            interrupt(maid);
-            return;
-        }
+        // 1. 取消检测 — 已删 (2026-08-16 实证: TaskDispatcher.cancel 同帧 clearAll,
+        // FLOW_STATE 零残留不跨 tick, 原 STATE_CANCELLED 分支不可达; 上面 flowTask
+        // 防御已覆盖终结后驱动路径, 错题 #124 防线保留)
 
         // 1.5 工作站式门 (到达 + 节拍 + 目标失效) — furnace/jukebox 迁移用; 默认关
         if (workStationGated() && WorkStationPipeline.gate(world, maid, this) == null) {

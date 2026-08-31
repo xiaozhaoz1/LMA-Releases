@@ -44,6 +44,4 @@ public record EnvSnapshot(long gameTime,
     public List<LivingEntity> entities(String category) {
         return entityHits != null ? entityHits.getOrDefault(category, List.of()) : List.of();
     }
-
-    /** 指定分类本轮是否命中（方块/实体/世界信号任一） */
 }

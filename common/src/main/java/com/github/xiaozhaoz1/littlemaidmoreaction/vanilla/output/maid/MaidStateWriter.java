@@ -200,17 +200,19 @@ public final class MaidStateWriter {
      * 自动修复原语 (v79.48) — 一次修 1 点耐久 (AutoRepairBehavior 每 ~5 秒调)。
      * 顺序: 主手 → 其余 (副手/4甲/饰品/背包, {@link #findRepairable} 复用)。
      * 消耗: max(1, 4 × 好感度消耗乘区) XP/点; 失败 (无破损/经验不足) 静默返回 false。
+     *
+     * @param costMultiplier 好感度消耗乘区 (task 域计算传入 — vanilla 层不依赖 task/service, v79.62 B3#6)
      */
-    public static boolean repairOneWithXp(EntityMaid m) {
-        if (repairOne(m, m.getMainHandItem())) return true;
+    public static boolean repairOneWithXp(EntityMaid m, double costMultiplier) {
+        if (repairOne(m, m.getMainHandItem(), costMultiplier)) return true;
         net.minecraft.world.item.ItemStack stack = findRepairable(m);
-        return stack != null && repairOne(m, stack);
+        return stack != null && repairOne(m, stack, costMultiplier);
     }
 
-    private static boolean repairOne(EntityMaid m, net.minecraft.world.item.ItemStack stack) {
+    private static boolean repairOne(EntityMaid m, net.minecraft.world.item.ItemStack stack, double costMultiplier) {
         if (stack == null || !isRepairable(stack)) return false;
         int exp = m.getExperience();
-        int cost = repairCostFor(com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability.costMultiplier(m));
+        int cost = repairCostFor(costMultiplier);
         if (exp < cost) return false;
         m.setExperience(exp - cost);
         stack.setDamageValue(Math.max(0, stack.getDamageValue() - 1));

@@ -33,7 +33,7 @@ public final class GetWorldInfoTool implements ITool<GetWorldInfoTool.Result> {
             return callback.addToolResult("服务端不可用", toolCallId);
         }
         return callback.addToolResult(
-                com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.WorldStateReader.describe(
+                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.WorldStateReader.describe(
                         sl, maid.blockPosition()), toolCallId);
     }
 

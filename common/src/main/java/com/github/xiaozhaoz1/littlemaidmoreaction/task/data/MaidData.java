@@ -96,6 +96,20 @@ public final class MaidData {
         return root(maid).getCompound(TaskKeys.CFG_PREFIX + taskType);
     }
 
+    /**
+     * 取配置引用, 不存在则先创建再返回 — 修复 2026-08-16 绑定不生效:
+     * {@code getCompound} 对不存在的 key 返回临时空 tag (非引用), 修改不落盘 →
+     * 首次绑定写进临时 tag 丢失 → GUI/按键读不到。写入路径必须用本方法。
+     */
+    public static CompoundTag cfgOrCreate(EntityMaid maid, String taskType) {
+        var root = root(maid);
+        String key = TaskKeys.CFG_PREFIX + taskType;
+        if (!root.contains(key)) {
+            root.put(key, new CompoundTag());
+        }
+        return root.getCompound(key);
+    }
+
     public static void removeCfg(EntityMaid maid, String taskType) {
         root(maid).remove(TaskKeys.CFG_PREFIX + taskType);
     }

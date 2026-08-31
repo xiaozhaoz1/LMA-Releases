@@ -31,7 +31,9 @@ public final class MaidUnloadRegistry {
         register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.DangerGuardCoordinator.clear(maid));
         // v79.58: SelfRescueState 自救上下文 (per-maid 内存态, 卸载清理)
         register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.SelfRescueState.onMaidUnload(maid));
-        register(maid -> GameTickPipelineManager.clearMaidCaches(maid));
+        // v79.61x: UnstuckCoordinator 卡住检测窗口 (per-maid 内存态, 卸载清理)
+        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.UnstuckCoordinator.onMaidUnload(maid));
+        // v79.61x: GMPM 被动 mask 缓存已删 (脱管线) — 冷却表经 registerCache 声明式清理
         register(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData::flushAllPl);
         // 环境感知/白名单/监控/假人 (原 Extension.ServerEvents 手写 4 处)
         register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSenseBroadcaster.onMaidUnload(maid.getId()));

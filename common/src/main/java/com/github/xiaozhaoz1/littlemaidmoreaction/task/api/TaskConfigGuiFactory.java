@@ -7,6 +7,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BellRingConfigMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BlockInteractConfigMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.CraftChainConfigMenu;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.ItemListConfigMenu;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -48,6 +49,7 @@ import java.util.function.Function;
  *   <li>{@link #blockInteractConfig(EntityMaid)} — 右键交互配置 (标记/定时器)</li>
  *   <li>{@link #craftChainConfig(EntityMaid)} — 配方链合成配置 (产物+上限)</li>
  *   <li>{@link #createMenuProvider(EntityMaid, Component, MenuFactory)} — 任意自定义 Menu 包装</li>
+ *   <li>{@link #voidExcavationConfig(EntityMaid)} — 挖空置域配置 (自绘销毁名单框, 空置域专名 destroy_list)</li>
  *   <li>{@link #of(EntityMaid)} — TLM 桥接: 当前运行任务 → 配置 GUI (引擎内部用)</li>
  * </ul>
  */
@@ -185,6 +187,16 @@ public final class TaskConfigGuiFactory {
         return createMenuProvider(maid,
             Component.translatable("task.littlemaidmoreaction.bell_ring"),
             (cid, inv, maidId) -> new BellRingConfigMenu(cid, inv, maidId));
+    }
+
+    /**
+     * 挖空置域单女仆配置 (自绘销毁名单框 — 只要销毁名单不要白名单, 空置域专名 destroy_list).
+     * 名单存 pipelineConfig "destroy_list" (名单内物品挖出即销毁); 关寻路 toggle per-maid 优先, 回退全局 Cloth.
+     */
+    public static MenuProvider voidExcavationConfig(EntityMaid maid) {
+        return createMenuProvider(maid,
+            Component.translatable("task.littlemaidmoreaction.void_excavation"),
+            (cid, inv, maidId) -> new VoidExcavationConfigMenu(cid, inv, maidId));
     }
 
 }

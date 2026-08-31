@@ -10,14 +10,17 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.api.SlotLayout;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.item.ItemSpawner;
 import net.minecraft.world.level.block.entity.AbstractFurnaceBlockEntity;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.item.crafting.RecipeType;
+import net.minecraft.world.level.block.state.BlockState;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskMetaData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.VanillaInputRegistry;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.item.crafting.RecipeType;
-import net.minecraft.world.item.crafting.SmeltingRecipe;
+import net.minecraft.world.item.crafting.AbstractCookingRecipe;
 //? if 1.20.1 {
 import net.minecraftforge.items.IItemHandler;
 //?} else {
@@ -43,8 +46,39 @@ public final class FurnaceService {
 
     private FurnaceService() {}
 
-    /** 校验可烧炼 — null = 通过; 非 null = 失败文案 (与原 validate 文案逐字一致) */
-    public static String validateSmelt(ServerLevel level, EntityMaid maid, String target) {
+    /**
+     * 炉子类型 → 配方类型 (v79.62.1 烟熏炉/高炉支持): 目标方块是
+     * 烟熏炉 → SMOKING (食物) / 高炉 → BLASTING (矿物) / 熔炉 → SMELTING.
+     * 三者都继承 AbstractFurnaceBlockEntity, 槽位 0/1/2 一致, 仅配方类型不同.
+     *
+     * @param furnacePos 目标炉子方块 pos (null/未知 → SMELTING 兜底)
+     */
+    public static RecipeType<?> recipeTypeFor(ServerLevel level, BlockPos furnacePos) {
+        if (furnacePos == null) return RecipeType.SMELTING;
+        BlockState st = level.getBlockState(furnacePos);
+        if (st.is(Blocks.SMOKER)) return RecipeType.SMOKING;
+        if (st.is(Blocks.BLAST_FURNACE)) return RecipeType.BLASTING;
+        return RecipeType.SMELTING;
+    }
+
+    /** 取某炉子类型的烧炼配方列表 (SMELTING/SMOKING/BLASTING 都是 AbstractCookingRecipe 子类,
+     *  兄弟关系不能互转 — 用公共父类, 避免 ClassCastException) —
+     *  泛型安全: getAllRecipesFor 需要具体类型, RecipeType<?> 无法直接传 (原始类型 .value() 找不到) */
+    private static java.util.List<AbstractCookingRecipe> smeltingRecipes(ServerLevel level, RecipeType<?> recipeType) {
+        java.util.List<AbstractCookingRecipe> out = new java.util.ArrayList<>();
+        for (Object o : level.getRecipeManager().getAllRecipesFor((RecipeType) recipeType)) {
+//? if 1.20.1 {
+            out.add((AbstractCookingRecipe) o);
+//?} else {
+            out.add((AbstractCookingRecipe) ((net.minecraft.world.item.crafting.RecipeHolder<?>) o).value());
+//?}
+        }
+        return out;
+    }
+
+    /** 校验可烧炼 — null = 通过; 非 null = 失败文案 (与原 validate 文案逐字一致)
+     *  <p>v79.62.1: recipeType 按炉子类型动态 (熔炉 SMELTING / 烟熏炉 SMOKING / 高炉 BLASTING) */
+    public static String validateSmelt(ServerLevel level, EntityMaid maid, String target, RecipeType<?> recipeType) {
         Map<Item, Integer> allItems = VanillaInputRegistry.readAllItems(maid);
         var lists = effectiveLists(maid);
         List<String> black = lists.get(0);
@@ -52,12 +86,7 @@ public final class FurnaceService {
 
         // 空 target — 检查是否有任何可烧炼材料
         if (target.isEmpty()) {
- //? if 1.20.1 {
-            for (SmeltingRecipe recipe : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
- //?} else {
-            for (RecipeHolder<SmeltingRecipe> recipeHolder : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
-                SmeltingRecipe recipe = recipeHolder.value();
- //?}
+            for (AbstractCookingRecipe recipe : smeltingRecipes(level, recipeType)) {
                 for (ItemStack ing : recipe.getIngredients().get(0).getItems()) {
                     if (!ItemFilters.isAllowed(ing.getItem(), black, white)) continue;
                     if (allItems.getOrDefault(ing.getItem(), 0) > 0) return null;
@@ -80,12 +109,7 @@ public final class FurnaceService {
         if (targetItem == null) return "无效的目标物品: " + target;
         if (!ItemFilters.isAllowed(targetItem, black, white)) return "目标物品在黑/白名单之外: " + target;
 
- //? if 1.20.1 {
-        for (SmeltingRecipe recipe : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
- //?} else {
-        for (RecipeHolder<SmeltingRecipe> recipeHolder : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
-            SmeltingRecipe recipe = recipeHolder.value();
- //?}
+        for (AbstractCookingRecipe recipe : smeltingRecipes(level, recipeType)) {
             ItemStack result = recipe.getResultItem(level.registryAccess());
             if (!result.is(targetItem)) continue;
             for (ItemStack ing : recipe.getIngredients().get(0).getItems()) {
@@ -97,8 +121,9 @@ public final class FurnaceService {
         return "no smeltable material for " + target;
     }
 
-    /** 取可烧炼原料注册名 — 无 → "" (executeOne 用; 空 target 立即失败 — 原语义) */
-    public static String resolveSmeltIngredient(ServerLevel level, EntityMaid maid) {
+    /** 取可烧炼原料注册名 — 无 → "" (executeOne 用; 空 target 立即失败 — 原语义)
+     *  <p>v79.62.1: recipeType 按炉子类型动态 */
+    public static String resolveSmeltIngredient(ServerLevel level, EntityMaid maid, RecipeType<?> recipeType) {
         String target = TaskMetaData.getTarget(maid);
         if (target.isEmpty()) return "";
  //? if 1.20.1 {
@@ -112,12 +137,7 @@ public final class FurnaceService {
         List<String> white = lists.get(1);
         if (!ItemFilters.isAllowed(targetItem, black, white)) return "";
         Map<Item, Integer> allItems = VanillaInputRegistry.readAllItems(maid);
- //? if 1.20.1 {
-        for (SmeltingRecipe recipe : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
- //?} else {
-        for (RecipeHolder<SmeltingRecipe> recipeHolder : level.getRecipeManager().getAllRecipesFor(RecipeType.SMELTING)) {
-            SmeltingRecipe recipe = recipeHolder.value();
- //?}
+        for (AbstractCookingRecipe recipe : smeltingRecipes(level, recipeType)) {
             if (!recipe.getResultItem(level.registryAccess()).is(targetItem)) continue;
             for (ItemStack ing : recipe.getIngredients().get(0).getItems()) {
                 if (!ItemFilters.isAllowed(ing.getItem(), black, white)) continue;

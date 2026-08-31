@@ -114,12 +114,13 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
 
     // ── 状态处理器 (每状态一个方法 — 单职责, 组合能力 API) ──
 
-    /** TO_TAKE — 导航到取货点 */
+    /** TO_TAKE — 导航到取货点 (v79.61x 导航守护: 走不到 → 两档 等重试→fail) */
     private static State handleToTake(EntityMaid maid, ServerLevel world) {
         BlockPos takePos = readPos(maid.getPersistentData(), KEY_TAKE);
         if (takePos == null) return null;
         if (arrived(maid, takePos)) return State.TAKING;
         navigateTo(maid, takePos);
+        navGuardStuck(maid, world, takePos, "取货点"); // 卡死 → fail 终态 (fail 后 GMPM 不再驱动本 FSM)
         return null;
     }
 
@@ -154,13 +155,41 @@ public final class ArmTransferPipeline extends TaskStateMachine<ArmTransferPipel
         return State.TO_DEPOSIT;
     }
 
-    /** TO_DEPOSIT — 导航到放货点 */
+    /** TO_DEPOSIT — 导航到放货点 (v79.61x 导航守护: 走不到 → 两档 等重试→fail) */
     private static State handleToDeposit(EntityMaid maid, ServerLevel world) {
         BlockPos depositPos = readPos(maid.getPersistentData(), KEY_DEPOSIT);
         if (depositPos == null) return null;
         if (arrived(maid, depositPos)) return State.DEPOSITING;
         navigateTo(maid, depositPos);
+        navGuardStuck(maid, world, depositPos, "放货点"); // 卡死 → fail 终态
         return null;
+    }
+
+    /**
+     * 导航守护 (v79.61x) — 目标绑定不可重搜, 用轻量两档 (FSM 处理器 static 无实例阶梯):
+     * 首轮卡死 → stage 0→1 + guard 重置 (等重试一个窗口); 次轮卡死 → fail 终态。
+     * stage 存 pipelineData (pl) — 终结随 clearPipelineData 自动闭环。
+     */
+    private static void navGuardStuck(EntityMaid maid, ServerLevel world, BlockPos target, String label) {
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.track(maid, target, world.getGameTime());
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.isStuck(maid, world.getGameTime())) {
+            return;
+        }
+        int stage = pipelineDataOf(maid).getInt("nav_stuck_stage");
+        if (stage == 0) {
+            // 档 1: 等重试 — guard 重置, 再观察一个窗口 (玩家可能清路)
+            pipelineDataOf(maid).putInt("nav_stuck_stage", 1);
+            com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.reset(maid);
+            return;
+        }
+        // 档 2: 放弃 — 对齐容器消失 fail 既有语义
+        com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, label + "不可达");
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher.fail(maid, label + "不可达");
+    }
+
+    /** pipelineData (pl) — 与 TaskConfigurable 同实现 (免实现配置接口) */
+    private static CompoundTag pipelineDataOf(EntityMaid maid) {
+        return com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.pl(maid, "arm_transfer");
     }
 
     /** DEPOSITING — 放货 (读物品 → 计算 → 存入 → 回取货) */

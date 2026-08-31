@@ -23,6 +23,16 @@ public final class WorldStateReader {
     public static String getBiome(Level w, BlockPos pos) {
         var biome = w.getBiome(pos); return biome != null ? biome.unwrapKey().map(k -> k.location().toString()).orElse("unknown") : "unknown";
     }
+
+    /** 生物群系基础温度 (0.0~2.0 区间典型) — v79.6x 自 EnvScanner 迁入 (B4) */
+    public static float getBiomeTemperature(Level w, BlockPos pos) {
+        return w.getBiome(pos).value().getBaseTemperature();
+    }
+
+    /** 生物群系降水类型名 (RAIN/SNOW/NONE) — v79.6x 自 EnvScanner 迁入 (B4) */
+    public static String getPrecipitation(Level w, BlockPos pos) {
+        return w.getBiome(pos).value().getPrecipitationAt(pos).name();
+    }
     public static int getLightLevel(Level w, BlockPos pos) {
         return w.getMaxLocalRawBrightness(pos);
     }
@@ -32,6 +42,17 @@ public final class WorldStateReader {
     }
     public static boolean bypassesArmor(DamageSource src) { return src.is(net.minecraft.tags.DamageTypeTags.BYPASSES_ARMOR); }
     public static String getDamageType(DamageSource src) { return src.getMsgId(); }
+    /** 世界状态摘要 (AI 可读文本) — v79.6x 自 task/sense/WorldStateReader 迁入 (分层收口 A1) */
+    public static String describe(Level level, BlockPos pos) {
+        boolean raining = level.isRaining();
+        boolean thundering = level.isThundering();
+        boolean day = !level.isNight();
+        return String.format("dimension=%s tick=%d day=%s weather=%s",
+                level.dimension().location(),
+                level.getGameTime(),
+                day ? "day" : "night",
+                thundering ? "thunder" : (raining ? "rain" : "clear"));
+    }
 
     // === Phase 7: 实体查找 ===
     /** 通过 UUID 获取在线玩家 */

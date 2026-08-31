@@ -34,6 +34,19 @@ public final class MaidDamageListener {
     public static void onMaidDamage(MaidDamageEvent event) {
         EntityMaid maid = event.getMaid();
         if (maid.level().isClientSide()) return;
+        // v79.62.1 仙人掌伤害免疫 — 女仆不踩仙人掌/不被扎 (取消伤害 + 不触发自救)
+        if (event.getSource().is(net.minecraft.world.damagesource.DamageTypes.CACTUS)) {
+            event.setCanceled(true);
+            return;
+        }
+        // v79.62.1 挖空置域摔落保护 — 挖空后自然下落, 摔落伤害固定 1 (不死, 安全下落)
+        if (event.getSource().is(net.minecraft.world.damagesource.DamageTypes.FALL)
+                && "void_excavation".equals(
+                        com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskTypeRegistry
+                                .extractTaskType(maid.getTask().getUid().getPath()))) {
+            event.setAmount(1);
+            return;
+        }
         // 掉血快照 (事件在扣血前 — 推算掉血后血量比例)
         SelfRescueState.record(maid, event.getAmount());
         // 启动自救被动 — 已在运行则覆盖写同值 (幂等); 哈气运行中被互斥挡 (哈气优先)

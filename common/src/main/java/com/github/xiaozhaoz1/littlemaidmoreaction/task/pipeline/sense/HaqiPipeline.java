@@ -19,7 +19,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.HaqiService;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSignal;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSnapshot;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.Signals;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvScanner;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.AnimExecute;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.movement.BrainHelper;
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmOutput;
@@ -78,6 +78,10 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
     private static final String KEY_AUDIO_TICKS = "audio_ticks";
     /** 挥击倒计时 (进入 LOOK 后延迟, 0=不挥 / -1=已挥) */
     private static final String KEY_HIT_TICKS = "hit_ticks";
+    /** MOVE 状态持续 tick (pipelineData) — 到达/重触发重置 (触发口写 0) */
+    public static final String KEY_MOVE_TICKS = "move_ticks";
+    /** MOVE 超时 (tick) — 目标在 2~4 格追逐带持续移动追不上 → 放弃 (v79.61x #4) */
+    private static final int MOVE_TIMEOUT_TICKS = 200;
     /** 目标类型 (maid=对女仆 / owner=对主人; 向后兼容: 读空默认 maid) */
     public static final String KEY_TARGET_TYPE = "target_type";
     public static final String TARGET_MAID = "maid";
@@ -99,8 +103,10 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
 
     /** 触发距离: 3 格 (distSqr <= 9) */
     private static final double TRIGGER_DIST_SQR = 9.0;
-    /** 到达目标旁判定: 1 格 (distSqr <= 1.5²) */
-    private static final double ARRIVE_DIST_SQR = 2.25;
+    /** 到达目标旁判定: 2.5 格 (distSqr <= 2.5²) — v79.61x 用户裁定「走近一次就 LOOK」:
+     *  触发时目标本就在 2-3 格内, 走到旁边即可开始哈气, 无需精确贴身 (原 1.5² 判定
+     *  要求贴身 → 目标轻微移动就长期追不上) */
+    private static final double ARRIVE_DIST_SQR = 6.25;
     /** 目标丢失判定: 4 格 (distSqr > 16) */
     private static final double LOST_DIST_SQR = 16.0;
 
@@ -142,14 +148,16 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
     @Override
     public void onSignal(EntityMaid maid, EnvSnapshot snap, String signalId) {
         // 总开关 + 对主人二级开关, 任一开则进入 (内部再分别门控)
-        if (!PassiveTaskConfig.HAQI_ENABLED.get() && !PassiveTaskConfig.HAQI_ENABLED_TO_OWNER.get()) return;
+        // v79.62.1 启用判定迁至 PassiveConfigUtil (per-maid pipelineConfig "enabled");
+        // submitPassive 已门控, 此处不再用全局 HAQI_ENABLED 二次判定 (否则子界面开了但全局默认关 → 不执行)
+        // HAQI_ENABLED_TO_OWNER 保留为对主人变体开关 (子界面可配)
         // 防重复 (自身运行中)
         String key = TaskKeys.passiveKey(taskType());
         if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))) return;
         if (snap == null || snap.world() == null) return;
 
         // 2 格内其他 maid (快照实体列表, 距离过滤)
-        List<LivingEntity> maids = snap.entities(EnvScanner.CAT_MAID);
+        List<LivingEntity> maids = snap.entities(EntityScanner.CAT_MAID);
         EntityMaid target = null;
         double best = Double.MAX_VALUE;
         for (LivingEntity e : maids) {
@@ -169,6 +177,7 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
             data.putString(KEY_TARGET_TYPE, TARGET_MAID);
             data.putString(KEY_STATE, State.MOVE.name());
             data.putInt(KEY_TIMER, 0);
+            data.putInt(KEY_MOVE_TICKS, 0);
             TaskDispatcher.submitPassive(maid, taskType());
             return;
         }
@@ -210,6 +219,14 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
                     // 到达 → 看她 + 音频 + 算总时长 (按目标类型分流)
                     enterLook(world, maid, data, targetType);
                 } else {
+                    // v79.61x #4: MOVE 超时 — 目标持续跑动 (跟着主人跑) 走不到 2.5 格旁时
+                    // 兜底放弃 (LOST_DIST 4 格只覆盖远离, 绕圈移动不触发) → 200t 放弃
+                    int moveTicks = data.getInt(KEY_MOVE_TICKS) + 1;
+                    if (moveTicks >= MOVE_TIMEOUT_TICKS) {
+                        TaskDispatcher.cancelPassive(maid, taskType());
+                        return;
+                    }
+                    data.putInt(KEY_MOVE_TICKS, moveTicks);
                     NavigationUtil.navigateTo(maid, targetPos);
                 }
             }
@@ -294,7 +311,7 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
         // 表情气泡 — 对女仆/对主人子集随机, 与语音随机相互独立
         MaidEmojiApi.send(maid, HaqiService.TARGET_OWNER.equals(targetType) ? MaidEmojiType.OWNER : MaidEmojiType.MAID);
         // 诊断: 触发女仆模型状态 (isYsm 服务端判断 — YSM 通道分流依据)
-        LittleMaidMoreAction.LOGGER.info("[LMA/Haqi] LOOK 进入 maid={} targetType={} isYsmModel={}",
+        LittleMaidMoreAction.LOGGER.debug("[LMA/Haqi] LOOK 进入 maid={} targetType={} isYsmModel={}",  // 2026-08-16 降噪: 周期刷屏 INFO→DEBUG
                 maid.getStringUUID(), targetType, maid.isYsmModel());
         // 哈气动画 — AnimExecute FULL 双通道分流 (YSM=playRouletteAnim / TLM=ISS geckolib:
         // START 播一次 → CASTING 循环 (durCasting=LOOK 总时长×3 — 用户裁定: 动画持续时长 = 哈气总时长 3 倍,

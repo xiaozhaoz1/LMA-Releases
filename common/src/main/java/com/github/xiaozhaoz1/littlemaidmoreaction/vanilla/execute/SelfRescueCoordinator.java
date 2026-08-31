@@ -38,14 +38,19 @@ public final class SelfRescueCoordinator {
         return tryDig(world, maid, pos.above());
     }
 
-    /** 单格: 判定 (对齐 maid_useful_task isNotSafeAndCanTryToDestroy) + 瞬破 */
+    /** 单格: 判定 (对齐 maid_useful_task isNotSafeAndCanTryToDestroy) + 瞬破
+     *  <p>v79.62.1 加蜘蛛网: WebBlock 不窒息 (isSuffocating=false) 但 makeStuckInBlock
+     *  减速 95% 困住女仆 (导航推不动 → Unstuck 转圈也出不来) → 单独识别 COBWEB 直接挖. */
     private static boolean tryDig(ServerLevel world, EntityMaid maid, BlockPos pos) {
         BlockState bs = world.getBlockState(pos);
         if (bs.isAir()) return false;
         VoxelShape collision = bs.getCollisionShape(world, pos);
         if (collision.isEmpty()) return false;
         if (!maid.getBoundingBox().intersects(collision.bounds().move(pos))) return false;
-        if (!bs.isSuffocating(world, pos)) return false;
+        // 窒息块 (被埋) 或 蜘蛛网 (缠住) — 都算卡住自救
+        boolean suffocating = bs.isSuffocating(world, pos);
+        boolean cobweb = bs.is(net.minecraft.world.level.block.Blocks.COBWEB);
+        if (!suffocating && !cobweb) return false;
         if (!maid.canDestroyBlock(pos)) return false;
         // 按方块类型换合适工具 (手工具已合适不动); 挖掉后 AABB 不再相交, 下轮自然收敛
         ChainHarvestExecute.ensureToolFor(maid, bs);

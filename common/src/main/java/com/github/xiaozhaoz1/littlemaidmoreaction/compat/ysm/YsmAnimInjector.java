@@ -269,7 +269,7 @@ public final class YsmAnimInjector {
             return;
         }
         JsonObject sourceAnims = sourceRoot.getAsJsonObject("animations");
-        if (sourceAnims == null || sourceAnims.isEmpty()) {
+        if (sourceAnims == null || sourceAnims.entrySet().isEmpty()) {  // v79.62.1 兼容旧版 Gson (isEmpty() 是 2.10+ API)
             LittleMaidMoreAction.LOGGER.warn("[LMA/YsmInject] 源动画无 animations: {}", source);
             return;
         }

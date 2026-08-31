@@ -21,6 +21,8 @@ public final class ContainerOutput {
     public static IItemHandler getHandler(net.minecraft.server.level.ServerLevel level,
                                           net.minecraft.core.BlockPos pos) {
         if (pos == null) return null;
+        // v79.62.1 修卡顿: 区块未加载 → null (getBlockEntity 用 getChunkAt 无守卫, 未加载区块会同步生成 → 卡主线程)
+        if (!level.hasChunk(pos.getX() >> 4, pos.getZ() >> 4)) return null;
         net.minecraft.world.level.block.entity.BlockEntity be = level.getBlockEntity(pos);
         if (be == null) return null;
         for (var dir : net.minecraft.core.Direction.values()) {

@@ -50,22 +50,44 @@ public final class PressPipeline extends MoveToBlockStateMachine<PressPipeline.S
 
     @Override
     protected State tick(State s, ServerLevel world, EntityMaid maid) {
+        long now = world.getGameTime();
         return switch (s) {
             case SEARCHING -> {
-                BlockPos target = PressService.findTarget(world, maid.blockPosition());
-                if (target == null) yield null;
+                // v79.61x: 多目标收集 + 跳过集过滤 (卡死目标 60t 不重选) + 无目标气泡
+                BlockPos target = PressService.findTargets(world, maid.blockPosition())
+                        .stream().filter(p -> !isSkipped(maid, p, now)).findFirst().orElse(null);
+                if (target == null) {
+                    if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                            .shouldFire(maid, "press_no_target", 600)) {
+                        com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
+                                .showFail(maid, "附近没有冲压台");
+                    }
+                    yield null;
+                }
+                com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
                 writeTarget(maid, target);
                 navigateTo(maid, target);
                 yield State.NAVIGATING;
             }
             case NAVIGATING -> {
                 BlockPos target = readTarget(maid);
-                if (target == null) yield State.SEARCHING;
+                if (target == null) {
+                    com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
+                    yield State.SEARCHING;
+                }
                 if (arrived(maid, target)) {
+                    com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
                     boolean depot = world.getBlockEntity(target) instanceof DepotBlockEntity;
                     yield (depot ? PressService.hasDepotRecipe(world, target)
                                  : PressService.hasBasinRecipe(world, target))
                         ? State.WORKING : State.SEARCHING;
+                }
+                // v79.61x 导航守护: 卡死 → 跳过集 + 重搜
+                com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.track(maid, target, now);
+                if (com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.isStuck(maid, now)) {
+                    addSkip(maid, target, now);
+                    com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.reset(maid);
+                    yield State.SEARCHING;
                 }
                 navigateTo(maid, target);
                 yield null;

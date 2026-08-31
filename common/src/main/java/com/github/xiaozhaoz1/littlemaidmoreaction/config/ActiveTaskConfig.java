@@ -108,6 +108,17 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.IntValue BI_TIMER_DEFAULT_INTERVAL;
 //?}
 
+    // ── 挖空置域 (v79.62) ──
+//? if 1.20.1 {
+    public static final ForgeConfigSpec.IntValue VOID_DEFAULT_CHUNKS;
+    public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> VOID_DESTROY_LIST;
+    public static final ForgeConfigSpec.BooleanValue VOID_NO_PATHFIND;
+//?} else {
+    public static final ModConfigSpec.IntValue VOID_DEFAULT_CHUNKS;
+    public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> VOID_DESTROY_LIST;
+    public static final ModConfigSpec.BooleanValue VOID_NO_PATHFIND;
+//?}
+
     // ── 合成任务 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.ConfigValue<String> CRAFT_DEFAULT_PRODUCT;
@@ -234,7 +245,7 @@ public final class ActiveTaskConfig {
                 .defineInRange("dig_down_depth", 6, 1, 8);
         CHAIN_NAV_TIMEOUT = b
                 .comment("导航看门狗超时 (tick): 寻路超时未达目标则跳过重试 (v79.26.6 配置化, 原 NAV_TIMEOUT_TICKS 常量; 默认 240 = 12 秒)")
-                .defineInRange("nav_timeout_ticks", 240, 40, 2400);
+                .defineInRange("nav_timeout_ticks", 100, 20, 2400);   // v79.62.2 默认 100t=5 秒 (用户裁定: 5 秒尝试, 原 240=12 秒)
         // 垫柱触发高度/面前挖穿距离配置退役 (用户: "不用垫方块了, 只要挖上下能挖到的就行了" —
         // 垫柱链全删, 面前挖穿删 — 走路全 TLM, 只挖垂直; 桥/阶梯固定逻辑无配置)
         b.pop();
@@ -282,6 +293,19 @@ public final class ActiveTaskConfig {
         BI_TIMER_DEFAULT_INTERVAL = b
                 .comment("定时器默认间隔 (tick, 200=10秒)")
                 .defineInRange("timer_default_interval", 200, 20, 12000);
+        b.pop();
+
+        b.push("void_excavation");
+        VOID_DEFAULT_CHUNKS = b
+                .comment("挖空置域默认区块数 (单女仆 TLM 任务栏可覆盖; 起点为中心 N×N 区块, 全挖)")
+                .defineInRange("default_chunks", 32, 1, 256);
+        VOID_DESTROY_LIST = b
+                .comment("挖空置域销毁名单 (物品id列表; 名单内物品挖出即销毁消失, 不进背包不落地; 单女仆 TLM 设置可覆盖)")
+                .defineList("destroy_list", java.util.List.of(),
+                        obj -> obj instanceof String);
+        VOID_NO_PATHFIND = b
+                .comment("关闭寻路 (开启后不 BFS 寻路, 直接传送到区块中间挖; 单女仆 TLM 设置可覆盖)")
+                .define("no_pathfind", false);
         b.pop();
 
         b.push("craft_chain");
@@ -374,6 +398,10 @@ public final class ActiveTaskConfig {
         MoreActionConfig.reg(ACTIVE_VALUES, "active", BI_TIMER_DEFAULT_INTERVAL);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CRAFT_DEFAULT_PRODUCT);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CRAFT_MAX_PRODUCTS);
+        // v79.62 挖空置域配置 (默认区块数 + 销毁名单 + 关寻路 — reg 同步, 防 ConfigConsistencyTest 红)
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", VOID_DEFAULT_CHUNKS);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", VOID_DESTROY_LIST);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", VOID_NO_PATHFIND);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", FURNACE_BLACKLIST);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", FURNACE_WHITELIST);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", JUKEBOX_WAIT_TICKS);

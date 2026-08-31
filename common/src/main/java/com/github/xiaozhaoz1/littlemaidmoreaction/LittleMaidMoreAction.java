@@ -84,14 +84,30 @@ public final class LittleMaidMoreAction {
     public static final RegistryObject<MenuType<ItemListConfigMenu>> ITEM_LIST_CONFIG_MENU =
         MENU_TYPES.register("item_list_config",
             () -> IForgeMenuType.create((id, inv, buf) -> new ItemListConfigMenu(id, inv, buf.readInt())));
+    /** v79.62.1: 通用被动管线开关配置菜单 (haqi/jiuhu_milk 共用) */
+    public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.PassiveToggleConfigMenu>> PASSIVE_TOGGLE_CONFIG_MENU =
+        MENU_TYPES.register("passive_toggle_config",
+            () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.PassiveToggleConfigMenu(id, inv, buf.readInt())));
     /** 配方链合成配置菜单 */
     public static final RegistryObject<MenuType<CraftChainConfigMenu>> CRAFT_CHAIN_CONFIG_MENU =
         MENU_TYPES.register("craft_chain_config",
             () -> IForgeMenuType.create((id, inv, buf) -> new CraftChainConfigMenu(id, inv, buf.readInt())));
+    /** v79.62.1: 锻造容器菜单 (原版锻造台样式, 无模板) */
+    public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingMenu>> SMITHING_MENU =
+        MENU_TYPES.register("smithing",
+            () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingMenu(id, inv, buf)));
     /** 敲钟单女仆间隔配置菜单 */
     public static final RegistryObject<MenuType<BellRingConfigMenu>> BELL_RING_CONFIG_MENU =
         MENU_TYPES.register("bell_ring_config",
             () -> IForgeMenuType.create((id, inv, buf) -> new BellRingConfigMenu(id, inv, buf.readInt())));
+    /** v79.62: 挖空置域单女仆区块数配置菜单 */
+/** v79.62.2 dam_fill config menu (drain toggle) */
+    public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigMenu>> DAM_FILL_CONFIG_MENU =
+        MENU_TYPES.register("dam_fill_config",
+            () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigMenu(id, inv, buf.readInt())));
+    public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu>> VOID_EXCAVATION_CONFIG_MENU =
+        MENU_TYPES.register("void_excavation_config",
+            () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu(id, inv, buf.readInt())));
     /** AI 操控配置菜单 (LLM 模型/声线名称) */
     public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigMenu>> AI_CONTROL_CONFIG_MENU =
         MENU_TYPES.register("ai_control_config",
@@ -122,6 +138,8 @@ public final class LittleMaidMoreAction {
         LmaRegistrar.registerItems(modBus);
         // 酒狐奶物品 (v79.6x)
         com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.register(modBus);
+        // LMA 创造栏标签页 (2026-08-16 — 用户裁定「创造栏没 LMA 栏」)
+        com.github.xiaozhaoz1.littlemaidmoreaction.init.LmaCreativeTab.register(modBus);
         // 便携装配 MenuType
         MENU_TYPES.register(modBus);
         // 网络发送注入 (SimpleChannel) — M-4: 统一走 setSender 记注入状态日志
@@ -146,7 +164,11 @@ public final class LittleMaidMoreAction {
             LmaMenus.CRAFT_CHAIN_CONFIG_MENU = CRAFT_CHAIN_CONFIG_MENU.get();
             LmaMenus.BELL_RING_CONFIG_MENU = BELL_RING_CONFIG_MENU.get();
             LmaMenus.AI_CONTROL_CONFIG_MENU = AI_CONTROL_CONFIG_MENU.get();
+            LmaMenus.PASSIVE_TOGGLE_CONFIG_MENU = PASSIVE_TOGGLE_CONFIG_MENU.get();
             LmaMenus.MAID_ASSEMBLY_MENU = MAID_ASSEMBLY_MENU.get();   // v75.1: 便携装配
+            LmaMenus.SMITHING_MENU = SMITHING_MENU.get();             // v79.62.1: 锻造容器
+            LmaMenus.VOID_EXCAVATION_CONFIG_MENU = VOID_EXCAVATION_CONFIG_MENU.get();
+            LmaMenus.DAM_FILL_CONFIG_MENU = DAM_FILL_CONFIG_MENU.get();   // v79.62.2 dam_fill   // v79.62: 挖空置域
             // 网络包注册 — 清单驱动 (批次 A: PacketRegistry.DEFS 单一事实源 + ForgePacketRegistrar 循环消费)
             ForgePacketRegistrar.registerAll(NETWORK);
 
@@ -159,6 +181,11 @@ public final class LittleMaidMoreAction {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationDurationManager.loadServerDurations();
+        // v79.62 种菜区域配置 — 服务端启动从 config/littlemaidmoreaction/farm_regions.json 加载
+        com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage
+                .load(LittleMaidMoreAction.CONFIG_DIR);
+        // v79.62.1 清空挖空认领池 (运行时状态, 重启后空 — 用户裁定, 防旧认领残留)
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.VoidExcavationPipeline.resetPool();
         LOGGER.info("[LMA] 服务端动画数据加载完成");
     }
 //?}

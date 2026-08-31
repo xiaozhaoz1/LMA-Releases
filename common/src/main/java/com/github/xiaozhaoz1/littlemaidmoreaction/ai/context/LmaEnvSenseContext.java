@@ -3,7 +3,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.ai.context;
 import com.github.tartaricacid.touhoulittlemaid.ai.agent.context.AbstractMaidContext;
 import com.github.tartaricacid.touhoulittlemaid.ai.agent.context.GameContextRegister;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvScanner;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSenseBroadcaster;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSnapshot;
 
@@ -67,9 +67,9 @@ public final class LmaEnvSenseContext {
         public String getValue(EntityMaid maid) {
             EnvSnapshot snap = EnvSenseBroadcaster.getSnapshot(maid);
             if (snap == null) return "实体数据尚未就绪";
-            int monsters = snap.entities(EnvScanner.CAT_MONSTER).size();
-            int friendlies = snap.entities(EnvScanner.CAT_FRIENDLY).size();
-            int maids = snap.entities(EnvScanner.CAT_MAID).size();
+            int monsters = snap.entities(EntityScanner.CAT_MONSTER).size();
+            int friendlies = snap.entities(EntityScanner.CAT_FRIENDLY).size();
+            int maids = snap.entities(EntityScanner.CAT_MAID).size();
             return String.format("附近怪物: %d, 友好生物: %d, 其他女仆: %d",
                     monsters, friendlies, maids);
         }
@@ -101,7 +101,7 @@ public final class LmaEnvSenseContext {
             if (!(maid.level() instanceof net.minecraft.server.level.ServerLevel sl)) {
                 return "实体清单不可用";
             }
-            var result = com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EntityScan.scanNearby(
+            var result = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner.scanNearby(
                     sl, maid.getX(), maid.getY(), maid.getZ(), 32, "all");
             StringBuilder sb = new StringBuilder();
             for (var e : result.entities().stream().limit(10).toList()) {

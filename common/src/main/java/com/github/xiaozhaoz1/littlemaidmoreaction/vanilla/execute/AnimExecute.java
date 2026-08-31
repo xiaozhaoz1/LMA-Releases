@@ -52,7 +52,7 @@ public final class AnimExecute {
             data.putString(TaskKeys.ANIM_NAME, animName);
             data.putLong(TaskKeys.ANIM_TICK, gameTime);
             data.putInt(TaskKeys.ANIM_DUR, 20);
-            if (autoWait) { BrainHelper.freeze(maid); data.putInt(TaskKeys.WAIT_TICKS, 20); }
+            if (autoWait) { BrainHelper.freeze(maid); }
             sync(maid, data, TaskKeys.ANIM_NAME, TaskKeys.ANIM_MODE, TaskKeys.ANIM_TICK, TaskKeys.ANIM_DUR);
             return true;
         }
@@ -73,7 +73,6 @@ public final class AnimExecute {
             TaskKeys.ANIM_SEQ, TaskKeys.ANIM_TICK, TaskKeys.ANIM_DUR, TaskKeys.LOCK_MOVE, TaskKeys.ANIM_PRIORITY);
 
         if (autoWait || def.freezeAI()) BrainHelper.freeze(maid);
-        if (autoWait) data.putInt(TaskKeys.WAIT_TICKS, animDur > 0 ? animDur : 40);
         return true;
     }
 
@@ -93,7 +92,7 @@ public final class AnimExecute {
             data.putString(TaskKeys.ANIM_NAME, start);
             data.putLong(TaskKeys.ANIM_TICK, gameTime);
             data.putInt(TaskKeys.ANIM_DUR, 20);
-            if (autoWait) { BrainHelper.freeze(maid); data.putInt(TaskKeys.WAIT_TICKS, 20); }
+            if (autoWait) { BrainHelper.freeze(maid); }
             sync(maid, data, TaskKeys.ANIM_NAME, TaskKeys.ANIM_MODE, TaskKeys.ANIM_TICK, TaskKeys.ANIM_DUR);
             return true;
         }
@@ -118,11 +117,6 @@ public final class AnimExecute {
             TaskKeys.DUR_START, TaskKeys.DUR_CASTING, TaskKeys.DUR_END, TaskKeys.ANIM_PRIORITY, TaskKeys.LOCK_MOVE);
 
         if (autoWait || defStart.freezeAI()) BrainHelper.freeze(maid);
-        if (autoWait) {
-            int ds = Math.max(1, parseInt(durStart, 20));
-            int dc = Math.max(1, parseInt(durCasting, 20));
-            data.putInt(TaskKeys.WAIT_TICKS, ds + dc);
-        }
         return true;
     }
 

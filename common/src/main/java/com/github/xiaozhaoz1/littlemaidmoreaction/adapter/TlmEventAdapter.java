@@ -53,6 +53,23 @@ public final class TlmEventAdapter {
         var data = maid.getPersistentData();
         // 门面收编 (remove 段保留 — 键常量已有)
         String task = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getTask(maid);
+        // v79.62.1 挖空重启恢复: 退出时任务可能被 cancel (FLOW_TASK 清), 但 cfg start 持久 —
+        // cfg 有 void_excavation start → 自动恢复提交 (女仆重启游戏继续挖, 用户裁定)
+        if (task.isEmpty()
+                && com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData
+                        .cfg(maid, "void_excavation").contains("start")) {
+            // v79.62.1 修重启残留: 认领/光标是运行时状态 (未持久化) — 游戏重启后 BLOCK_POOL
+            // 静态残留 + PD curCX/curCZ/x/y/z 残留 → 女仆跳过认领挖旧 cursor (3 女仆同光标实锤).
+            // 重启恢复 = 清 PD 运行时状态 → tick 重新认领区块 (区块缓存同理, 重启时空).
+            com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid fmaid = maid;
+            var fpl = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.pl(fmaid, "void_excavation");
+            fpl.remove("curCX"); fpl.remove("curCZ");
+            fpl.remove("x"); fpl.remove("y"); fpl.remove("z");
+            fpl.remove("claimWait"); fpl.remove("wait"); fpl.remove("digTicks");
+            fpl.remove("navTimeout"); fpl.remove("navCd");
+            TaskDispatcher.submit(maid, "void_excavation", null, 0);
+            return;
+        }
         if (task.isEmpty()) return;
 
         long now = maid.level().getGameTime();

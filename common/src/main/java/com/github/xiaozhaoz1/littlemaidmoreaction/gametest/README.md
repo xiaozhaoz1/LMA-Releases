@@ -6,6 +6,6 @@
 
 **依赖方向**: 全项目; 双节点运行 (forge + neoforge)。
 
-**代表**: LmaGameTests (10 测试) / 继承 TLM TLMGameTests 基建
+**代表**: LmaGameTests (12 测试) / 继承 TLM TLMGameTests 基建
 
 **修改注意**: 测试注册的临时任务用 __ 前缀隔离; 运行时 TLM 已冻结 (迟注册走 fail-soft); 修改后双节点全跑。

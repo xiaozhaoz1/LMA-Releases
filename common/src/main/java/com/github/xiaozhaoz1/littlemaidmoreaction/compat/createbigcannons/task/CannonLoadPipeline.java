@@ -1,0 +1,480 @@
+package com.github.xiaozhaoz1.littlemaidmoreaction.compat.createbigcannons.task;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
+
+import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
+import com.github.xiaozhaoz1.littlemaidmoreaction.api.navigation.NavigationMemory;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskStateMachine;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.StepType;
+import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.ai.behavior.BlockPosTracker;
+import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
+import net.minecraft.world.entity.ai.memory.MemoryModuleType;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.state.BlockState;
+//? if 1.20.1 {
+import net.minecraftforge.items.IItemHandler;
+//?} else {
+import net.neoforged.neoforge.items.IItemHandler;
+//?}
+import rbasamoyai.createbigcannons.cannon_control.contraption.PitchOrientedContraptionEntity;
+
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+
+/**
+ * 速射炮闩装填管线 — 多炮架+Worm清膛+装填顺序验证+目光跟踪+定期重扫。
+ *
+ * <p>loaded标记持久化防止重复装填; 每3秒 (CLEAR_ALL_INTERVAL=60t) 全清loaded标记重扫
+ * 以检测已发射的炮 (2026-08-11c 修正: 原 javadoc "每 10 秒" 与实现不符)。
+ *
+ * <p>2026-08-16: 移植 1.21.1 (CBC 5.11.7) — 源码移 common 双平台编译;
+ * 版本差异适配 (//? if): BigCannonMunitionBlock.getExtractedItem/getHandloadingInfo
+ * 1.21 增加 HolderLookup.Provider 参数; getInitialOrientation 双平台均在位 (javap 实证)。
+ */
+public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipeline.State> implements TaskConfigurable {
+
+    enum State { SEARCHING, MOVING, OPENING, CLEARING, LOADING, CLOSING }
+
+    private static final String KEY_STEP = "load_step";
+    private static final String KEY_MOUNT = "mount_pos";
+    private static final String KEY_CD_MOUNT = "cd_mount";
+    private static final String KEY_LOADED = "loaded_mounts";
+    private static final String KEY_CLEAR_STEP = "clear_step";
+    private static final String KEY_NAV_MODE = "nav_mode";
+    private static final String KEY_LAST_CLEAR = "last_clear_all";
+    private static final String KEY_LAST_CLOSE = "last_close_tick";
+    private static final int MAX_SUB = 3;
+    private static final long CLEAR_ALL_INTERVAL = 60; // 每3秒全清loaded标记重扫
+    /** LOADING 滞留超时 (tick) — 弹药耗尽无进展 30s (v79.61x 200t 用户实测仍刷 → 600t 30 秒一次提示) */
+    private static final long LOAD_STALL_TIMEOUT = 600;
+
+    @Override protected Class<State> stateClass() { return State.class; }
+    @Override protected State initialState() { return State.SEARCHING; }
+    @Override public String taskType() { return "cannon_load"; }
+
+    @Override
+    protected Map<State, Set<State>> transitions() {
+        return Map.of(
+            State.SEARCHING, Set.of(State.MOVING),
+            State.MOVING,    Set.of(State.OPENING, State.SEARCHING),
+            State.OPENING,   Set.of(State.CLEARING, State.LOADING, State.SEARCHING),
+            // CLEARING→OPENING 出边已删 (v79.61x 悬空边: tickClearing 恒回 SEARCHING, worm 一次清膛)
+            State.CLEARING,  Set.of(State.SEARCHING),
+            State.LOADING,   Set.of(State.CLOSING, State.SEARCHING),
+            State.CLOSING,   Set.of(State.SEARCHING)
+        );
+    }
+
+    @Override
+    public List<TaskStep> steps() {
+        return List.of(
+            new TaskStep("search",  "寻找火炮炮架", StepType.INTERACT, List.of()),
+            new TaskStep("open",    "打开炮闩",     StepType.INTERACT, List.of()),
+            new TaskStep("load",    "装填弹药",     StepType.INTERACT, List.of()),
+            new TaskStep("close",   "合上炮闩",     StepType.INTERACT, List.of())
+        );
+    }
+
+    @Override
+    public boolean isTargetBlock(ServerLevel world, BlockPos pos, BlockState state, EntityMaid maid) {
+        if ("mount".equals(pipelineData(maid).getString(KEY_NAV_MODE))) {
+            return CannonLoadService.isCannonMount(world, pos, state);
+        }
+        return false;
+    }
+
+    @Override
+    public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
+        return PipelineResult.ok("");
+    }
+
+    @Override
+    protected void onEnter(State state, ServerLevel world, EntityMaid maid) {
+        pipelineData(maid).putString(KEY_NAV_MODE, state == State.SEARCHING ? "mount" : "none");
+    }
+
+    @Override
+    protected void cleanup(EntityMaid maid) {
+        super.cleanup(maid);
+        // 键闭环: 实际读写均在 pipelineData (lma_pl_cannon_load) — 清 compound 键;
+        // KEY_LAST_CLEAR 刻意保留 (周期重置防强制重扫误清刚写的 loaded 标记; 终结路径由 clearPipelineData 整段清除)
+        CompoundTag pl = pipelineData(maid);
+        pl.remove(KEY_STEP);
+        pl.remove(KEY_MOUNT);
+        pl.remove(KEY_CLEAR_STEP);
+        pl.remove(KEY_CD_MOUNT);
+        pl.remove(KEY_NAV_MODE);
+        pl.remove(KEY_LAST_CLOSE);
+        // 兼容历史版本写入根 PersistentData 的残留 + loaded 标记闭环 (跨 session NBT 残留防线)
+        maid.getPersistentData().remove(KEY_STEP);
+        maid.getPersistentData().remove(KEY_MOUNT);
+        maid.getPersistentData().remove(KEY_CLEAR_STEP);
+        maid.getPersistentData().remove(KEY_LOADED);
+        NavigationMemory.clearAllNav(maid);
+    }
+
+    // ── 主 tick (每帧目光看向炮架) ──
+
+    @Override
+    protected State tick(State s, ServerLevel world, EntityMaid maid) {
+        BlockPos mount = loadMountPos(maid);
+        if (mount != null) {
+            maid.getBrain().setMemory(MemoryModuleType.LOOK_TARGET, new BlockPosTracker(mount));
+        }
+        return switch (s) {
+            case SEARCHING -> tickSearching(world, maid);
+            case MOVING    -> tickMoving(world, maid);
+            case OPENING   -> tickOpening(world, maid);
+            case CLEARING  -> tickClearing(world, maid);
+            case LOADING   -> tickLoading(world, maid);
+            case CLOSING   -> tickClosing(world, maid);
+        };
+    }
+
+    // ── 各状态 ──
+
+    private static final int RELOAD_DELAY = 20;
+
+    private State tickSearching(ServerLevel world, EntityMaid maid) {
+        CompoundTag data = pipelineData(maid);
+        long lastClose = data.getLong(KEY_LAST_CLOSE);
+        long cdMount = data.getLong(KEY_CD_MOUNT);
+        long lastClear = data.getLong(KEY_LAST_CLEAR);
+        long now = world.getGameTime();
+
+        List<BlockPos> mounts = CannonLoadService.findAllCannonMounts(world, maid.blockPosition());
+        if (mounts.isEmpty()) return null;
+
+        // 第一遍: 跳过loaded + CD中的炮架 + v79.61x 导航跳过集 (卡死炮架 60t 不重选)
+        for (BlockPos mount : mounts) {
+            if (isLoaded(maid, mount)) continue;
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavSkipSet
+                    .isSkipped(maid, taskType(), mount, now)) continue;
+            if (cdMount != 0 && lastClose > 0
+                && mount.asLong() == cdMount
+                && now - lastClose < RELOAD_DELAY) continue;
+            saveMountPos(maid, mount);
+            navigateToMount(maid, mount);
+            return State.MOVING;
+        }
+
+        // 全部loaded/CD → 定期清空loaded标记重扫(检测已发射的炮)
+        if (now - lastClear > CLEAR_ALL_INTERVAL) {
+            clearAllLoaded(maid);
+            data.putLong(KEY_LAST_CLEAR, now);
+            // 重试第一个非CD炮架
+            for (BlockPos mount : mounts) {
+                if (cdMount != 0 && lastClose > 0
+                    && mount.asLong() == cdMount
+                    && now - lastClose < RELOAD_DELAY) continue;
+                saveMountPos(maid, mount);
+                navigateToMount(maid, mount);
+                return State.MOVING;
+            }
+        }
+        return null;
+    }
+
+    private State tickMoving(ServerLevel world, EntityMaid maid) {
+        BlockPos mount = loadMountPos(maid);
+        if (mount == null) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
+            return State.SEARCHING;
+        }
+        if (!CannonLoadService.isValidMount(world, mount)) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
+            return State.SEARCHING;
+        }
+
+        if (arrivedAtMount(maid, mount)) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
+            return State.OPENING;
+        }
+        // v79.61x 导航守护: 卡死 → 炮架进跳过集 (60t) + 重搜换炮
+        long now = world.getGameTime();
+        com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.track(maid, mount, now);
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.isStuck(maid, now)) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavSkipSet
+                    .addSkip(maid, taskType(), mount, now);
+            com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.reset(maid);
+            return State.SEARCHING;
+        }
+        navigateToMount(maid, mount);
+        return null;
+    }
+
+    private State tickOpening(ServerLevel world, EntityMaid maid) {
+        var breechInfo = resolveBreech(world, maid);
+        var entity = resolveEntity(world, maid);
+        if (breechInfo == null || entity == null) return State.SEARCHING;
+
+        BlockPos mount = loadMountPos(maid);
+        var st = CannonLoadService.scanCannon(entity, breechInfo);
+
+        // 炮管已满 → 先验顺序再 mark loaded (v79.61x 用户裁定: 满装判定先过顺序校验 —
+        // 原顺序错满装直接标记跳过, 60t 后才被重扫发现, 问题延迟暴露)
+        if (st.hasProjectile() && st.propellantCount() >= 1) {
+            var slots = CannonLoadService.scanDetailed(entity, breechInfo);
+            if (CannonLoadService.isLoadOrderCorrect(slots)) {
+                markLoaded(maid, mount);
+                pipelineData(maid).putLong(KEY_LAST_CLOSE, world.getGameTime());
+                pipelineData(maid).putLong(KEY_CD_MOUNT, mount.asLong());
+                return State.SEARCHING;
+            }
+            // 顺序错满装 → 落下面 worm 清膛分支
+        }
+
+        // 炮管有弹药但顺序不对 → 用worm清膛
+        if (st.totalCharges() > 0) {
+            var slots = CannonLoadService.scanDetailed(entity, breechInfo);
+            if (!CannonLoadService.isLoadOrderCorrect(slots)) {
+                boolean hasWorm = CannonLoadService.isWorm(maid.getOffhandItem());
+                if (hasWorm) {
+                    pipelineData(maid).putInt(KEY_CLEAR_STEP, 0);
+                    return State.CLEARING;
+                }
+                unmarkLoaded(maid, mount);
+                return State.SEARCHING;
+            }
+        }
+
+        // 炮管已空(正常) → 开闩装填
+        if (!st.hasProjectile() && !st.hasPropellant()) {
+            unmarkLoaded(maid, mount);
+        }
+
+        if (CannonLoadService.isBreechOpen(breechInfo)) {
+            pipelineData(maid).putInt(KEY_STEP, 0);
+            return State.LOADING;
+        }
+        if (CannonLoadService.isOnCooldown(breechInfo)) return null;
+
+        CannonLoadService.toggleBreech(entity, breechInfo);
+        return null;
+    }
+
+    private State tickClearing(ServerLevel world, EntityMaid maid) {
+        var breechInfo = resolveBreech(world, maid);
+        var entity = resolveEntity(world, maid);
+        if (breechInfo == null || entity == null) return State.SEARCHING;
+
+        if (!CannonLoadService.isBreechOpen(breechInfo)) {
+            if (CannonLoadService.isOnCooldown(breechInfo)) return null;
+            CannonLoadService.toggleBreech(entity, breechInfo);
+            return null;
+        }
+
+        CompoundTag data = pipelineData(maid);
+        int step = data.getInt(KEY_CLEAR_STEP);
+
+        if (step == 0) {
+            data.putInt(KEY_CLEAR_STEP, 1);
+            return null;
+        }
+
+        CannonLoadService.wormClear(entity, breechInfo, maid);
+        return State.SEARCHING;
+    }
+
+    private State tickLoading(ServerLevel world, EntityMaid maid) {
+        var breechInfo = resolveBreech(world, maid);
+        if (breechInfo == null) return State.SEARCHING;
+        if (!CannonLoadService.isBreechOpen(breechInfo)) return State.CLOSING;
+
+        PitchOrientedContraptionEntity entity = resolveEntity(world, maid);
+        if (entity == null) return State.SEARCHING;
+
+        CompoundTag data = pipelineData(maid);
+        int step = data.getInt(KEY_STEP);
+
+        // v79.62 用户实测 1.21.1 装填无挥手: 原 % 10 == 0 节流在快速装填 (<10t) 下整段错过 —
+        // 改每 tick 调用 (原版 swing 节流自持: swingTime >= duration/2 才重播, 默认 6t → 最快每 3t 一次)
+        maid.swing(InteractionHand.MAIN_HAND);
+
+        // v79.61x 用户裁定: LOADING 弹药耗尽滞留 — 无进展超时 (200t) → 气泡 + 回 SEARCHING
+        // (原 tryLoadOne 连败不推进 step 永久挂死, 挥臂动画刷屏)
+        long now = world.getGameTime();
+        long loadStart = data.getLong("load_start");
+        if (loadStart == 0) {
+            data.putLong("load_start", now);
+        } else if (now - loadStart > LOAD_STALL_TIMEOUT) {
+            // 2026-08-16 用户实测: 缺弹 → LOADING 200t 超时 → 气泡 → SEARCHING → 再 LOADING → 每 ~10s 弹
+            // → 加 60s 气泡节流 (shouldFire 写戳) — 不刷屏仍周期提醒
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                    .shouldFire(maid, "cannon_no_ammo", 1200)) {
+                com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
+                        .showFail(maid, "缺少弹药，无法继续装填");
+            }
+            data.remove("load_start");
+            return State.SEARCHING;
+        }
+
+        boolean hasRamRod = CannonLoadService.isRamRod(maid.getMainHandItem());
+
+        boolean advanced = switch (step) {
+            case 0 -> {
+                if (CannonLoadService.isProjectileAtBreech(entity, breechInfo)) { yield true; }
+                yield tryLoadOne(world, maid, entity, breechInfo, CannonLoadService::isProjectile);
+            }
+            case 1 -> {
+                boolean loaded = tryLoadOne(world, maid, entity, breechInfo, CannonLoadService::isPropellant);
+                if (loaded) { CannonLoadService.ramPush(entity, breechInfo); }
+                yield loaded;
+            }
+            case 2 -> {
+                if (!hasRamRod) { yield true; }
+                if (CannonLoadService.hasBigCartridgeInTube(entity, breechInfo)) { yield true; }
+                boolean loaded = tryLoadOne(world, maid, entity, breechInfo, CannonLoadService::isPropellant);
+                if (loaded) { CannonLoadService.ramPush(entity, breechInfo); }
+                yield loaded;
+            }
+            default -> true;
+        };
+
+        var st = CannonLoadService.scanCannon(entity, breechInfo);
+        LittleMaidMoreAction.LOGGER.debug("[LMA/CBC] step={} advanced={} p={} pp={} total={} canLoad={}",
+            step, advanced, st.projectileCount(), st.propellantCount(), st.totalCharges(), st.canLoadAtBreech());
+
+        if (advanced) {
+            step++;
+            data.putInt(KEY_STEP, step);
+            data.remove("load_start"); // 有进展重置滞留计时
+            if (step >= MAX_SUB) return State.CLOSING;
+        }
+        return null;
+    }
+
+    private State tickClosing(ServerLevel world, EntityMaid maid) {
+        var breechInfo = resolveBreech(world, maid);
+        var entity = resolveEntity(world, maid);
+        if (breechInfo == null || entity == null) return State.SEARCHING;
+        if (!CannonLoadService.isBreechOpen(breechInfo) && !CannonLoadService.isOnCooldown(breechInfo)) {
+            BlockPos mount = loadMountPos(maid);
+            cleanup(maid);
+            // cleanup 已清 loaded/cd/last_close — 周期重置后重写跨周期标记 (防重复装填 + 冷却)
+            markLoaded(maid, mount);
+            CompoundTag pd = pipelineData(maid);
+            pd.putLong(KEY_LAST_CLOSE, world.getGameTime());
+            pd.putLong(KEY_CD_MOUNT, mount.asLong());
+            return State.SEARCHING;
+        }
+        if (CannonLoadService.isOnCooldown(breechInfo)) return null;
+
+        CannonLoadService.toggleBreech(entity, breechInfo);
+        return null;
+    }
+
+    // ── 已装填标记 ──
+
+    private static void markLoaded(EntityMaid maid, BlockPos mount) {
+        if (mount == null) return;
+        long[] cur = maid.getPersistentData().getLongArray(KEY_LOADED);
+        long v = mount.asLong();
+        for (long l : cur) if (l == v) return;
+        long[] next = Arrays.copyOf(cur, cur.length + 1);
+        next[cur.length] = v;
+        maid.getPersistentData().putLongArray(KEY_LOADED, next);
+    }
+
+    private static void unmarkLoaded(EntityMaid maid, BlockPos mount) {
+        if (mount == null) return;
+        long[] cur = maid.getPersistentData().getLongArray(KEY_LOADED);
+        long v = mount.asLong();
+        int keep = 0;
+        for (long l : cur) if (l != v) keep++;
+        if (keep == cur.length) return;
+        long[] next = new long[keep];
+        int j = 0;
+        for (long l : cur) if (l != v) next[j++] = l;
+        maid.getPersistentData().putLongArray(KEY_LOADED, next);
+    }
+
+    private static boolean isLoaded(EntityMaid maid, BlockPos mount) {
+        if (mount == null) return false;
+        long[] cur = maid.getPersistentData().getLongArray(KEY_LOADED);
+        long v = mount.asLong();
+        for (long l : cur) if (l == v) return true;
+        return false;
+    }
+
+    private static void clearAllLoaded(EntityMaid maid) {
+        maid.getPersistentData().putLongArray(KEY_LOADED, new long[0]);
+    }
+
+    // ── 辅助 ──
+
+    private CannonLoadService.BreechInfo resolveBreech(ServerLevel world, EntityMaid maid) {
+        BlockPos mount = loadMountPos(maid);
+        if (mount == null) return null;
+        PitchOrientedContraptionEntity entity = CannonLoadService.getContraption(world, mount);
+        if (entity == null) return null;
+        return CannonLoadService.findBreechInContraption(entity);
+    }
+
+    private PitchOrientedContraptionEntity resolveEntity(ServerLevel world, EntityMaid maid) {
+        BlockPos mount = loadMountPos(maid);
+        if (mount == null) return null;
+        return CannonLoadService.getContraption(world, mount);
+    }
+
+    private static boolean tryLoadOne(ServerLevel world, EntityMaid maid,
+                                       PitchOrientedContraptionEntity entity,
+                                       CannonLoadService.BreechInfo breechInfo,
+                                       java.util.function.Predicate<ItemStack> filter) {
+        IItemHandler inv = maid.getAvailableInv(true);
+        for (int i = 0; i < inv.getSlots(); i++) {
+            ItemStack stack = inv.getStackInSlot(i);
+            if (filter.test(stack)) {
+                ItemStack toLoad = inv.extractItem(i, 1, false);
+                if (toLoad.isEmpty()) continue;
+                boolean ok = CannonLoadService.loadMunition(entity, breechInfo, toLoad);
+                if (!ok) {
+                    // 退还链路: 源槽原位放回 (同种堆叠合并) → 背包任意槽 → 掉落兜底 (spawnAtLocation), 无静默丢弃
+                    ItemStack remainder = inv.insertItem(i, toLoad, false);
+                    if (!remainder.isEmpty()) {
+                        IItemHandler bp = maid.getAvailableBackpackInv();
+                        for (int j = 0; j < bp.getSlots() && !remainder.isEmpty(); j++) {
+                            remainder = bp.insertItem(j, remainder, false);
+                        }
+                    }
+                    if (!remainder.isEmpty()) {
+                        maid.spawnAtLocation(remainder);  // 全满 → 掉女仆脚下 (保底不丢)
+                    }
+                }
+                return ok;
+            }
+        }
+        return false;
+    }
+
+    private void saveMountPos(EntityMaid maid, BlockPos pos) {
+        pipelineData(maid).putLong(KEY_MOUNT, pos.asLong());
+    }
+
+    private BlockPos loadMountPos(EntityMaid maid) {
+        CompoundTag data = pipelineData(maid);
+        if (!data.contains(KEY_MOUNT)) return null;
+        return BlockPos.of(data.getLong(KEY_MOUNT));
+    }
+
+    private void navigateToMount(EntityMaid maid, BlockPos mount) {
+        BlockPos stand = CannonLoadService.getStandPos((ServerLevel) maid.level(), mount);
+        if (stand == null) return;
+        NavigationMemory.setNavTarget(maid, stand);
+        BehaviorUtils.setWalkAndLookTargetMemories(maid, stand, 1.0F, 1);
+        maid.getBrain().setMemory(MemoryModuleType.LOOK_TARGET, new BlockPosTracker(mount));
+    }
+
+    private static boolean arrivedAtMount(EntityMaid maid, BlockPos mount) {
+        return mount.distToCenterSqr(maid.position()) < 16.0;
+    }
+}

@@ -21,7 +21,6 @@ import net.minecraft.world.level.block.entity.BlockEntity;
  */
 public final class MixService {
     private static final int SEARCH_RANGE = 3;
-    static final int IDLE_INTERVAL = 60; // 3秒摸鱼
 
     private MixService() {}
 
@@ -45,6 +44,27 @@ public final class MixService {
             }
         }
         return null;
+    }
+
+    /** 螺旋序收集全部 Basin (近→远, v79.61x — 跳过集"换目标"用) */
+    public static java.util.List<BlockPos> findBasins(Level level, BlockPos center) {
+        java.util.List<BlockPos> found = new java.util.ArrayList<>();
+        for (int dr = 0; dr <= SEARCH_RANGE; dr++) {
+            for (int dx = -dr; dx <= dr; dx++) {
+                for (int dz = -dr; dz <= dr; dz++) {
+                    if (Math.abs(dx) != dr && Math.abs(dz) != dr) continue;
+                    BlockPos pos = center.offset(dx, 0, dz);
+                    for (int dy = -1; dy <= 1; dy++) {
+                        BlockPos p = pos.offset(0, dy, 0);
+                        BlockEntity be = level.getBlockEntity(p);
+                        if (be instanceof BasinBlockEntity) {
+                            found.add(p.immutable());
+                        }
+                    }
+                }
+            }
+        }
+        return found;
     }
 
     // ── Compute ──

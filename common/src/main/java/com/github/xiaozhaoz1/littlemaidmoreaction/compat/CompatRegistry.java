@@ -66,15 +66,16 @@ public final class CompatRegistry {
                 "女仆专属任务: 曲柄/动力/压块/搅拌/跑步带/便携装配 + 发电皮带方块", "create");
         registerModule("numen", "言出法随 Numen",
                 "AI 操控任务 (ai_control) — 依赖 Numen 提供 AI 对话来源", "numen");
-//? if 1.20.1 {
-        registerModule("createbigcannons", "Create Big Cannons",
-                "速射炮闩装填任务 (cannon_load) — 1.20.1 专属", "createbigcannons");
-//?}
+registerModule("createbigcannons", "Create Big Cannons",
+                "速射炮闩装填任务 (cannon_load) — 双平台 (2026-08-16 移植 1.21.1)", "createbigcannons");
         // 2026-08-11c: ysm 并入模块表 (R-16) — 消费方 = YsmCompat.isInstalled() (+CompatToggle 门控,
         // 经 isPipelineReady 影响假人桥 TRANSFORM_ACTIVATOR / ai_control 前置提示)。modId 单串限制:
         // neoforge 仅装 OpenYSM 时 GUI 灰显 (实际 isInstalled 双 id 检测, 纯显示瑕疵)。
         registerModule("ysm", "Yes Steve Model",
                 "石板化假人变身依赖 — 假人桥双门控 (Numen + YSM; neoforge 含 OpenYSM)", "yes_steve_model");
+        // 2026-08-16: PatPat 抚摸反应并入模块表 (用户裁定补 GUI 开关) — 消费方 = PatPatCompat.isInstalled
+        registerModule("patpat", "PatPat 抚摸",
+                "女仆被抚摸反应 (好感+1/爱心/对主人语音/气泡) — 客户端轮询移植 (C2S 包驱动)", "patpat");
     }
 
     public static void registerModule(String id, String name, String description, String modId) {
@@ -110,6 +111,9 @@ public final class CompatRegistry {
         // 兼容模块开关 — 构造期显式加载 (TaskRegistry static 块门控依赖此时序: 本行早于一切门控点)
         CompatToggle.load();
         VanillaCompat.init();
+        // PatPat 抚摸反应 (v79.61x) — 仅 PatPat 安装时激活; forge 1.20.1 无 PatPat 构建
+        // (fabric-only) → isLoaded 恒 false, TLM 默认坐下行为不变
+        checkModLoad("patpat", com.github.xiaozhaoz1.littlemaidmoreaction.compat.patpat.PatPatCompat::init);
     }
 
     /** mod 存在性门控 (未来 compat 恢复用) */

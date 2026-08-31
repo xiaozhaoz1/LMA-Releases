@@ -70,6 +70,11 @@ public interface TaskPipeline {
     /** 目标方块判断 — 供 Brain 导航匹配 */
     default boolean isTargetBlock(ServerLevel world, BlockPos pos, BlockState state, EntityMaid maid) { return false; }
 
+    /** 是否走 Brain 导航 (LmaFlowCoordinationBehavior.searchForDestination 找目标块).
+     *  游标驱动任务 (挖空置域) 覆写 false — 导航在自己 tick 内做, Brain 的 shouldMoveTo 逐候选
+     *  扫描对它们无意义 (isTargetBlock 默认 false), 只会白扫搜索区, 必须跳过. */
+    default boolean usesBrainNavigation() { return true; }
+
     /**
      * 每游戏 tick 回调 — v79.46b: GMPM 驱动所有 in_progress 主动管线 (needsGameTick 字段已删,
      * 防新管线忘声明 = 静默死任务)。

@@ -1,7 +1,4 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.combat;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ItemStackHelper;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import net.minecraft.resources.ResourceLocation;
@@ -110,11 +107,7 @@ public final class CombatOutput {
 //? if 1.20.1 {
         var type = ForgeRegistries.ENTITY_TYPES.getValue(rl);
 //?} else {
-//? if 1.20.1 {
-        var type = BuiltInRegistries.ENTITY_TYPE.getValue(rl);
-//?} else {
         var type = BuiltInRegistries.ENTITY_TYPE.get(rl);
-//?}
 //?}
         if (type == null) return;
         var entity = type.create(source.level());

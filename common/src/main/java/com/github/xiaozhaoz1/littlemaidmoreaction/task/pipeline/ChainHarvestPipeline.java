@@ -9,11 +9,9 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigGuiFactory;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.TaskStep;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline.StepType;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ToolJudge;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ToolJudge;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.item.ItemStack;
@@ -58,10 +56,10 @@ public final class ChainHarvestPipeline implements TaskPipeline, TaskConfigurabl
 //?}
     }
 
-    /** 每 tick 直执行 — 取消检查 + ChainHarvestExecute */
+    /** 每 tick 直执行 — ChainHarvestExecute (取消检查已删 — 2026-08-16 实证:
+     *  cancel 同帧 clearAll, FLOW_STATE 零残留; 终结后 GMPM 已挡, execute 内 flow 防御兜底) */
     @Override
     public void tick(ServerLevel world, EntityMaid maid) {
-        if (TaskKeys.STATE_CANCELLED.equals(FlowTaskData.getState(maid))) return;
         ChainHarvestExecute.execute(world, maid, maid.blockPosition(),
                 maid.getPersistentData(), isOre() ? ChainHarvestExecute.Mode.ORE : ChainHarvestExecute.Mode.WOOD);
     }

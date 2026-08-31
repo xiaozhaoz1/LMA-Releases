@@ -53,7 +53,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
         return Map.of(
             State.IDLE,       Set.of(State.TRY_START),
             State.TRY_START,  Set.of(State.ADVANCE, State.IDLE),
-            State.ADVANCE,    Set.of(State.STRIKE, State.EAT_RESET, State.IDLE),
+            State.ADVANCE,    Set.of(State.STRIKE, State.EAT_RESET),
             State.STRIKE,     Set.of(State.ADVANCE),
             State.EAT_RESET,  Set.of(State.IDLE)
         );
@@ -95,9 +95,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
 
     @Override
     protected State tick(State s, ServerLevel world, EntityMaid maid) {
-        if (TaskKeys.STATE_CANCELLED.equals(FlowTaskData.getState(maid))) {
-            return null;
-        }
+        // 取消检查已删 (2026-08-16 实证: cancel 同帧 clearAll — 不可达; 终结后 GMPM 已挡)
         return switch (s) {
             case IDLE      -> tickIdle(maid);
             case TRY_START -> tickTryStart(maid);
@@ -127,7 +125,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
         if (input.isEmpty()) return State.IDLE;
 
         CompoundTag pd = pipelineData(maid);
-        pd.putBoolean("InProc", true);
+        // InProc 死写已删 (v79.61x: 只写不读, 见 tickEatReset)
         pd.putInt("Slot", 0);
         pd.putInt("Pass", 0);
         pd.putInt("Timer", -1);
@@ -232,7 +230,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
     private State tickEatReset(EntityMaid maid) {
         MaidAssemblyInventory.of(maid).saveToNBT();
         CompoundTag pd = pipelineData(maid);
-        pd.putBoolean("InProc", false);
+        // InProc 死写已删 (v79.61x: 全项目零读取方)
         pd.remove("Timer"); pd.remove("Slot"); pd.remove("Pass");
         pd.remove("TryCd"); pd.remove("AdvCd");
         return State.IDLE;
@@ -333,7 +331,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
                 bp.extractItem(s, 1, false); return;
             }
         }
-        com.github.xiaozhaoz1.littlemaidmoreaction.task.service.NearbyContainerService.extractItem(
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.container.NearbyContainerScanner.extractItem(
             maid.level(), maid.blockPosition(), MaidAssemblyService.SEARCH_RADIUS,
             st -> ItemStackHelper.isSameItem(st, target), java.util.Set.of(), true, maid);
     }

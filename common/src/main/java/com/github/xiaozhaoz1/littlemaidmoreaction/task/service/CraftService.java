@@ -66,27 +66,36 @@ public final class CraftService {
         // Phase 1: 预验证 — 只读统计库存
         // 假设：单线程服务器（Forge server thread）。预验证与执行之间无需锁，
         // 因为不存在并发库存修改。如迁移到异步模型，需在此处加锁。
+        // v79.62.1: 用解析树记录的选定变体 (selectedInputs) 匹配 — 不再 matches[0]
+        // (配方允许多种原料如任意木板, 背包有第二种变体时 matches[0] 误判不足)
         for (var step : chain.steps()) {
+            var selected = step.selectedInputs();
+            int selIdx = 0;
             for (Ingredient ing : step.recipe().getIngredients()) {
                 if (ing.isEmpty()) continue;
-                ItemStack[] matches = ing.getItems();
-                if (matches.length == 0) continue;
-                int need = step.craftCount() * matches[0].getCount();
-                var slots = ItemsUtil.getFilterStackSlots(maidInv, s -> s.is(matches[0].getItem()));
+                Item item = selIdx < selected.size() ? selected.get(selIdx) : ing.getItems()[0].getItem();
+                selIdx++;
+                int per = ing.getItems().length > 0 ? ing.getItems()[0].getCount() : 1;
+                int need = step.craftCount() * per;
+                var slots = ItemsUtil.getFilterStackSlots(maidInv, s -> s.is(item));
                 int have = slots.stream().mapToInt(i -> maidInv.getStackInSlot(i).getCount()).sum();
                 if (have < need) return false;
             }
         }
 
-        // Phase 2: 执行
+        // Phase 2: 执行 (v79.62.1: selectedInputs 匹配 — 与预验证一致)
         for (var step : chain.steps()) {
+            var selected = step.selectedInputs();
+            int selIdx = 0;
             for (Ingredient ing : step.recipe().getIngredients()) {
                 if (ing.isEmpty()) continue;
                 ItemStack[] matches = ing.getItems();
                 if (matches.length == 0) continue;
+                Item item = selIdx < selected.size() ? selected.get(selIdx) : matches[0].getItem();
+                selIdx++;
                 int need = step.craftCount() * matches[0].getCount();
                 for (int i = 0; i < maidInv.getSlots() && need > 0; i++) {
-                    if (maidInv.getStackInSlot(i).is(matches[0].getItem())) {
+                    if (maidInv.getStackInSlot(i).is(item)) {
                         ItemStack extracted = maidInv.extractItem(i,
                             Math.min(need, maidInv.getStackInSlot(i).getCount()), false);
                         need -= extracted.getCount();
@@ -98,8 +107,9 @@ public final class CraftService {
                 step.recipe().getResultItem(world.registryAccess()).getItem(),
                 step.recipe().getResultItem(world.registryAccess()).getCount()));
         }
-        world.playSound(null, pos, SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT,
-            net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 1.0F);
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.SoundOutput.playAt(
+                world, pos, SoundEvents.UI_CARTOGRAPHY_TABLE_TAKE_RESULT,
+                net.minecraft.sounds.SoundSource.BLOCKS, 1.0F, 1.0F);
         return true;
     }
 }

@@ -38,9 +38,4 @@ public final class TaskStateManager {
     public static void clearAll(EntityMaid maid) {
         FlowTaskData.clearAll(maid);
     }
-
-    /** 检查任务是否已被取消 — 执行器tick入口检查 */
-    public static boolean isCancelled(EntityMaid maid) {
-        return TaskKeys.STATE_CANCELLED.equals(FlowTaskData.getState(maid));
-    }
 }

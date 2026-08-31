@@ -107,11 +107,15 @@ public final class RecipeTreeResolver {
 
             // ★ 聚合相同原料的需求量（多槽位配方如木棍需要2个木板）;
             // 变体选择按 available 感知 (审计 H1 — matches[0] 会漏 tag 变体)
+            // v79.62.1: 记录每个 Ingredient 选定的变体 (selectedInputs) — 执行层用解析树的
+            // 选定变体匹配, 不再 matches[0] (避免"配方允许多种原料, 背包有第二种变体误判不足")
             Map<Item, Integer> neededPerItem = new LinkedHashMap<>();
+            java.util.List<Item> selectedInputs = new ArrayList<>();
             for (Ingredient ing : best.getIngredients()) {
                 if (ing.isEmpty()) continue;
                 ItemStack match = pickIngredientMatch(ing, available, index);
                 if (match.isEmpty()) continue;
+                selectedInputs.add(match.getItem());
                 int totalNeeded = craftCount * match.getCount();
                 neededPerItem.merge(match.getItem(), totalNeeded, Integer::sum);
             }
@@ -144,7 +148,7 @@ public final class RecipeTreeResolver {
                 }
             }
 
-            rawSteps.add(new RawStep(best, item, perCraft, craftCount, deps));
+            rawSteps.add(new RawStep(best, item, perCraft, craftCount, deps, selectedInputs));
         }
 
         // 拓扑排序: 依赖关系 → 正向执行顺序
@@ -261,7 +265,8 @@ public final class RecipeTreeResolver {
                     ordered.add(new RecipeChain.RecipeStep(
                         rs.recipe, rs.outputItem,
                         rs.perCraft, rs.craftCount,
-                        Set.copyOf(rs.dependsOn)));
+                        Set.copyOf(rs.dependsOn),
+                        rs.selectedInputs));
                     produced.add(rs.outputItem);
                 }
             }
@@ -303,6 +308,7 @@ public final class RecipeTreeResolver {
         Item outputItem,
         int perCraft,
         int craftCount,
-        Set<Item> dependsOn
+        Set<Item> dependsOn,
+        java.util.List<Item> selectedInputs
     ) {}
 }

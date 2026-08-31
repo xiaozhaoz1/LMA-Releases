@@ -40,10 +40,11 @@ dependencies {
             rootProject.file('libs/Ponder-Forge-1.20.1-1.0.91.jar'),
             rootProject.file('libs/flywheel-forge-1.20.1-1.0.5.jar'),
             rootProject.file('libs/createbigcannons-5.11.4-mc.1.20.1-forge.jar'),
-            rootProject.file('libs/SlashBladeResharped-1.20.1.jar'),
-            rootProject.file('libs/mrqxs_Slashblade_Core-1.20.1-1.4.1.jar'),
+            // v79.62: SlashBlade 依赖清理 (用户裁定: 只留动画资产, 无逻辑联动 — 全项目零代码引用实证)
             rootProject.file('libs/True_POWER-1.20.1-1.1.8.jar'),
-            rootProject.file('libs/True_POWER_of_Maid-1.20.1-1.2.2.jar')
+            rootProject.file('libs/True_POWER_of_Maid-1.20.1-1.2.2.jar'),
+            // v79.61x: PatPat 抚摸兼容 (fabric 1.2.1 jar — forge 无 PatPat 构建, 仅编译期签名, 运行时门控恒关)
+            rootProject.file('libs/patpat-1.2.1+1.20.1.jar')
     )
 }
 

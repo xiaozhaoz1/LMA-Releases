@@ -48,7 +48,7 @@ public final class ScanNearbyEntitiesTool implements ITool<ScanNearbyEntitiesToo
             case "hostile", "passive", "player" -> result.typeFilter();
             default -> "all";
         };
-        var scan = com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EntityScan.scanNearby(
+        var scan = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner.scanNearby(
                 sl, maid.getX(), maid.getY(), maid.getZ(), radius, filter);
         StringBuilder sb = new StringBuilder();
         for (var e : scan.entities()) {

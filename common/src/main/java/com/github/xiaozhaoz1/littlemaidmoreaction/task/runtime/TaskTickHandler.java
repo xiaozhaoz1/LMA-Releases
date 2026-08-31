@@ -65,6 +65,11 @@ public final class TaskTickHandler {
                 // 主动+被动合并单次遍历 (原双循环 — 无跨女仆耦合, 行为等价)
                 GameTickPipelineManager.tickActive(sl, maid, now);
                 GameTickPipelineManager.tickPassiveFor(sl, maid, passives, now);
+                // v79.61x 脱管线: 跨 tick 动作型独立心跳 (temp/torch — 管线内节流自持)
+                GameTickPipelineManager.tickStandalonePassives(sl, maid, passives);
+                // v79.61x 摔落自救预触发 (掉血事件通道外 — 摔落中启动, 落地掉血前放水;
+                // 便宜判定先行零背包扫描, 主循环内联零额外遍历)
+                com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.SelfRescueTrigger.tryTrigger(maid);
                 // 拉拽看门狗 (NavWatchdog) 删 — 只用 TLM 寻路, 不干预导航
             }
             // 走路全 TLM — 无自研执行器 (PathExecutor.sweep 退役)
@@ -87,6 +92,11 @@ public final class TaskTickHandler {
     public static void onServerStopping(net.neoforged.neoforge.event.server.ServerStoppingEvent event) {
 //?}
         for (ServerLevel sl : event.getServer().getAllLevels()) {
+            // v79.61x: 世界关闭 → 清维度级世界缓存 (WorldInfoCache/BlockPatternCache 按维度键,
+            // 防重开维度/多世界残留旧维度 map; 懒清理兜底但维度级需显式收口)
+            String dimKey = sl.dimension().location().toString();
+            com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.WorldInfoCache.clearDimension(dimKey);
+            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.BlockPatternCache.clearDimension(dimKey);
             for (var e : sl.getAllEntities()) {
                 if (e instanceof EntityMaid maid) {
                     com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.flushAllPl(maid);

@@ -96,7 +96,7 @@ public final class DangerGuardCoordinator {
     /** 往液体位置放方块 — 从任一实心邻格点击朝向液体 (块落液体格); 液体已被别的东西
      *  占住 (非可替换) = 已堵住 → true (下轮重检消失); 全邻格不可点 → false。
      *  <p>放置复查说明 (P-6): placeMaterial 返回 true 仅表示 useOn 被接受, 不复查目标格 —
-     *  若假阳性 (事件吞交互/目标被占), 液体仍在 → 下轮 findDanger 重检继续堵, 240t 看门狗
+     *  若假阳性 (事件吞交互/目标被占), 液体仍在 → 下轮 findDanger 重检继续堵, 60t 看门狗
      *  超时 FAILED (调用方跳过), 自愈语义成立, 无需本层复查。 */
     private static boolean blockDanger(ServerLevel world, EntityMaid maid, BlockPos danger) {
         if (!world.getBlockState(danger).canBeReplaced()) return true;

@@ -76,6 +76,7 @@ public final class MaidListScreen extends Screen {
     private int probeCounter;
     private Button attrButton;
     private Button envButton;
+    private Button farmButton;
 
     public MaidListScreen(Screen parent) {
         super(Component.translatable("screen.littlemaidmoreaction.maid_list"));
@@ -88,20 +89,35 @@ public final class MaidListScreen extends Screen {
         int py = (this.height - PANEL_H) / 2;
         // 打开即请求服务端全维度扫描 (C2S)
         MaidListQueryPacket.sendToServer();
+        // v79.62 底部按钮一行 4 个 (宽 320 面板, 不重叠):
+        //   back 16..86 / env 90..156 / farm 160..232 / attr 236..304
         this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.back"),
                 btn -> Minecraft.getInstance().setScreen(parent))
-                .pos(px + LIST_X, py + PANEL_H - 26).size(80, 20).build());
+                .pos(px + LIST_X, py + PANEL_H - 26).size(70, 20).build());
         this.attrButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.littlemaidmoreaction.maid_list.open_attr"),
                 btn -> openAttribute())
-                .pos(px + PREVIEW_X + 6, py + PANEL_H - 26).size(92, 20).build());
+                .pos(px + 236, py + PANEL_H - 26).size(68, 20).build());
         this.attrButton.active = false;
         // v79.47: per-maid 环境感知开关 (选中行可切; 服务端翻转 PD, 默认开)
         this.envButton = this.addRenderableWidget(Button.builder(
                 Component.literal(""), btn -> toggleEnv())
-                .pos(px + LIST_X + 86, py + PANEL_H - 26).size(98, 20).build());
+                .pos(px + 90, py + PANEL_H - 26).size(66, 20).build());
         this.envButton.active = false;
+        // v79.62: 种植区域管理 (v79.62 修: 原 py+190 与预览下名字重叠, 再修与 env 重叠 → 一行 4 按钮)
+        this.farmButton = this.addRenderableWidget(Button.builder(
+                Component.translatable("gui.littlemaidmoreaction.maid_list.farm_region"),
+                btn -> openFarmRegions())
+                .pos(px + 160, py + PANEL_H - 26).size(72, 20).build());
+        this.farmButton.active = false;
+    }
+
+    /** 打开选中女仆的作物区域管理屏 (需本地实体有 uuid? 区域按 uuid 存 — 列表条目即有 uuid) */
+    private void openFarmRegions() {
+        if (entries.isEmpty() || selected < 0 || selected >= entries.size()) return;
+        MaidEntry e = entries.get(selected);
+        Minecraft.getInstance().setScreen(new MaidFarmRegionScreen(this, e.uuid().toString(), e.name()));
     }
 
     /** 更新环境感知按钮 (选中行状态) — 无选中禁用 */
@@ -145,6 +161,8 @@ public final class MaidListScreen extends Screen {
             probeCounter = 0;
             this.attrButton.active = findLocal(selectedMaidId()) != null;
             updateEnvButton();
+            // 种植区域按钮: 有选中即可 (区域按 uuid 存, 远端也可配)
+            this.farmButton.active = !entries.isEmpty() && selected >= 0 && selected < entries.size();
         }
     }
 
@@ -223,12 +241,16 @@ public final class MaidListScreen extends Screen {
         EntityMaid local = findLocal(e.uuid());
         if (local != null) {
             // 半身修复 (错题 #137): 1.21 区域版给足区域 (104×150), 实体完整显示
+            // v79.62 修 (用户实测「一直看左上角, 移动微动」): mouseX/mouseY 应为鼠标相对
+            // 预览区中心的偏移, 原传 px-mx/py-my 远偏→实体固定看左上角 (错题 #136 同族: 参数语义)
+            float mdx = (float) (px + PREVIEW_W / 2.0 - mx);
+            float mdy = (float) (py + PREVIEW_H / 2.0 - my);
             //? if 1.20.1 {
-            InventoryScreen.renderEntityInInventoryFollowsMouse(g, px, py + PREVIEW_H / 2, 50,
-                    (float) (px - mx), (float) (py - my), local);
+            InventoryScreen.renderEntityInInventoryFollowsMouse(g, px + PREVIEW_W / 2, py + PREVIEW_H / 2, 50,
+                    mdx, mdy, local);
             //?} else {
             InventoryScreen.renderEntityInInventoryFollowsMouse(g, px, py, px + PREVIEW_W, py + PREVIEW_H, 50, 0.0F,
-                    (float) (px - mx), (float) (py - my), local);
+                    mdx, mdy, local);
             //?}
             drawCentered(g, local.getName(), px + PREVIEW_W / 2, py + PREVIEW_H + 6, COLOR_TEXT);
             Component lv = Component.translatable(

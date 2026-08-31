@@ -11,7 +11,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * ItemSelect 泛型纯核心测试 (v77.5) — 谓词/评分器注入, List&lt;Integer&gt; 零 MC 依赖。
  *
  * <p>ItemStack/BlockState 版不可纯 JVM 测 (MC 类 mock 插桩失败 — 注册表陷阱家族) —
- * ToolSelectExecute.miningScore 逻辑由客户端手动验证。
+ * 旧 ToolSelectExecute.miningScore 逻辑已删 (v79.48 死代码清理) — 客户端手动验证。
  */
 class ItemSelectTest {
 

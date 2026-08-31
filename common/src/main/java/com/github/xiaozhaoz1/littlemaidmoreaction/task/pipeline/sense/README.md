@@ -8,7 +8,7 @@
 
 **依赖方向**: task/api + task/data + task/service; 被 TaskRegistry 注册 (PASSIVE 规格表)。
 
-**代表**: HaqiPipeline (双通道触发+LOOK 状态机) / StructureSensePipeline / TorchLightPipeline / SelfRescuePipeline
+**代表**: HaqiPipeline (双通道触发+LOOK 状态机) / TempAdaptPipeline / TorchLightPipeline / SelfRescuePipeline (v79.62 SnowShovelPipeline 删 — TLM 原版清雪覆盖)
 
 **修改注意**:
 1. 被动键 lma_passive_<type> 与主动 lma_flow_task 是两套平行世界 — submitPassive/cancelPassive 键闭环

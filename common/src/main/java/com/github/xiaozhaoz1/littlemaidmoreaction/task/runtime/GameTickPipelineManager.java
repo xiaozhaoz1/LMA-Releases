@@ -3,8 +3,8 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskMetaData;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskTypeUid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskToggle;
@@ -12,7 +12,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
 import java.util.List;
-import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * GameTick 集中管理层 (v79) — 主动流程 + 被动流程的每 tick 驱动。
@@ -26,7 +25,19 @@ import java.util.concurrent.ConcurrentHashMap;
  *
  * <p>v79.27: 被动检查 10t 节流 (位掩码缓存) — eligible 判定 (遍历 passives × PD 读取)
  * 每 {@link #PASSIVE_CHECK_INTERVAL} tick 重算, 中间 9t 位操作过滤; tick 本身仍每 tick
- * (Haqi TIMER / SnowShovel Cd 倒计时依赖每 tick 驱动)。
+ * (Haqi TIMER 倒计时依赖每 tick 驱动)。
+ *
+ * <p>v79.61x 被动脱管线 (用户批准): 被动不再共用单一 tick 通道 —
+ * <ul>
+ *   <li>GMPM 真管线 ({@link #GMPM_PIPELINES}: haqi FSM+底层覆盖 / self_rescue 时间关键) 仍由
+ *       {@link #tickPassiveFor} 驱动 (haqi 运行中 self_rescue 停 tick — 底层覆盖)</li>
+ *   <li>跨 tick 动作型 ({@link #STANDALONE}: temp_adapt/torch_light) 由
+ *       {@link #tickStandalonePassives} 独立心跳驱动 — 每 tick 调用, 动作频率由管线内
+ *       ThrottleUtil 节流自持 (100/200/300t), 不再共享 budget 轮转/位掩码缓存</li>
+ *   <li>纯触发型 (structure_sense/festival) 无 tick — 经 PassiveDispatcher</li>
+ * </ul>
+ * 删除: PASSIVE_TICK_BUDGET 配置 / PassiveRotation 轮转 / 位掩码缓存 (PASSIVE_ACTIVE_CACHE) /
+ * clearMaidCaches (mask 缓存消失, 冷却表走 MaidUnloadRegistry 声明式清理)。
  */
 public final class GameTickPipelineManager {
 
@@ -37,15 +48,15 @@ public final class GameTickPipelineManager {
     /** 超时默认值 — v79.55: FLOW_TIMEOUT 键无写方已删 (错题 #181), 恒用默认 1200t */
     private static final int DEFAULT_TIMEOUT = 1200;
 
-    /** 被动检查节流 (tick) — eligible 判定 (遍历 passives × PD 读取) 每 10t 重算,
-     *  中间 9t 用位掩码位操作过滤; tick 本身仍每 tick (Haqi TIMER / SnowShovel Cd 倒计时
-     *  依赖每 tick 驱动, 节流 tick 会把计时拖慢 10 倍)。 */
+    /** 被动检查节流 (tick) — 运行中关开关清理遍历每 10t 一次 (摊薄 PD 读取) */
     public static final int PASSIVE_CHECK_INTERVAL = 10;
 
-    /** 被动活跃位掩码缓存 (maidId → MaskEntry) — EntityCleanupListener 实体卸载时清理
-     *  (同 ChainHarvestExecute 缓存管理: 防 maidId 泄漏 + 实体 ID 复用串扰) */
-    private static final ConcurrentHashMap<Integer, MaskEntry> PASSIVE_ACTIVE_CACHE = new ConcurrentHashMap<>();
-    private record MaskEntry(long mask, List<TaskRegistry.TaskHandler> source) {}
+    /** GMPM 真管线 (保留本通道) — haqi (FSM + 底层覆盖) / self_rescue (时间关键并行) */
+    private static final java.util.Set<String> GMPM_PIPELINES = java.util.Set.of("haqi", "self_rescue");
+
+    /** 跨 tick 动作型 (v79.61x 脱管线 — 独立心跳, 管线内节流自持) */
+    private static final java.util.Set<String> STANDALONE = java.util.Set.of(
+            "temp_adapt", "torch_light");
 
     private GameTickPipelineManager() {}
 
@@ -70,7 +81,7 @@ public final class GameTickPipelineManager {
                 // 失败 → 下方 cancel 兜底。新写方再写裸格式立即在此暴露
                 LittleMaidMoreAction.LOGGER.warn("[LMA/TaskTickHandler] TLM_SWITCH 非完整 RL 格式: '{}' (预期 lma:task/<type>)", tlmSwitch);
             } else if (LittleMaidMoreAction.MOD_ID.equals(uid.getNamespace())) {
-                String newType = LmaTaskTypeRegistry.extractTaskType(uid.getPath());
+                String newType = TaskTypeUid.extractTaskType(uid.getPath());
                 // 如果FLOW_TASK已匹配且运行中, 跳过 (AI已通过StartTaskTool提交)
                 if (newType != null && newType.equals(task) && TaskKeys.STATE_IN_PROGRESS.equals(state)
                         && TaskRegistry.get(newType) != null) {
@@ -96,9 +107,10 @@ public final class GameTickPipelineManager {
             return;
         }
 
-        // ── 非活跃状态 或 CANCELLED ──
+        // ── 非活跃状态 ──
+        // (CANCELLED 分支已删 — 2026-08-16 实证: TaskDispatcher.cancel 同帧 clearAll,
+        // FLOW_STATE 在 CLEAR_ALL_KEYS 内, 状态零残留不跨 tick, 原 cleanupMaid 兜底不可达)
         if (!TaskKeys.STATE_IN_PROGRESS.equals(state)) {
-            if (TaskKeys.STATE_CANCELLED.equals(state)) cleanupMaid(maid);
             return;
         }
         if (task.isEmpty()) return;
@@ -149,97 +161,71 @@ public final class GameTickPipelineManager {
     }
 
     /**
-     * 被动流程每 tick (原 tickPassive 单女仆体) — passives 每 level hoist 一次。
-     * 预算轮转 (PassiveTaskConfig.PASSIVE_TICK_BUDGET, 0=不限) — 每女仆每 tick
-     * 最多执行 budget 个被动管线; 超预算时环形轮转 (确定性, 零 per-maid 状态)。
-     * eligible 判定 (遍历 passives × PD 读取) 10t 节流 — 位掩码缓存,
-     * 中间 9t 位操作过滤; tick 本身仍每 tick (计时管线不受影响)。
+     * 被动流程每 tick (v79.61x 脱管线版) — 只驱动 GMPM 真管线
+     * ({@link #GMPM_PIPELINES}: haqi/self_rescue); 跨 tick 型走
+     * {@link #tickStandalonePassives} 独立心跳; 纯触发型 (pipeline null) 占位跳过。
+     *
+     * <p>保留: 运行中关开关 → cancelPassive 清理 (10t 节流遍历, 防旧状态复活 — v79.61x #6)。
+     * haqi 底层覆盖 (用户裁定): haqi 运行中 self_rescue 停 tick (恢复由 haqi 结束下轮自然继续)。
+     * 删除: PASSIVE_TICK_BUDGET 轮转 / 位掩码缓存 — 每 tick 全量判定 (遍历 7 条目 × PD 读,
+     * 与 passiveMask 重算同量级)。
      */
     public static void tickPassiveFor(ServerLevel sl, EntityMaid maid,
                                       List<TaskRegistry.TaskHandler> passives, long now) {
-        // v79.58 (用户裁定): 哈气第一位 — 哈气运行时其他被动停 tick (含已运行的自救 —
-        // in_progress 保留, 哈气完恢复; 原互斥只挡提交口, 已运行被动照跑 = 哈气+自救并行缺陷)
-        // 范围: 被动全停; 主动任务保持现状 (只挡新提交, 已运行并行)
-        if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData()
-                .getString(TaskKeys.passiveKey("haqi")))) {
+        // 运行中关开关 → cancelPassive 清理 (火把回背包/pipelineData 清/哈气 pin 恢复
+        // — 原禁用只停 tick, in_progress 键+残留状态挂着, 重开开关后旧状态复活)。
+        if (now % PASSIVE_CHECK_INTERVAL == 0) {
             for (TaskRegistry.TaskHandler h : passives) {
-                if ("haqi".equals(h.taskType())) {
-                    h.pipeline().tick(sl, maid);
+                String key = TaskKeys.passiveKey(h.taskType());
+                if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))
+                        && !TaskToggle.isEnabled(h.taskType())) {
+                    TaskDispatcher.cancelPassive(maid, h.taskType());
                 }
             }
-            return;
         }
-        int budget = com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig.PASSIVE_TICK_BUDGET.get();
-        if (budget <= 0 || passives.size() <= budget) {
-            // 不限/未超预算 → 全量 tick (现状语义)
-            tickAll(sl, maid, passives);
-            return;
-        }
-        // 预算轮转: 收集 eligible (IN_PROGRESS + toggle), 环形取 budget 个
-        long mask = passiveMask(maid, passives, now);
-        if (mask == 0) return;
-        int active = Long.bitCount(mask);
-        if (active <= budget) {
-            for (int i = 0; i < passives.size(); i++) {
-                if ((mask & (1L << i)) != 0) {
-                    passives.get(i).pipeline().tick(sl, maid);
-                }
+        for (TaskRegistry.TaskHandler h : passives) {
+            if (h.pipeline() == null) continue;                    // 纯触发型占位 — Dispatcher 通道
+            if (!GMPM_PIPELINES.contains(h.taskType())) continue;  // 跨 tick 型 — 独立心跳
+            if (!running(maid, h)) continue;
+            // haqi 底层覆盖 — haqi 运行中 self_rescue 停 tick (用户裁定: 哈气启动不结束不做其他事)
+            if (!"haqi".equals(h.taskType())
+                    && com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveDispatcher.haqiRunning(maid)) {
+                continue;
             }
-            return;
-        }
-        // 超预算 → 环形轮转: 收集活跃索引, 从 PassiveRotation.startIndex 起取 budget 个
-        int[] idx = new int[active];
-        int k = 0;
-        for (int i = 0; i < passives.size(); i++) {
-            if ((mask & (1L << i)) != 0) idx[k++] = i;
-        }
-        int start = PassiveRotation.startIndex(now, maid.getId(), active);
-        for (int i = 0; i < budget; i++) {
-            passives.get(idx[(start + i) % active]).pipeline().tick(sl, maid);
+            h.pipeline().tick(sl, maid);
         }
     }
 
     /**
-     * eligible 位掩码 — 每 {@link #PASSIVE_CHECK_INTERVAL} tick 重算 (遍历判定),
-     * 中间 9t 用缓存掩码 (位操作); passives 列表重建 (引用变化) 立即重算。
+     * 跨 tick 动作型独立心跳 (v79.61x) — temp_adapt/torch_light 移出共享通道
+     * (v79.62: snow_shovel 已删 — TLM 原版清雪任务覆盖, 用户裁定)。
+     * 每 tick 调用 (动作频率由管线内 ThrottleUtil 节流自持 — temp 100/600t,
+     * torch 20/300t, 行为等价); haqi 底层覆盖统一检查 (PassiveDispatcher 同源判定)。
      */
-    private static long passiveMask(EntityMaid maid, List<TaskRegistry.TaskHandler> passives, long now) {
-        int id = maid.getId();
-        MaskEntry cached = PASSIVE_ACTIVE_CACHE.get(id);
-        if (cached == null || cached.source() != passives || now % PASSIVE_CHECK_INTERVAL == 0) {
-            long mask = 0;
-            int size = Math.min(passives.size(), 63); // 位掩码 63 上限 — LMAT 公开扩展面, 溢出即错乱 (审计 H2)
-            if (size < passives.size()) {
-                LittleMaidMoreAction.LOGGER.warn("[GMPM] 被动任务超过 63 个, 掩码截断: {} -> 63", passives.size());
-            }
-            for (int i = 0; i < size; i++) {
-                TaskRegistry.TaskHandler h = passives.get(i);
-                String key = TaskKeys.passiveKey(h.taskType());
-                if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))
-                        && TaskToggle.isEnabledFor(maid, h.taskType())) {
-                    mask |= 1L << i;
-                }
-            }
-            PASSIVE_ACTIVE_CACHE.put(id, new MaskEntry(mask, passives));
-            return mask;
-        }
-        return cached.mask();
-    }
-
-    /** 实体卸载清理 (EntityCleanupListener 调用) — 被动位掩码缓存, 防 maidId 泄漏/串扰 */
-    public static void clearMaidCaches(EntityMaid maid) {
-        PASSIVE_ACTIVE_CACHE.remove(maid.getId());
-    }
-
-    private static void tickAll(ServerLevel sl, EntityMaid maid,
-                                List<TaskRegistry.TaskHandler> passives) {
+    public static void tickStandalonePassives(ServerLevel sl, EntityMaid maid,
+                                              List<TaskRegistry.TaskHandler> passives) {
         for (TaskRegistry.TaskHandler h : passives) {
-            String key = TaskKeys.passiveKey(h.taskType());
-            if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))
-                    && TaskToggle.isEnabledFor(maid, h.taskType())) {
-                h.pipeline().tick(sl, maid);
+            if (h.pipeline() == null) continue;
+            if (!STANDALONE.contains(h.taskType())) continue;
+            if (!running(maid, h)) continue;
+            // haqi 底层覆盖 — 哈气运行中跨 tick 型停 tick (统一入口)
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveDispatcher.haqiRunning(maid)) {
+                continue;
             }
+            // 2026-08-16 用户实测「坐下还往水边走」: 独立心跳被动 (温度/火把) 自己 moveTo,
+            // 不走 Brain 导航行为 — 坐下判断必须在心跳入口统一拦 (Brain 侧拦不到)
+            if (maid.isMaidInSittingPose()) {
+                continue;
+            }
+            h.pipeline().tick(sl, maid);
         }
+    }
+
+    /** in_progress + 开关 (两通道共用判定) */
+    private static boolean running(EntityMaid maid, TaskRegistry.TaskHandler h) {
+        String key = TaskKeys.passiveKey(h.taskType());
+        return TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))
+                && TaskToggle.isEnabled(h.taskType());
     }
 
     /** 先走 pipeline.onCleanup 闭合游标, 再 clearAll (原直调 clearAll 绕过 onCleanup) */

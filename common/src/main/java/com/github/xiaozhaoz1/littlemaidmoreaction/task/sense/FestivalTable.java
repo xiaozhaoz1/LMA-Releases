@@ -20,8 +20,11 @@ import java.util.List;
  */
 public final class FestivalTable {
 
-    /** 节日定义 — 纯数据 (festival.json: id/name/month/day/text + lunar 标志, 缺省 false) */
-    public record Festival(String id, String name, int month, int day, String text, boolean lunar) {}
+    /** 节日定义 — 纯数据 (festival.json: id/name/month/day/text/foods + lunar 标志, 缺省 false) */
+    public record Festival(String id, String name, int month, int day, String text, boolean lunar,
+                           java.util.List<String> foods) {
+        public Festival { foods = foods == null ? java.util.List.of() : foods; }
+    }
 
     private static volatile List<Festival> festivals = List.of();
 
@@ -37,11 +40,26 @@ public final class FestivalTable {
         return festivals;
     }
 
+    /** 按 id 查节日 (调试命令用) — 无则 null */
+    public static Festival byName(String name) {
+        for (Festival f : festivals) {
+            if (f.id().equals(name) || f.name().equals(name)) return f;
+        }
+        return null;
+    }
+
     /** 日期 → 节日 (无则 null) — 纯函数; 农历条目经 lunar 库换算 (农历月负数=闰月, 条目正数不匹配) */
     public static Festival lookup(LocalDate date) {
         for (Festival f : festivals) {
             if (f.lunar()) {
-                Lunar l = Lunar.fromDate(Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                // v79.62 连带修复: lunar 库缺失 (dev/gametest classpath 未含 jar-in-jar) 时静默跳过
+                // 农历条目, 不让服务器崩溃 (对齐「解析失败→空表静默」韧性; 2026-08-19 gametest 实测炸机)
+                Lunar l;
+                try {
+                    l = Lunar.fromDate(Date.from(date.atStartOfDay(ZoneId.systemDefault()).toInstant()));
+                } catch (LinkageError e) {
+                    continue;
+                }
                 if (f.month() == l.getMonth() && f.day() == l.getDay()) return f;
             } else {
                 if (f.month() == date.getMonthValue() && f.day() == date.getDayOfMonth()) return f;

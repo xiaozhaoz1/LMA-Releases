@@ -4,6 +4,8 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvEdgeDetector;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvRules;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvScanner;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StructureScanCache;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSenseBroadcaster;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSnapshot;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ScanFilters;
@@ -60,7 +62,7 @@ public final class SenseApi {
     /** 女仆站立点所在结构 id 列表 (排序; 空 = 不在任何结构; 零成本瞬时查询) */
     public static List<String> structuresAt(EntityMaid maid) {
         if (!(maid.level() instanceof ServerLevel sl)) return List.of();
-        String joined = EnvScanner.structuresAt(sl, maid.blockPosition());
+        String joined = StructureScanCache.structuresAt(sl, maid.blockPosition());
         return joined.isEmpty() ? List.of() : List.of(joined.split(","));
     }
 
@@ -81,15 +83,24 @@ public final class SenseApi {
     public static BlockPos findNearestBlock(EntityMaid maid, int radius, int vRange,
                                             Predicate<BlockState> filter,
                                             @Nullable java.util.Set<Long> skip, int maxHits) {
+        return findNearestBlock(maid, radius, vRange, filter, skip, maxHits, null);
+    }
+
+    /** v79.62.2 加位置过滤 — posFilter (BlockPos,BlockState) 额外排除 (如脚下 >2 格深矿),
+     *  扫描谓词只拿到 BlockState, 位置类过滤必须在此 (BlockScanner 返回列表后) 应用. */
+    @Nullable
+    public static BlockPos findNearestBlock(EntityMaid maid, int radius, int vRange,
+                                            Predicate<BlockState> filter,
+                                            @Nullable java.util.Set<Long> skip, int maxHits,
+                                            @Nullable java.util.function.BiPredicate<net.minecraft.core.BlockPos, BlockState> posFilter) {
         if (!(maid.level() instanceof ServerLevel sl)) return null;
-        // radius (格) → chunk 半径 ceil 换算 — 原 radius/16+1: 16 → 2 chunk =
-        // 32 格半径 (超预期 1 倍); 用户: "我说的周围16格是半径16格" → 16 格 = 1 chunk。
-        // Math.max(1, ...): 0-16 格 → 1 chunk (BlockScanner 最少 1 环)
         int chunkRadius = Math.max(1, (radius + 15) / 16);
         var matches = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.BlockScanner.scan(
                 sl, maid.blockPosition(), chunkRadius, vRange, filter, Math.max(8, maxHits));
         for (var m : matches) {
-            if (skip == null || !skip.contains(m.pos().asLong())) return m.pos();
+            if (skip != null && skip.contains(m.pos().asLong())) continue;
+            if (posFilter != null && !posFilter.test(m.pos(), m.state())) continue;
+            return m.pos();
         }
         return null;
     }
@@ -97,13 +108,7 @@ public final class SenseApi {
     /** 扫描附近实体 (分类 monster/friendly/maid, 按距离排序截断) */
     public static Map<String, List<LivingEntity>> scanEntities(EntityMaid maid, int radius, int maxHits) {
         if (!(maid.level() instanceof ServerLevel sl)) return Map.of();
-        return EnvScanner.scanEntities(sl, maid, radius, maxHits);
-    }
-
-    /** 扫描附近雪层 (同步有界) */
-    public static List<BlockPos> scanSnow(EntityMaid maid, int radius) {
-        if (!(maid.level() instanceof ServerLevel sl)) return List.of();
-        return EnvScanner.scanSnowBlocks(sl, maid.blockPosition(), radius);
+        return EntityScanner.scanEntities(sl, maid, radius, maxHits);
     }
 
 

@@ -4,7 +4,6 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskProgressDisplay;
 import com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
@@ -52,15 +51,20 @@ public final class TaskDispatcher {
             return false;
         }
 
-        // 哈气互斥 — 哈气运行中拒绝主动任务
-        if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData()
-                .getString(TaskKeys.passiveKey("haqi")))) {
+        // 哈气底层覆盖 — 哈气运行中拒绝主动任务提交 (v79.61x 收敛: PassiveDispatcher.haqiRunning 统一判定)
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveDispatcher.haqiRunning(maid)) {
             return false;
         }
 
         // 2. 冲突检测: 验证通过后再取消旧任务
-        // 优先级策略 — 新任务严格更低 → 拒绝 (失败气泡节流); 等/高 → 抢占 (既有行为)
+        // v79.62.1 幂等 (用户裁定: 右键提示两遍 — onEntityJoin 恢复 + handler 重复 submit):
+        // 同任务已在运行 (STATE_IN_PROGRESS) → 不重复提交 (防重复启动/重复提示)
         String current = FlowTaskData.getTask(maid);
+        if (current.equals(taskType)
+                && TaskKeys.STATE_IN_PROGRESS.equals(FlowTaskData.getState(maid))) {
+            return true;   // 已在运行 → 幂等跳过 (不重复 submit/提示)
+        }
+        // 优先级策略 — 新任务严格更低 → 拒绝 (失败气泡节流); 等/高 → 抢占 (既有行为)
         if (!current.isEmpty() && !current.equals(taskType)) {
             if (!shouldPreempt(priorityOf(current), priorityOf(taskType))) {
                 MaidChatBubbleApi.showFail(maid, "已有更高优先级任务: " + current);
@@ -107,6 +111,12 @@ public final class TaskDispatcher {
         }
         FlowTaskData.setState(maid, TaskKeys.STATE_CANCELLED);
         TaskStateManager.clearAll(maid); // cancel 后清除残留 NBT (同 complete/fail)
+        // 2026-08-16 修: 任务切换 (装填→敲钟等) 旧 brain 导航目标残留 — 女仆仍盯着旧目标 (炮台) 不去新任务
+        // 目标; cancel 即旧目标作废, 擦 TARGET_POS/WALK_TARGET/LOOK_TARGET (LOOK_TARGET 残留=女仆
+        // 朝向旧目标站着看 — Brain behavior 只有 stop 才擦, 任务切换不触发 stop), 新任务重新搜索
+        maid.getBrain().eraseMemory(com.github.tartaricacid.touhoulittlemaid.init.InitEntities.TARGET_POS.get());
+        maid.getBrain().eraseMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
+        maid.getBrain().eraseMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.LOOK_TARGET);
         LittleMaidMoreAction.LOGGER.info("[LMA/Task] cancel maid={} task={}",
             maid.getStringUUID(), task);
     }
@@ -151,11 +161,13 @@ public final class TaskDispatcher {
         // FAIL_REASON 死写已删 (v79.55, 错题 #181): put 后同方法 clearAll 立即删, 零读方 — reason 仅用于日志
         String task = FlowTaskData.getTask(maid);
         var h = getHandler(task);
-        if (h != null) {
-            h.pipeline().interrupt(maid);  // interrupt→onCleanup
+        if (h != null) {            h.pipeline().interrupt(maid);  // interrupt→onCleanup
         }
         FlowTaskData.setState(maid, TaskKeys.STATE_FAILED);
         TaskStateManager.clearAll(maid);
+        // 2026-08-16: 同 cancel — 失败后旧导航目标作废, 擦 brain TARGET_POS/WALK_TARGET
+        maid.getBrain().eraseMemory(com.github.tartaricacid.touhoulittlemaid.init.InitEntities.TARGET_POS.get());
+        maid.getBrain().eraseMemory(net.minecraft.world.entity.ai.memory.MemoryModuleType.WALK_TARGET);
         LittleMaidMoreAction.LOGGER.warn("[LMA/Task] fail maid={} task={} reason={}",
             maid.getStringUUID(), task, reason);
     }
@@ -175,31 +187,39 @@ public final class TaskDispatcher {
 
     private static int priorityOf(String taskType) {
         TaskRegistry.TaskHandler h = TaskRegistry.get(taskType);
-        return h == null ? 0 : h.pipeline().priority();
+        // 无 pipeline 占位条目 (纯触发型被动) — 优先级 0 (不进主动抢占面)
+        return h == null || h.pipeline() == null ? 0 : h.pipeline().priority();
     }
 
     // ── 被动任务 — 与主动任务隔离, 可并行运行 ──
 
-    /** 提交被动任务 (与 lma_flow_task 不冲突) — 哈气运行中拒绝其他被动 (互斥) */
+    /** 提交被动任务 (与 lma_flow_task 不冲突) — 哈气运行中拒绝其他被动 (底层覆盖, 统一入口) */
     public static void submitPassive(EntityMaid maid, String taskType) {
         if (TaskRegistry.get(taskType) == null) return;
-        if (!TaskToggle.isEnabled(taskType)) return;
-        // 哈气互斥 — 哈气运行中其他被动不启动 (哈气自身防重复在 onSignal)
-        if (!"haqi".equals(taskType) && TaskKeys.STATE_IN_PROGRESS.equals(
-                maid.getPersistentData().getString(TaskKeys.passiveKey("haqi")))) {
+        // v79.62.1 被动启用迁移: haqi/jiuhu_milk 由管线 per-maid 配置 (pipelineConfig "enabled",
+        // 子任务界面开关) 门控, 不再用全局 TaskToggle; 其他被动仍走 TaskToggle
+        if ("haqi".equals(taskType) || "jiuhu_milk".equals(taskType)) {
+            if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveConfigUtil
+                    .isEnabled(maid, taskType)) return;
+        } else if (!TaskToggle.isEnabled(taskType)) {
+            return;
+        }
+        // haqi 底层覆盖 — 哈气运行中其他被动不启动 (v79.61x 收敛: PassiveDispatcher.haqiRunning 统一判定)
+        if (!"haqi".equals(taskType) && com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveDispatcher.haqiRunning(maid)) {
             return;
         }
         maid.getPersistentData().putString(TaskKeys.passiveKey(taskType), TaskKeys.STATE_IN_PROGRESS);
-        LittleMaidMoreAction.LOGGER.info("[LMA/Task] submitPassive maid={} task={}", maid.getStringUUID(), taskType);
+        // 2026-08-16 降噪: 被动提交/取消周期高频 (温度抖动成对刷屏) INFO→DEBUG
+        LittleMaidMoreAction.LOGGER.debug("[LMA/Task] submitPassive maid={} task={}", maid.getStringUUID(), taskType);
     }
 
     /** 取消被动任务 */
     public static void cancelPassive(EntityMaid maid, String taskType) {
         var h = TaskRegistry.get(taskType);
-        if (h != null) h.pipeline().onCleanup(maid);
+        if (h != null && h.pipeline() != null) h.pipeline().onCleanup(maid);
         maid.getPersistentData().remove(TaskKeys.passiveKey(taskType));
-        // GMPM 被动掩码缓存失效 — 否则 10t 缓存窗口内缓存掩码仍含该管线 → 仍驱动 1 次 (AUDIT LOW #4)
-        GameTickPipelineManager.clearMaidCaches(maid);
-        LittleMaidMoreAction.LOGGER.info("[LMA/Task] cancelPassive maid={} task={}", maid.getStringUUID(), taskType);
+        // (v79.61x: mask 缓存已删, 无需 clearMaidCaches; PassiveDispatcher 冷却表经
+        // MaidUnloadRegistry 声明式清理)
+        LittleMaidMoreAction.LOGGER.debug("[LMA/Task] cancelPassive maid={} task={}", maid.getStringUUID(), taskType);
     }
 }

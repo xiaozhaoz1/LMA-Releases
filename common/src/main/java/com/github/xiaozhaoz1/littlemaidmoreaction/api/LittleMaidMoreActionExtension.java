@@ -119,11 +119,14 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         }
     }
 
-    /** 注册耕种种子白名单处理器 — 拦截 farmland 上的 canPlant 调用 */
+    /**
+     * 注册耕种白名单处理器 — v79.62 退役 (用户裁定: AutoCrop 是 TLM 通道钩子, 新 LMA 原版
+     * 区域制种菜 farm 任务已自研判定/收种; TLM farm 任务不再接管, 钩子移除避免双通道重复).
+     */
     @Override
     public void registerSpecialCropHandler(SpecialCropManager manager) {
-        manager.addCrop(Blocks.FARMLAND, new AutoCropHandler());
-        LittleMaidMoreAction.LOGGER.info("[LMA] 耕种白名单处理器已注册");
+        // v79.62: 不再注册 AutoCropHandler — 新 farm 区域制种菜 (CropRegistry + FarmExecute)
+        LittleMaidMoreAction.LOGGER.info("[LMA] TLM 耕种白名单钩子已退役 (改用 LMA farm 区域制种菜)");
     }
 
     // ── AI 整合扩展点 (TLM >= 1.5.1) ──

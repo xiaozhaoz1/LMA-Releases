@@ -27,10 +27,10 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * 未驯服右键走 tameMaid (不 fire InteractMaidEvent)。故拆两条监听:
  * <ul>
  *   <li>已驯服 + 主人 → {@link InteractMaidEvent}: 酒狐奶桶 + 加 1 好感 (CD 5min, 仅好感有 CD)</li>
- *   <li>未驯服 (ownerUUID == null) → {@code PlayerInteractEvent.EntityInteract}: 野生奶(副开关开)/奶桶(副开关关) + 哈气动画 + 攻击</li>
+ *   <li>未驯服 (ownerUUID == null) → {@code PlayerInteractEvent.EntityInteract}: 野生奶(副开关开)/奶桶(副开关关) + 爱心粒子 (v79.6x 裁定: 不打人不哈气不加好感)</li>
  *   <li>已驯服 + 别人 → 两事件都不产奶 (InteractMaidEvent 不 fire; EntityInteract 里 decide 判 null)</li>
  * </ul>
- * 仅挤奶无 CD; 攻击伤害读哈气管线 {@code PassiveTaskConfig.HAQI_HIT_DAMAGE} (用户裁定)。
+ * 仅挤奶无 CD; 加好感有 5min CD (仅好感, 见 {@link #FAVOR_CD_TICKS})。
  */
 //? if 1.20.1 {
 @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID)

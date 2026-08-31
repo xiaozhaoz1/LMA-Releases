@@ -42,6 +42,15 @@ public final class LmaCommand {
             .then(Commands.literal("task")
                 .then(Commands.argument("args", StringArgumentType.greedyString())
                     .executes(LmaCommand::handleTask)))
+            .then(Commands.literal("festival")
+                .then(Commands.argument("name", StringArgumentType.word())
+                    .executes(LmaCommand::handleFestival)))
+            .then(Commands.literal("structure")
+                .then(Commands.literal("fire")
+                    .then(Commands.argument("kind", StringArgumentType.word())
+                        .executes(LmaCommand::handleStructureFire)))
+                .then(Commands.literal("state").executes(LmaCommand::handleStructureState))
+                .then(Commands.literal("reset").executes(LmaCommand::handleStructureReset)))
         );
     }
 
@@ -127,6 +136,59 @@ public final class LmaCommand {
         sb.append("\n§6═══ 分组 ═══\n");
         for (var g : TaskTree.buildGroups()) sb.append("§f📁 ").append(g.label()).append(" §7→ ").append(String.join(", ", g.tasks())).append("\n");
         return send(ctx, sb.toString());
+    }
+
+    /** /lma festival <name> — 触发节日信号 (调试节日礼物/气泡) */
+    private static int handleFestival(CommandContext<CommandSourceStack> ctx) {
+        var src = ctx.getSource();
+        if (!(src.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) {
+            return send(ctx, "§c该指令需玩家执行");
+        }
+        String name = StringArgumentType.getString(ctx, "name");
+        var f = com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.FestivalTable.byName(name);
+        if (f == null) return send(ctx, "§c未知节日: " + name + " (支持 id 或名称, 如 spring_festival/春节)");
+        var level = (net.minecraft.server.level.ServerLevel) sp.level();
+        for (var e : level.getEntities().getAll()) {
+            if (!(e instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid)) continue;
+            if (maid.getOwner() != sp) continue;
+            // 直接触发对应节日的礼物+气泡 (绕过日期查表 — 调试用)
+            com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.impl.FestivalPassiveTask
+                    .debugTrigger(level, maid, f);
+            return send(ctx, "§a已触发: " + f.name() + " → " + maid.getName().getString());
+        }
+        return send(ctx, "§7附近没有你的女仆");
+    }
+
+    // ── structure 调试 ──
+
+    /** /lma structure fire <kind> — 立即发射结构信号 (气泡+聊天真实链路, 绕过节流/状态机) */
+    private static int handleStructureFire(CommandContext<CommandSourceStack> ctx) {
+        var src = ctx.getSource();
+        if (!(src.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) {
+            return send(ctx, "§c该指令需玩家执行");
+        }
+        String kind = StringArgumentType.getString(ctx, "kind");
+        String result = com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.StructureSense.debugFire(
+                (net.minecraft.server.level.ServerLevel) sp.level(), sp, kind);
+        return send(ctx, "§6[结构调试] §f" + result);
+    }
+
+    /** /lma structure state — 结构状态机与文案缓存快照 */
+    private static int handleStructureState(CommandContext<CommandSourceStack> ctx) {
+        var src = ctx.getSource();
+        if (!(src.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) {
+            return send(ctx, "§c该指令需玩家执行");
+        }
+        return send(ctx, "§6[结构状态] §f" + com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.StructureSense.debugState(sp.getUUID()));
+    }
+
+    /** /lma structure reset — 清空结构缓存 (重测首次发现) */
+    private static int handleStructureReset(CommandContext<CommandSourceStack> ctx) {
+        var src = ctx.getSource();
+        if (!(src.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) {
+            return send(ctx, "§c该指令需玩家执行");
+        }
+        return send(ctx, "§6[结构重置] §f" + com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.StructureSense.debugReset(sp.getUUID()));
     }
 
     // ── helpers ──

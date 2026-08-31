@@ -33,6 +33,14 @@ dependencies {
     // v75.3: OpenYSM (org.openysm 开源包 — 假人模型全自动化 setModelAndTexture, 替代混淆 YSM 指令)
     compileOnly files(rootProject.file('libs/openysm-neoforge-1.21.1-2.6.6-r5-neoforge+mc1.21.1.jar'))
 
+    // v79.61x PatPat 抚摸兼容 (视觉 — 仅 neoforge 1.21.1 可实际加载; forge 1.20.1 无 PatPat 版,
+    // compileOnly 就位 → ModList 门控恒 false, 代码双平台共用同一 API (getPatEntity 签名一致实证))
+    if (minecraftVersion == '1.20.1') {
+        compileOnly files(rootProject.file('libs/patpat-1.2.1+1.20.1.jar'))
+    } else {
+        compileOnly files(rootProject.file('libs/patpat-1.2.4+1.21.1+neoforge.jar'))
+    }
+
     implementation 'io.github.classgraph:classgraph:4.8.168'
     // v79.47 农历节日: 农历换算库 — 2026-08-11c 改 jar-in-jar 内置 (forge/neoforge 各节点 jarJar 声明,
     // 部署不再手动拷 lunar jar 到 mods; 测试 classpath 由节点 implementation 继承)

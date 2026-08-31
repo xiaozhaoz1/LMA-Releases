@@ -42,12 +42,23 @@ public final class LmaNeoForgeEntry {
     public static final Supplier<MenuType<ItemListConfigMenu>> ITEM_LIST_CONFIG_MENU =
             MENU_TYPES.register("item_list_config", () -> IMenuTypeExtension.create(
                     (id, inv, buf) -> new ItemListConfigMenu(id, inv, buf.readInt())));
+    public static final Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.PassiveToggleConfigMenu>> PASSIVE_TOGGLE_CONFIG_MENU =
+            MENU_TYPES.register("passive_toggle_config", () -> IMenuTypeExtension.create(
+                    (id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.PassiveToggleConfigMenu(id, inv, buf.readInt())));
     public static final Supplier<MenuType<CraftChainConfigMenu>> CRAFT_CHAIN_CONFIG_MENU =
             MENU_TYPES.register("craft_chain_config", () -> IMenuTypeExtension.create(
                     (id, inv, buf) -> new CraftChainConfigMenu(id, inv, buf.readInt())));
     public static final Supplier<MenuType<BellRingConfigMenu>> BELL_RING_CONFIG_MENU =
             MENU_TYPES.register("bell_ring_config", () -> IMenuTypeExtension.create(
                     (id, inv, buf) -> new BellRingConfigMenu(id, inv, buf.readInt())));
+    /** v79.62.2: 填坝排水配置菜单 (排水开关) */
+    public static final Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigMenu>> DAM_FILL_CONFIG_MENU =
+            MENU_TYPES.register("dam_fill_config", () -> IMenuTypeExtension.create(
+                    (id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigMenu(id, inv, buf.readInt())));
+    /** v79.62: 挖空置域单女仆区块数配置菜单 */
+    public static final Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu>> VOID_EXCAVATION_CONFIG_MENU =
+            MENU_TYPES.register("void_excavation_config", () -> IMenuTypeExtension.create(
+                    (id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu(id, inv, buf.readInt())));
     public static final Supplier<MenuType<AiControlConfigMenu>> AI_CONTROL_CONFIG_MENU =
             MENU_TYPES.register("ai_control_config", () -> IMenuTypeExtension.create(
                     (id, inv, buf) -> new AiControlConfigMenu(id, inv, buf.readInt())));
@@ -55,6 +66,10 @@ public final class LmaNeoForgeEntry {
     public static final Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyMenu>> MAID_ASSEMBLY_MENU =
             MENU_TYPES.register("maid_assembly", () -> IMenuTypeExtension.create(
                     com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyMenu::new));
+    /** v79.62.1: 锻造容器菜单 (原版锻造台样式, 无模板) */
+    public static final Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingMenu>> SMITHING_MENU =
+            MENU_TYPES.register("smithing", () -> IMenuTypeExtension.create(
+                    (id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingMenu(id, inv, buf)));
 
     public LmaNeoForgeEntry(IEventBus modBus, ModContainer modContainer) {
         // 3 个 spec 注册 (文件名对齐 forge 侧; CONFIG_DIR 已在 common 定义)
@@ -79,6 +94,8 @@ public final class LmaNeoForgeEntry {
         LmaRegistrar.registerItems(modBus);
         // 酒狐奶物品 (v79.6x)
         com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.register(modBus);
+        // LMA 创造栏标签页 (2026-08-16 — 用户裁定「创造栏没 LMA 栏」)
+        com.github.xiaozhaoz1.littlemaidmoreaction.init.LmaCreativeTab.register(modBus);
         MENU_TYPES.register(modBus);
 
         // 网络发送注入 (无注册依赖) — M-4: 统一走 setSender 记注入状态日志
@@ -107,6 +124,11 @@ public final class LmaNeoForgeEntry {
 
     private void onServerStarting(ServerStartingEvent event) {
         com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationDurationManager.loadServerDurations();
+        // v79.62 种菜区域配置 — 服务端启动从 config/littlemaidmoreaction/farm_regions.json 加载
+        com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage
+                .load(LittleMaidMoreAction.CONFIG_DIR);
+        // v79.62.1 清空挖空认领池 (运行时状态, 重启后空 — 用户裁定, 防旧认领残留)
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.VoidExcavationPipeline.resetPool();
     }
 
     private void commonSetup(net.neoforged.fml.event.lifecycle.FMLCommonSetupEvent event) {
@@ -115,7 +137,11 @@ public final class LmaNeoForgeEntry {
         LmaMenus.ITEM_LIST_CONFIG_MENU = ITEM_LIST_CONFIG_MENU.get();
         LmaMenus.CRAFT_CHAIN_CONFIG_MENU = CRAFT_CHAIN_CONFIG_MENU.get();
         LmaMenus.BELL_RING_CONFIG_MENU = BELL_RING_CONFIG_MENU.get();
+        LmaMenus.VOID_EXCAVATION_CONFIG_MENU = VOID_EXCAVATION_CONFIG_MENU.get();
+        LmaMenus.DAM_FILL_CONFIG_MENU = DAM_FILL_CONFIG_MENU.get();
         LmaMenus.AI_CONTROL_CONFIG_MENU = AI_CONTROL_CONFIG_MENU.get();
+        LmaMenus.PASSIVE_TOGGLE_CONFIG_MENU = PASSIVE_TOGGLE_CONFIG_MENU.get();
+        LmaMenus.SMITHING_MENU = SMITHING_MENU.get();
         LmaMenus.MAID_ASSEMBLY_MENU = MAID_ASSEMBLY_MENU.get();   // v75.1: 便携装配
     }
 }

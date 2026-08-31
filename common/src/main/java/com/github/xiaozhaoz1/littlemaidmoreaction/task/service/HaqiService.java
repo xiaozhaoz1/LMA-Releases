@@ -4,7 +4,6 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.combat.CombatOutput;
-import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.LivingEntity;
@@ -47,30 +46,14 @@ public final class HaqiService {
         } else {
             CombatOutput.damage(target, maid, PassiveTaskConfig.HAQI_HIT_DAMAGE.get().floatValue());
         }
-        maid.playSound(SoundEvents.PLAYER_ATTACK_SWEEP, 0.8F, 1.0F);
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.SoundOutput.playEntity(
+                maid, SoundEvents.PLAYER_ATTACK_SWEEP, 0.8F, 1.0F);
     }
 
-    /** 播放音频 (音量走配置; 非 maid* 前缀 → 标准服务端播放) */
+    /** 播放音频 (音量走配置) — v79.6x: 注册表解析收编 vanilla SoundOutput (B5) */
     public static void playSound(EntityMaid maid, String name) {
-        SoundEvent event = resolveSound(name);
-        if (event != null) {
-            float volume = PassiveTaskConfig.HAQI_VOLUME.get().floatValue();
-            maid.playSound(event, volume, 1.0F);
-        }
-    }
-
-    /** 双平台注册表查 SoundEvent (1.20.1 ForgeRegistries.SOUND_EVENTS / 1.21.1 BuiltInRegistries.SOUND_EVENT) */
-    private static SoundEvent resolveSound(String name) {
-        net.minecraft.resources.ResourceLocation rl =
- //? if 1.20.1 {
-                new net.minecraft.resources.ResourceLocation(LittleMaidMoreAction.MOD_ID, name);
- //?} else {
-                net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, name);
- //?}
- //? if 1.20.1 {
-        return net.minecraftforge.registries.ForgeRegistries.SOUND_EVENTS.getValue(rl);
- //?} else {
-        return net.minecraft.core.registries.BuiltInRegistries.SOUND_EVENT.get(rl);
- //?}
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.SoundOutput.playModSound(
+                maid, LittleMaidMoreAction.MOD_ID, name,
+                PassiveTaskConfig.HAQI_VOLUME.get().floatValue());
     }
 }

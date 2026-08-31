@@ -42,12 +42,10 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
     public static final int TOTAL_SLOTS = 12;
 
     private static final String NBT_KEY = TaskKeys.ASSEMBLY_INV, INV_KEY = "Inventory",
-        LOCKS_KEY = "Locks", BLOCKED_KEY = "Blocked", MAT_LOCK_KEY = "MatLock";
+        MAT_LOCK_KEY = "MatLock"; // LOCKS_KEY/BLOCKED_KEY 已删 (v79.61x: itemLocks/slotBlocked 恒空零写方死面)
 
     private final EntityMaid maid;
     private final boolean serverSide;
-    private final ItemStack[] itemLocks = new ItemStack[MACHINE_SLOTS];
-    private final boolean[] slotBlocked = new boolean[MACHINE_SLOTS];
     private ItemStack materialLock = ItemStack.EMPTY;
 
     /** 获取/创建此 Maid 的唯一 Inventory 实例 (服务端共享) */
@@ -64,7 +62,6 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
         super(TOTAL_SLOTS);
         this.maid = maid;
         this.serverSide = serverSide;
-        for (int i = 0; i < MACHINE_SLOTS; i++) itemLocks[i] = ItemStack.EMPTY;
         loadFromNBT();
         LittleMaidMoreAction.LOGGER.info("[AssemblyInv] created serverSide={} maid={}", serverSide, maid.getStringUUID());
     }
@@ -137,11 +134,6 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
 //?}
             LittleMaidMoreAction.LOGGER.info("[AssemblyInv] loadFromNBT items={}", invTag.getList("Items", Tag.TAG_COMPOUND).size());
         }
-        ListTag lt = root.getList(LOCKS_KEY, Tag.TAG_COMPOUND);
-        for (int i = 0; i < MACHINE_SLOTS; i++)
-            itemLocks[i] = i < lt.size() ? parseItem(maid.level().registryAccess(), lt.getCompound(i)) : ItemStack.EMPTY;
-        byte[] bl = root.getByteArray(BLOCKED_KEY);
-        for (int i = 0; i < MACHINE_SLOTS; i++) slotBlocked[i] = i < bl.length && bl[i] != 0;
         if (root.contains(MAT_LOCK_KEY, Tag.TAG_COMPOUND))
             materialLock = parseItem(maid.level().registryAccess(), root.getCompound(MAT_LOCK_KEY));
     }
@@ -154,10 +146,6 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
 //?} else {
         root.put(INV_KEY, serializeNBT(maid.level().registryAccess()));
 //?}
-        ListTag lt = new ListTag(); for (ItemStack l : itemLocks) lt.add(saveItem(l, maid.level().registryAccess()));
-        root.put(LOCKS_KEY, lt);
-        byte[] bl = new byte[MACHINE_SLOTS]; for (int i = 0; i < MACHINE_SLOTS; i++) bl[i] = slotBlocked[i] ? (byte)1 : 0;
-        root.putByteArray(BLOCKED_KEY, bl);
         if (isMaterialLocked()) root.put(MAT_LOCK_KEY, saveItem(materialLock, maid.level().registryAccess()));
         else root.remove(MAT_LOCK_KEY);
         // 门面收编 (root 是 MaidData.get 返回的引用 — put 回写语义等价)

@@ -46,72 +46,23 @@ public final class ArmTransferSetupHandler {
 
     private ArmTransferSetupHandler() {}
 
-    // ── ① 木棍右键容器: 标记取出点/放入点 ──
+    // ── ① 木棍右键容器: 打开统一绑定菜单 (v79.62 — 4 角色: 种子/收获/取出/放入, 全局统一)
+    // 客户端开屏在 LmaForgeClientEntry / LmaNeoForgeClientEntry (RightClickBlock 客户端监听,
+    // common 类禁引 Minecraft — 主类可客户端类规则)。
+    // v79.62 修复: 服务端必须取消容器打开 — 客户端 setCanceled 拦不住 ServerboundUseItemOnPacket,
+    // 否则原版容器菜单(ClientboundOpenScreenPacket)会盖掉绑定屏 (用户实测「闪一下变成打开箱子」)。 ──
 
+    /** 服务端: 标记物品(非潜行)右键容器 → 取消原版容器打开 (绑定屏已由客户端打开) */
     @SubscribeEvent
-    public static void onRightClickBlock(PlayerInteractEvent.RightClickBlock event) {
-        ItemStack held = event.getItemStack();
-        if (!StickBindUtil.isMarkItem(held)) return;
+    public static void onRightClickContainer(PlayerInteractEvent.RightClickBlock event) {
         if (event.getLevel().isClientSide()) return;
-
-        BlockPos pos = event.getPos();
-        if (!StickBindUtil.isContainer(event.getLevel(), pos)) return;
-
-//? if 1.20.1 {
-        CompoundTag tag = held.getOrCreateTag();
-//?} else {
-CustomData _cd = held.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
-CompoundTag tag = _cd.copyTag();
-//?}
-        BlockPos curTake = readPos(tag, "take");
-        BlockPos curDep = readPos(tag, "deposit");
-
-        if (pos.equals(curTake)) {
-            tag.remove("take");
-//? if 1.20.1 {
-            tag.put("deposit", NbtUtils.writeBlockPos(pos));
-//?} else {
-CompoundTag _c = new CompoundTag();
-_c.putLong("pos", pos.asLong());
-tag.put("deposit", _c);
-//?}
-            event.getEntity().sendSystemMessage(comp("§e放入点已标记: " + pos.toShortString()
-                + " §7(右键另一个容器标记取出点 → 右键女仆开始)"));
-        //? if !1.20.1 {
-        held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-        //?}
-        } else if (pos.equals(curDep)) {
-            tag.remove("deposit");
-//? if 1.20.1 {
-            tag.put("take", NbtUtils.writeBlockPos(pos));
-//?} else {
-CompoundTag _c = new CompoundTag();
-_c.putLong("pos", pos.asLong());
-tag.put("take", _c);
-//?}
-            event.getEntity().sendSystemMessage(comp("§b取出点已标记: " + pos.toShortString()
-                + " §7(右键女仆开始搬运)"));
-        //? if !1.20.1 {
-        held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-        //?}
-        } else {
-            tag.remove("take");
-//? if 1.20.1 {
-            tag.put("take", NbtUtils.writeBlockPos(pos));
-//?} else {
-CompoundTag _c = new CompoundTag();
-_c.putLong("pos", pos.asLong());
-tag.put("take", _c);
-//?}
-            event.getEntity().sendSystemMessage(comp("§b取出点已标记: " + pos.toShortString()
-                + " §7(再右键同一容器→放入点)"));
-        //? if !1.20.1 {
-        held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
-        //?}
-        }
+        if (event.getEntity().isShiftKeyDown()) return;   // shift 留给选区标记
+        if (!StickBindUtil.isMarkItem(event.getItemStack())) return;
+        if (!StickBindUtil.isContainer(event.getLevel(), event.getPos())) return;
+        event.setCanceled(true);
     }
 
-    // ── ② 木棍右键女仆: 仅在 arm_transfer 任务时启动 ──
+    // ── ② 木棍右键女仆: 交付容器绑定 → 按任务启动 (arm_transfer: 取/放; farm: 种子源/收获目标) ──
 
     @SubscribeEvent
     public static void onInteractMaid(InteractMaidEvent event) {
@@ -121,19 +72,36 @@ tag.put("take", _c);
         if (held == null) return;
         if (maid.level().isClientSide) return;
 
-        if (!StickBindUtil.checkTaskType(maid, "arm_transfer", player)) return;
-
 //? if 1.20.1 {
         CompoundTag tag = held.getOrCreateTag();
 //?} else {
 CustomData _cd = held.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
 CompoundTag tag = _cd.copyTag();
 //?}
+        String taskType = com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskTypeRegistry
+                .extractTaskType(maid.getTask().getUid().getPath());
+
+        // farm 交付 (v79.62 区域制): 区域绑定走 FarmRegionBindPacket (客户端选区+木棍箱标记) —
+        // 服务端 InteractMaidEvent 只消费本次右键 (客户端已并行发绑定包), 不在此建区域。
+        // 木棍上无箱标记 → 提示先标记 (客户端无选区也不会发包)。
+        if ("farm".equals(taskType)) {
+            boolean hasBox = tag.contains("farm_seed") || tag.contains("farm_harvest");
+            if (!hasBox) {
+                player.sendSystemMessage(comp("§c请先用木棍右键容器菜单标记种子源箱 / 收获目标箱"));
+                return;
+            }
+            // 本次右键已由客户端发送 FarmRegionBindPacket — 事件仅置位防止 TLM 打开女仆界面
+            event.setCanceled(true);
+            return;
+        }
+
+        // arm_transfer 交付 (原逻辑)
+        if (!StickBindUtil.checkTaskType(maid, "arm_transfer", player)) return;
         BlockPos takePos = readPos(tag, "take");
         BlockPos depositPos = readPos(tag, "deposit");
 
-        if (takePos == null) { player.sendSystemMessage(comp("§c请先用木棍右键容器标记取出点")); return; }
-        if (depositPos == null) { player.sendSystemMessage(comp("§c请再用木棍右键另一个容器标记放入点")); return; }
+        if (takePos == null) { player.sendSystemMessage(comp("§c请先用木棍右键容器菜单标记取出点")); return; }
+        if (depositPos == null) { player.sendSystemMessage(comp("§c请再用木棍右键容器菜单标记放入点")); return; }
         if (maid.getAvailableInv(false).getSlots() <= 0) { player.sendSystemMessage(comp("§c女仆没有背包")); return; }
 
         var data = maid.getPersistentData();

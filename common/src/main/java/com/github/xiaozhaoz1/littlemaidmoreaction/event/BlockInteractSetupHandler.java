@@ -114,13 +114,17 @@ CompoundTag tag = _cd.copyTag();
 //? if 1.20.1 {
         BlockPos pos = NbtUtils.readBlockPos(tag.getCompound(STICK_KEY));
 //?} else {
-        BlockPos pos = BlockPos.of(tag.getCompound(STICK_KEY).getLong("pos"));
+        // 2026-08-16 实测修: 写侧 tag.put(STICK_KEY, NbtUtils.writeBlockPos(pos)) 在 1.21.1 存的是
+        // LongTag 直接作 STICK_KEY 值 (javap: writeBlockPos→Tag); 原 getCompound("pos") 读空 → 0,0,0。
+        // 用官方 readBlockPos(CompoundTag,key) 兼容 LongTag 存储, 兜底女仆位不再 0,0,0
+        BlockPos pos = NbtUtils.readBlockPos(tag, STICK_KEY).orElse(maid.blockPosition());
 //?}
 
-        // 写入 pipelineConfig (跨任务持久)
-        // v79.55 (错题 #183): 原直调 NbtUtils.writeBlockPos — 1.21.1 存 IntArrayTag → 读侧 getCompound 空 → 绑定失效;
-        // 改走 NbtCodecs (双平台格式契约, 与读侧 BlockInteractPipeline.readPos 同款)
-        CompoundTag cfg = TaskConfigs.get(maid, "block_interact");
+        // 写入 pipelineConfig (跨任务持久) — 2026-08-16 修: cfgOrCreate (getCompound 对不存在 key
+        // 返回临时空 tag 不落盘 → 首次绑定丢失 → GUI/按键读不到; cfgOrCreate 先 put 再取引用)
+        // v79.55 (错题 #183): NbtCodecs 双平台格式契约, 与读侧 BlockInteractPipeline.readPos 同款
+        CompoundTag cfg = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData
+                .cfgOrCreate(maid, "block_interact");
         com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs.writeBlockPos(cfg, BlockInteractPipeline.KEY_POS, pos);
 
         TaskDispatcher.submit(maid, "block_interact", null, 0);

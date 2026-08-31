@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.63 (2026-08-31) — 填坝排水 dam_fill 新任务 + 挖空置域大修 + 温度感知触发语义
+
+- **新任务 dam_fill 填坝排水 (两模式独立)**: 填坝=只筑墙 (四方向, 重力方块自落填充, 检测列堆顶到 topY) / 排水=只排水 (按排从墙边往里, 液体→空气+粒子+舀水声); cfg 只存标记配置, 游标全 PD 内存; 任务期间 HOME + 水下呼吸
+- **挖空置域修复**: 液体提前空气化+相邻扫描+清缓存 / 脚下 >2 格深矿扫描排除 / 矿必须裸露才挖 (6 邻面至少 1 面空气) / 导航 navGoal=target.above + 5s 尝试→2s CD→2 次→跳过集 10s / 递归 idleScan 卡死修复 / ChunkWorkArea 3 点 restrict 防拉回 / 挖产物遍历全槽入包 / 认领后自动传送
+- **温度感知**: 触发即写 5 分钟 CD + tick CD 未冷却 cancelPassive + 到火/水旁立即 CD+结束 (删 30 秒停留)
+- **导航重试**: 5 秒尝试 → 2 秒 CD → 2 次失败进跳过集 10 秒 (SKIP_TTL 60→200)
+- 版本 0.9.62 → 0.9.63 (双平台)
+- 验证: 双编译 --no-build-cache ✅ + 单测 474 用例 0 失败 ✅ + gametest 48/48 ✅
+
 ## 0.9.59 (2026-08-15) — 新功能: 酒狐奶桶 / 野生酒狐奶饰品
 
 - **两个可饮+可装备饰品的奶桶** (继承 TLM `IMaidBauble`, 经 `bindMaidBauble` 注册): 酒狐奶桶 (喝=抗性提升II+生命恢复I 10s; 饰品受伤=双buff+掉耐久, 总30) / 野生酒狐奶 (喝=生命恢复I 30s; 无法破坏; 饰品濒死=无敌30s+音乐+CD10min 图腾式, 触发后保留)

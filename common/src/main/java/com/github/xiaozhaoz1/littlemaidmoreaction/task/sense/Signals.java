@@ -12,18 +12,18 @@ import javax.annotation.Nullable;
  * v79.58: 删 MONSTER_NEARBY/CLEAR (monster_log 管线退役)。
  * v79.61x S4: 常量/枚举实 19 个 (与 {@link EnvSignal} 一一对应 — 历史注释 28/26 计数漂移修正)。
  *
- * <h3>信号 → 消费管线 → 配置面 (19 全量映射)</h3>
+ * <h3>信号 → 消费管线 → 配置面 (8 全量映射; v79.61x 死信号同族清理后; v79.62 snow_shovel 删)</h3>
  * <ul>
- *   <li>SNOWING → SnowShovelPipeline → ENV_DEFAULT_RADIUS</li>
+ *   <li>SNOWING/WEATHER_CLEAR → 天气检出保留 (LLM 对话/规则系统上下文, 用户裁定; 原 SnowShovelPipeline 消费已删)</li>
  *   <li>TEMP_COLD/HOT/NORMAL → TempAdaptPipeline → ENV_COLD/HOT_THRESHOLD</li>
  *   <li>DARKNESS → TorchLightPipeline → ENV_DARKNESS_THRESHOLD</li>
  *   <li>MAID_NEARBY → HaqiPipeline → HAQI_*</li>
- *   <li>FESTIVAL_ENTER → FestivalPipeline → showTrigger 100t (无阈值)</li>
- *   <li>结构动态信号 (STRUCTURE_PREFIX + id:discover/refresh/enter/leave) → StructureSensePipeline
- *       → ENV_STRUCTURE_* (独立于本 19 常量, 走 StructureSense.PREFIX 通配)</li>
- *   <li>RAINING/THUNDER_START/WEATHER_CLEAR/DARKNESS_CLEAR/DIMENSION_CHANGE/TIME_SEGMENT/
- *       FRIENDLY_NEARBY/FRIENDLY_CLEAR/MAID_CLEAR/BIOME_CHANGE/STRUCTURE_ENTER/STRUCTURE_LEAVE
- *       → 侦测端生成, 当前无管线消费 (预留)</li>
+ *   <li>FESTIVAL_ENTER → FestivalPassiveTask (纯触发型) → showTrigger 100t (无阈值)</li>
+ *   <li>结构动态信号 (STRUCTURE_PREFIX + id:discover/refresh/enter/leave) → StructureSensePassiveTask
+ *       → ENV_STRUCTURE_* (独立于本 8 常量, 走 StructureSense.PREFIX 通配)</li>
+ *   <li>v79.61x: RAINING/THUNDER_START/DIMENSION_CHANGE/TIME_SEGMENT/FRIENDLY_NEARBY/FRIENDLY_CLEAR/
+ *       MAID_CLEAR/BIOME_CHANGE/STRUCTURE_ENTER/STRUCTURE_LEAVE + DARKNESS_CLEAR 共 11 个
+ *       零消费死信号全删 (用户裁定同族清理)</li>
  * </ul>
  */
 public final class Signals {
@@ -31,14 +31,10 @@ public final class Signals {
     /** 信号 id 前缀 — 环境信号 */
     public static final String ENV_PREFIX = "env:";
 
-    // ── env: 常量 (19 个, 与 EnvSignal 枚举一一对应; v79.58 删 MONSTER 2 个) ──
+    // ── env: 常量 (8 个, 与 EnvSignal 枚举一一对应; v79.58 删 MONSTER 2, v79.61x 删死信号 11) ──
 
     /** 开始下雪 */
     public static final String ENV_SNOWING = "env:SNOWING";
-    /** 开始下雨 */
-    public static final String ENV_RAINING = "env:RAINING";
-    /** 雷暴开始 */
-    public static final String ENV_THUNDER_START = "env:THUNDER_START";
     /** 天气转晴 */
     public static final String ENV_WEATHER_CLEAR = "env:WEATHER_CLEAR";
     /** 进入寒冷区域 */
@@ -47,31 +43,14 @@ public final class Signals {
     public static final String ENV_TEMP_HOT = "env:TEMP_HOT";
     /** 返回常温 */
     public static final String ENV_TEMP_NORMAL = "env:TEMP_NORMAL";
-    /** 昼夜切换 */
     /** 进入黑暗 */
     public static final String ENV_DARKNESS = "env:DARKNESS";
-    /** 脱离黑暗 */
-    public static final String ENV_DARKNESS_CLEAR = "env:DARKNESS_CLEAR";
-    /** 女仆切换维度 */
-    public static final String ENV_DIMENSION_CHANGE = "env:DIMENSION_CHANGE";
-    /** 时间段切换 */
-    public static final String ENV_TIME_SEGMENT = "env:TIME_SEGMENT";
-    /** 附近有友好生物 */
-    public static final String ENV_FRIENDLY_NEARBY = "env:FRIENDLY_NEARBY";
-    /** 附近友好生物清除 */
-    public static final String ENV_FRIENDLY_CLEAR = "env:FRIENDLY_CLEAR";
     /** 附近有其他女仆 */
     public static final String ENV_MAID_NEARBY = "env:MAID_NEARBY";
-    /** 附近女仆离开 */
-    public static final String ENV_MAID_CLEAR = "env:MAID_CLEAR";
-    /** 生物群系切换 */
-    public static final String ENV_BIOME_CHANGE = "env:BIOME_CHANGE";
-    /** 进入站立点所在结构 */
-    public static final String ENV_STRUCTURE_ENTER = "env:STRUCTURE_ENTER";
-    /** 离开站立点所在结构 */
-    public static final String ENV_STRUCTURE_LEAVE = "env:STRUCTURE_LEAVE";
     /** 节日状态广播 (stateless — 每轮查表非空即发, 消费端当天首收去重) */
     public static final String ENV_FESTIVAL_ENTER = "env:FESTIVAL_ENTER";
+    /** 稀有群系 (stateless — 每轮查当前 biome 稀有即发, 消费端每群系去重) */
+    public static final String ENV_RARE_BIOME = "env:RARE_BIOME";
 
     /** EnvSignal → 信号 id */
     public static String envOf(EnvSignal signal) {

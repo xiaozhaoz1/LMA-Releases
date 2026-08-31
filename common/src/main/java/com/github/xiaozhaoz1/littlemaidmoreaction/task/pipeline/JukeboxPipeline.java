@@ -82,10 +82,14 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
 //? if 1.20.1 {
             if (!s.isEmpty() && s.is(ItemTags.MUSIC_DISCS) && ItemFilters.isAllowed(s, lists.get(0), lists.get(1))) {
 //?} else {
-            if (!s.isEmpty() && s.is(ItemTags.CREEPER_DROP_MUSIC_DISCS) && ItemFilters.isAllowed(s, lists.get(0), lists.get(1))) {
+            // 1.21.1: ItemTags 无 MUSIC_DISCS 常量 (javap 仅 CREEPER_DROP_MUSIC_DISCS — 苦力怕掉落子集,
+            // Pigstep/2/5 等非苦力怕掉落唱片会漏检 → 「没有唱片」); 补原版唱片 id 前缀判别
+            // (minecraft:music_disc_*) 兜底全集 — 2026-08-16 用户实测修正
+            if (!s.isEmpty() && (s.is(ItemTags.CREEPER_DROP_MUSIC_DISCS) || isVanillaDisc(s))
+                    && ItemFilters.isAllowed(s, lists.get(0), lists.get(1))) {
 //?}
                 if (target.isEmpty()) return PipelineResult.ok("");
-                if (s.getDescriptionId().contains(target) || s.getItem().toString().contains(target))
+                if (matchesTarget(s, target))
                     return PipelineResult.ok("");
             }
         }
@@ -99,6 +103,32 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
 //?} else {
         return jukebox.getItem(0).isEmpty();
 //?}
+    }
+
+    /**
+     * 碟目标匹配 (v79.61x S1-F4 统一判据) — 注册表 key + 描述名 + 显示名, 统一 lowercase。
+     * 双平台 key 格式一致 (minecraft:music_disc_11), 修原 toString() 平台漂移 (错题 #191 同根)
+     * 与 validate/INSERTING 大小写判据分裂 (原 validate 大小写敏感 / INSERTING lowercase)。
+     */
+    private static boolean matchesTarget(ItemStack disc, String target) {
+        if (target.isEmpty()) return true;
+        String t = target.toLowerCase();
+//? if 1.20.1 {
+        var key = net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(disc.getItem());
+//?} else {
+        var key = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(disc.getItem());
+//?}
+        if (key != null && key.toString().toLowerCase().contains(t)) return true;
+        return disc.getDescriptionId().toLowerCase().contains(t)
+                || disc.getDisplayName().getString().toLowerCase().contains(t);
+    }
+
+    /** 原版唱片判别 (1.21.1 兜底全集 — ItemTags 无 MUSIC_DISCS 常量; 原版唱片注册 path 统一
+     * {@code music_disc_*} 前缀, 覆盖非苦力怕掉落唱片 Pigstep/2/5 等; 2026-08-16 用户实测修正) */
+    private static boolean isVanillaDisc(ItemStack s) {
+        if (s.isEmpty()) return false;
+        var key = net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(s.getItem());
+        return key != null && key.getPath().startsWith("music_disc_");
     }
 
     /** 计时到期判定 — 相位时间戳 (DataKey.JUKEBOX_TICK) 与当前 tick 差 */
@@ -157,7 +187,9 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
 //? if 1.20.1 {
             if (s.is(ItemTags.MUSIC_DISCS) && ItemFilters.isAllowed(s, lists.get(0), lists.get(1))) discs.add(s);
 //?} else {
-            if (s.is(ItemTags.CREEPER_DROP_MUSIC_DISCS) && ItemFilters.isAllowed(s, lists.get(0), lists.get(1))) discs.add(s);
+            // 1.21.1 唱片全集修正同上 (CREEPER_DROP 子集漏检 + music_disc_ 前缀兜底) — 2026-08-16
+            if ((s.is(ItemTags.CREEPER_DROP_MUSIC_DISCS) || isVanillaDisc(s))
+                    && ItemFilters.isAllowed(s, lists.get(0), lists.get(1))) discs.add(s);
 //?}
         }
         if (discs.isEmpty()) {
@@ -169,15 +201,18 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
         if (!target.isEmpty()) {
             chosen = null;
             for (ItemStack d : discs) {
-                String id = d.getItem().toString().toLowerCase();
-                String name = d.getDisplayName().getString().toLowerCase();
-                if (id.contains(target.toLowerCase()) || name.contains(target.toLowerCase())) {
+                if (matchesTarget(d, target)) {
                     chosen = d;
                     break;
                 }
             }
             if (chosen == null) {
-                LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} disc '{}' not found", maid.getId(), target);
+                // v79.61x S1-F4 (用户裁定): 目标碟不存在 → 节流气泡提醒, 保持 INSERTING 等补碟
+                // (原静默卡住; 匹配判据已与 validate 统一为 matchesTarget)
+                if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                        .shouldFire(maid, "jukebox_target_miss", 600)) {
+                    com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, "背包里没有目标唱片: " + target);
+                }
                 return null;
             }
         } else {
@@ -225,15 +260,24 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
         return null;
     }
 
-    /** EJECTING — 弹出 → PICKUP_WAIT; 空 → INSERTING */
+    /** EJECTING — 弹出 → PICKUP_WAIT; 机内空 → INSERTING; 全拒 (背包满) → 保持 EJECTING 重试 (v79.61x S1-F3 修复: 原全拒误判"空"→ INSERTING→PLAYING→EJECTING 死循环震荡) */
     private Phase handleEjecting(EntityMaid maid, JukeboxBlockEntity jukebox) {
+        if (jukeboxEmpty(jukebox)) {
+            LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} EJECTING: empty, back to INSERTING", maid.getId());
+            return Phase.INSERTING;
+        }
         boolean ejected = JukeboxService.ejectDisc(jukebox, maid);
         if (ejected) {
             LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} EJECTING: disc ejected", maid.getId());
             return Phase.PICKUP_WAIT;
         }
-        LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} EJECTING: empty, back to INSERTING", maid.getId());
-        return Phase.INSERTING;
+        // 全拒 (背包满, insertItem 剩余=原数量) — 碟滞留机内; 保持 EJECTING 每 tick 重试,
+        // 600t 节流气泡提醒; 背包腾出空间后下一 tick 自然弹出 (自愈)
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                .shouldFire(maid, "jukebox_full", 600)) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, "背包已满，无法取回唱片");
+        }
+        return null;
     }
 
     /** PICKUP_WAIT — 拾取等待计时, 到时 → INSERTING */

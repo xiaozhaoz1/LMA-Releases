@@ -84,16 +84,21 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
 
     /** 接收女仆在皮带表面的移动速度。路由到控制器 BE。 */
     public void addSurfaceMovement(float signedSurfaceSpeed) {
+        addSurfaceMovement(signedSurfaceSpeed, 1f);
+    }
+
+    /** 接收表面速度 + 蛋糕应力倍率 (v79.62.1) — cakeMult = 2^蛋糕数 (1/2/4), 应力层乘倍 */
+    public void addSurfaceMovement(float signedSurfaceSpeed, float cakeMult) {
         MaidPowerBeltBlockEntity controllerBE = isController() ? this : getControllerBE();
         if (controllerBE == null) {
             LittleMaidMoreAction.LOGGER.info("[MaidPowerBelt] addSurfaceMovement: no controller at {}", worldPosition);
             return;
         }
-        LittleMaidMoreAction.LOGGER.info("[MaidPowerBelt] addSurfaceMovement speed={} at {}", signedSurfaceSpeed, worldPosition);
-        controllerBE.collectSurfaceMovement(signedSurfaceSpeed);
+        LittleMaidMoreAction.LOGGER.info("[MaidPowerBelt] addSurfaceMovement speed={} cakeMult={} at {}", signedSurfaceSpeed, cakeMult, worldPosition);
+        controllerBE.collectSurfaceMovement(signedSurfaceSpeed, cakeMult);
     }
 
-    private void collectSurfaceMovement(float signedSurfaceSpeed) {
+    private void collectSurfaceMovement(float signedSurfaceSpeed, float cakeMult) {
         if (level == null || level.isClientSide)
             return;
         if (Math.abs(signedSurfaceSpeed) < MIN_SURFACE_SPEED)
@@ -112,8 +117,10 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
         }
 
         collectedGeneratedSpeed = getStrongerSpeed(collectedGeneratedSpeed, speed);
+        // v79.62.1 蛋糕应力倍率: cakeMult = 2^蛋糕数 (1/2/4) — 应力 = RPM×4×cakeMult
+        // (绕开 MAX_GENERATED_RPM=256 封顶对速度→应力的拖累, 1 蛋糕×2 / 2 蛋糕×4)
         collectedStressCapacity =
-                Mth.clamp(collectedStressCapacity + getStressCapacityForRpm(speed), 0, getMaxStressCapacity());
+                Mth.clamp(collectedStressCapacity + getStressCapacityForRpm(speed) * cakeMult, 0, getMaxStressCapacity());
     }
 
     private void sampleSurfaceMovementBefore(long gameTime) {
@@ -223,6 +230,22 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
         updateGeneratedRotation();
     }
 
+    /**
+     * 直接设置发电输出 (v79.62.1) — 绕开表面速度采样链路, 精确控制最终应力.
+     *  Create 应力 = generatedSpeed(RPM) × generatedCapacity(每RPM应力).
+     *  调用方传目标 RPM + 目标总应力, 内部换算 capacity = stress / rpm.
+     *  非控制器段转发给 controller; 已在 controller 上则直接设置.
+     */
+    public void setDirectOutput(float rpm, float stress) {
+        MaidPowerBeltBlockEntity controllerBE = isController() ? this : getControllerBE();
+        if (controllerBE == null) return;
+        if (Mth.equal(rpm, 0)) {
+            controllerBE.setGeneratedOutput(0, 0);
+            return;
+        }
+        controllerBE.setGeneratedOutput(rpm, stress / Math.abs(rpm));
+    }
+
     @Override
     public float getGeneratedSpeed() {
         if (!isController() || !getBlockState().is(LmaBlocks.MAID_POWER_BELT.get()))
@@ -289,6 +312,22 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
 
     public float getBeltMovementSpeed() {
         return getSpeed() / SURFACE_SPEED_TO_RPM;
+    }
+
+    /**
+     * 皮带实际移动方向 (v79.62.1) — 对齐 Create {@code BeltBlockEntity.getMovementFacing()}:
+     * 移动沿皮带轴向 (FACING 轴), 方向由速度正负决定:
+     * {@code dir = (speed<0) ^ (axis==X) ? NEGATIVE : POSITIVE}.
+     * 女仆身体应朝此方向 (模拟在跑步机上跑步, 而非跟随玩家).
+     */
+    public Direction getMovementFacing() {
+        Direction facing = getBeltFacing();
+        Direction.Axis axis = facing.getAxis();
+        boolean negBySpeed = getBeltMovementSpeed() < 0;
+        boolean negByAxisX = axis == Direction.Axis.X;
+        Direction.AxisDirection dir = (negBySpeed ^ negByAxisX)
+                ? Direction.AxisDirection.NEGATIVE : Direction.AxisDirection.POSITIVE;
+        return Direction.fromAxisAndDirection(axis, dir);
     }
 
     @Override

@@ -77,6 +77,22 @@ public final class PassiveTaskConfig {
 //?} else {
     public static final ModConfigSpec.IntValue ENV_STRUCTURE_RADIUS;
 //?}
+    // ── 稀有群系 (v79.62.1 per-player 重构: 玩家为中心检测, 发主人女仆; 用户裁定跟结构一致) ──
+//? if 1.20.1 {
+    public static final ForgeConfigSpec.BooleanValue ENV_RARE_BIOME_ENABLED;
+//?} else {
+    public static final ModConfigSpec.BooleanValue ENV_RARE_BIOME_ENABLED;
+//?}
+//? if 1.20.1 {
+    public static final ForgeConfigSpec.IntValue ENV_RARE_BIOME_INTERVAL;
+//?} else {
+    public static final ModConfigSpec.IntValue ENV_RARE_BIOME_INTERVAL;
+//?}
+//? if 1.20.1 {
+    public static final ForgeConfigSpec.IntValue ENV_RARE_BIOME_SIGNAL_RADIUS;
+//?} else {
+    public static final ModConfigSpec.IntValue ENV_RARE_BIOME_SIGNAL_RADIUS;
+//?}
     // ── 结构信号 (v79.60 per-player 重构: 玩家为中心检测, 发主人女仆; v79.61 状态机: discover/refresh/enter/leave) ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.IntValue ENV_STRUCTURE_SIGNAL_RADIUS;
@@ -148,11 +164,11 @@ public final class PassiveTaskConfig {
 //?} else {
     public static final ModConfigSpec.BooleanValue ENVSENSE_ENABLED;
 //?}
-    // ── 被动 tick 预算 ──
+    // ── 酒狐奶自动喂食 ──
 //? if 1.20.1 {
-    public static final ForgeConfigSpec.IntValue PASSIVE_TICK_BUDGET;
+    public static final ForgeConfigSpec.BooleanValue JIUHU_MILK_AUTO_FEED;
 //?} else {
-    public static final ModConfigSpec.IntValue PASSIVE_TICK_BUDGET;
+    public static final ModConfigSpec.BooleanValue JIUHU_MILK_AUTO_FEED;
 //?}
     // ── 哈气任务 ──
 //? if 1.20.1 {
@@ -278,28 +294,39 @@ public final class PassiveTaskConfig {
                 .comment("随机选择女仆收信号: true=玩家附近主人女仆中随机选 1 个, false=选最近 (v79.60)")
                 .define("structure_random_maid", true);
         ENV_STRUCTURE_ENTER_DIST = b
-                .comment("进入结构判定距离 (格): 主人距结构中心 ≤ 此值 = 在结构内 (enter 信号, 不气泡; v79.61 用户裁定)")
-                .defineInRange("structure_enter_dist", 40, 1, 100);
+                .comment("进入结构判定距离 (格, 距结构边界盒): 在盒内=0; ≤ 此值 = 在结构内 (enter 气泡+聊天; v79.6x BB 语义用户裁定)")
+                .defineInRange("structure_enter_dist", 8, 1, 100);
         ENV_STRUCTURE_LEAVE_DIST = b
-                .comment("离开结构判定距离 (格): 主人距结构中心 > 此值 = 离开 (leave 信号, 不气泡; 建议 ≤ 结构探测半径×16; v79.61 用户裁定)")
-                .defineInRange("structure_leave_dist", 100, 2, 256);
+                .comment("离开结构判定距离 (格, 距结构边界盒): > 此值 = 离开 (leave 信号, 不气泡; v79.6x BB 语义用户裁定)")
+                .defineInRange("structure_leave_dist", 24, 2, 256);
         ENV_STRUCTURE_REFRESH_TICKS = b
-                .comment("结构方向提醒重发间隔 (tick): 主人在结构外 (enter~leave 距离区间) 每此间隔重发一次方向气泡 (默认 2400 = 2 分钟; v79.61 用户裁定)")
+                .comment("结构方向提醒重发间隔 (tick): 主人在边界环带 (距盒 enter~leave) 每此间隔重发一次方向气泡 (默认 2400 = 2 分钟; v79.61 用户裁定)")
                 .defineInRange("structure_refresh_ticks", 2400, 1200, 168000);
         ENV_STRUCTURE_REFRESH_MAX = b
                 .comment("结构提醒次数上限: 每次进入结构外围的提醒总数 (含首次发现, 默认 3; v79.61 用户裁定)")
                 .defineInRange("structure_refresh_max", 3, 1, 10);
+        ENV_RARE_BIOME_ENABLED = b
+                .comment("稀有群系通报总开关 (蘑菇岛/深暗之域/溶洞/繁茂洞穴等, v79.62.1)")
+                .define("rare_biome_enabled", true);
+        ENV_RARE_BIOME_INTERVAL = b
+                .comment("稀有群系检测间隔 (tick), 默认 1200 = 1 分钟")
+                .defineInRange("rare_biome_interval_ticks", 1200, 1200, 168000);
+        ENV_RARE_BIOME_SIGNAL_RADIUS = b
+                .comment("稀有群系信号半径 (格): 玩家附近此范围内的主人女仆才收信号 (v79.62.1 per-player)")
+                .defineInRange("rare_biome_signal_radius", 10, 1, 64);
         ENVSENSE_ENABLED = b
                 .comment("环境感知总开关: true=女仆接收环境信号 (2026-08-11b: 默认 false→true — v79.11 哈气同根因, 6/8 被动默认永不触发; per-maid 键可单独关)")
                 .define("enabled", true);
         b.pop();
 
-        b.push("tick_budget");
-        PASSIVE_TICK_BUDGET = b
-                .comment("每女仆每 tick 最多执行的被动管线数, 0=不限; 超预算时环形轮转 (v79)")
-                .defineInRange("passive_tick_budget", 2, 0, 16);
-        b.pop();
+        // v79.61x: PASSIVE_TICK_BUDGET 已删 (被动脱管线 — 无共享 tick 通道, 预算轮转退役)
 
+        // ── 酒狐奶 ──
+        b.push("jiuhu_milk");
+        JIUHU_MILK_AUTO_FEED = b
+                .comment("酒狐奶自动喂食: 主人受伤 (<70%血量) 时自动喂奶 (清负面+buff)")
+                .define("auto_feed", false);
+        b.pop();
         // ── 哈气任务 ──
         b.push("haqi");
         SELF_RESCUE_ENABLED = b
@@ -378,8 +405,11 @@ public final class PassiveTaskConfig {
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_STRUCTURE_LEAVE_DIST);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_STRUCTURE_REFRESH_TICKS);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_STRUCTURE_REFRESH_MAX);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_RARE_BIOME_ENABLED);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_RARE_BIOME_INTERVAL);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_RARE_BIOME_SIGNAL_RADIUS);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENVSENSE_ENABLED);
-        MoreActionConfig.reg(PASSIVE_VALUES, "passive", PASSIVE_TICK_BUDGET);
+        MoreActionConfig.reg(PASSIVE_VALUES, "passive", JIUHU_MILK_AUTO_FEED);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", SELF_RESCUE_ENABLED);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", HAQI_ENABLED);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", HAQI_CHANCE);

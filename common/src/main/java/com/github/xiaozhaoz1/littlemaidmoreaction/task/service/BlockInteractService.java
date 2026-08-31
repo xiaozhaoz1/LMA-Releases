@@ -27,6 +27,12 @@ public final class BlockInteractService {
         if (!pos.closerToCenterThan(maid.position(), ActiveTaskConfig.BI_INTERACT_DISTANCE.get())) return false;
 
         // ② 模拟右键 (公共样板见 FakePlayerInteract)
-        return FakePlayerInteract.rightClick(world, maid, pos, Direction.UP);
+        boolean ok = FakePlayerInteract.rightClick(world, maid, pos, Direction.UP);
+        // v79.62 用户实测: 1.21.1 右键互动无挥手 (TLM 任务动画 fallback 缺失) —
+        // LMA 侧补 swing 快速摆臂 (swing_hand, 原版节流自持), 双平台统一
+        if (ok) {
+            maid.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
+        }
+        return ok;
     }
 }

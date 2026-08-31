@@ -31,7 +31,7 @@ final class ChainScan {
     /** 跳过集容量 (用户定 10) */
     private static final int SKIP_MAX = 10;
     /** 跳过集 TTL — 60t: 失败目标过期重试, 长 TTL 防垃圾输出 (死循环实测 错题 #119; 演化史见 changelog) */
-    private static final int SKIP_TTL = 60;
+    private static final int SKIP_TTL = 200;   // v79.62.2 用户裁定: 跳过集 10 秒 (原 60=3 秒)
     /** nearPass 近扫轻节流 (tick) — 独立于 CHAIN_SCAN_INTERVAL, 寻路途中也扫周围矿 */
     private static final int NEAR_SCAN_INTERVAL = 5;
 
@@ -135,9 +135,13 @@ final class ChainScan {
         long now = world.getGameTime();
         skip.removeIf(l -> st.expire(l, now, SKIP_TTL));
         // 泛化最近搜索提升到 API 面 (SenseApi.findNearestBlock — BlockScanner + skip 集)
+        // v79.62.2 用户裁定: 排除脚下 >2 格的深矿 (被泥土/石头盖住挖不到 → 女仆一直看卡住).
+        // 目标Y 必须 >= 女仆脚Y - 2; 其余 (头上/旁边/远处 32 格) 不变.
+        int footY = maid.blockPosition().getY();
         return SenseApi.findNearestBlock(maid,
                 radius, ChainHarvestExecute.vRange(target), s -> target.matches(s) && ChainHarvestExecute.allowed(maid, s) && target.canHarvest(tool, s),
-                skip, ChainHarvestMath.scanBudget(radius));
+                skip, ChainHarvestMath.scanBudget(radius),
+                (p, s) -> p.getY() >= footY - 2);
     }
 
     /**
@@ -167,6 +171,8 @@ final class ChainScan {
                     if (d > VanillaConstants.MINE_DIG_DIST_SQR) continue;
                     BlockPos p = foot.offset(dx, dy, dz);
                     if (skip.contains(p.asLong())) continue;
+                    // v79.62.2 用户裁定: 排除脚下 >2 格的深矿 (盖住挖不到 → 一直看卡住)
+                    if (p.getY() < foot.getY() - 2) continue;
                     BlockState state = world.getBlockState(p);
                     if (!target.matches(state) || !ChainHarvestExecute.allowed(maid, state) || !target.canHarvest(tool, state)) continue;
                     if (d < bestDist) {
@@ -192,18 +198,20 @@ final class ChainScan {
         st.addSkip(pos, now, SKIP_MAX);
     }
 
-    /** 失败出口单点 — 记跳过 + 重扫 (v79.56 结构整理: 原 5 处散落出口收敛; 跳过集逻辑集中) */
+    /** 失败出口单点 — 记跳过 + 下 tick 重扫 (v79.62.2 修爆栈: 原递归 idleScan(immediate=true)
+     *  → 找到下一目标又 tryStartVein 失败 → failAndSkip 无限递归 StackOverflow (用户切砍树任务崩溃).
+     *  改为记跳过 + CONTINUE — 下 tick idleScan 自然重扫, 不递归.) */
     static TaskResult failAndSkip(MaidChainState st, BlockPos pos, ServerLevel world,
                                   EntityMaid maid, CompoundTag data,
                                   HarvestTarget target, ItemStack tool) {
         addSkip(st, pos.asLong(), world.getGameTime());
-        return idleScan(world, maid, data, target, tool, true);
+        return TaskResult.CONTINUE;
     }
 
     private static int searchRadius(EntityMaid maid) {
-        return maid.hasRestriction()
-                ? Math.max(4, (int) maid.getRestrictRadius())
-                : PassiveTaskConfig.ENV_DEFAULT_RADIUS.get();
+        // v79.62.2 用户裁定: chain 搜索半径固定 32 (原 ENV_DEFAULT_RADIUS=16 → findNearestBlock
+        // 16格=1 chunk → 16格外矿/树找不到 → 女仆不去; 32格=2 chunk 覆盖更远目标)
+        return 32;
     }
 
     /** 扫描谓词用模式默认工具 (与手工具解耦) — 手拿铲也能扫到矿 (挖完泥土换目标),

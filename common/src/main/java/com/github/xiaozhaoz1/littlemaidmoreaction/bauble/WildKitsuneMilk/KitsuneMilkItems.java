@@ -8,7 +8,7 @@ import net.minecraftforge.registries.ForgeRegistries;
 import net.minecraftforge.registries.RegistryObject;
 //?} else {
 import net.neoforged.neoforge.registries.DeferredRegister;
-import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.core.registries.Registries;
 import java.util.function.Supplier;
 //?}
 
@@ -22,7 +22,9 @@ public final class KitsuneMilkItems {
 //? if 1.20.1 {
             DeferredRegister.create(ForgeRegistries.ITEMS, LittleMaidMoreAction.MOD_ID);
 //?} else {
-            DeferredRegister.create(BuiltInRegistries.ITEM, LittleMaidMoreAction.MOD_ID);
+            // neoforge 1.21 官方推荐 ResourceKey 写法 (Registries.ITEM) — BuiltInRegistries.ITEM
+            // Registry 对象对原生 registry 有冻结/游离时序坑 (JEI/游戏不可见), 2026-08-16 用户实测修正
+            DeferredRegister.create(Registries.ITEM, LittleMaidMoreAction.MOD_ID);
 //?}
 
 //? if 1.20.1 {

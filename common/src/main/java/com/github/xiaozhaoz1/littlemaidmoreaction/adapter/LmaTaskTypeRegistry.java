@@ -3,6 +3,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.adapter;
 import com.github.tartaricacid.touhoulittlemaid.api.task.IMaidTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.task.TaskManager;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskTypeUid;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;

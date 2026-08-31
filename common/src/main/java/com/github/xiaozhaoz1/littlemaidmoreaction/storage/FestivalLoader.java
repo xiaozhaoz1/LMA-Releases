@@ -72,13 +72,18 @@ public final class FestivalLoader {
                     // 逐条容错 (审计 B2): 用户手改坏一个条目不应让全部节日静默失效
                     try {
                         JsonObject o = el.getAsJsonObject();
+                        java.util.List<String> foods = new java.util.ArrayList<>();
+                        if (o.has("foods")) {
+                            for (var fe : o.getAsJsonArray("foods")) foods.add(fe.getAsString());
+                        }
                         list.add(new FestivalTable.Festival(
                                 o.get("id").getAsString(),
                                 o.get("name").getAsString(),
                                 o.get("month").getAsInt(),
                                 o.get("day").getAsInt(),
                                 o.has("text") ? o.get("text").getAsString() : "",
-                                o.has("lunar") && o.get("lunar").getAsBoolean()));  // 缺省 false (兼容旧 json)
+                                o.has("lunar") && o.get("lunar").getAsBoolean(),
+                                foods));  // v79.62 节日礼物食物表
                     } catch (Exception ignored) {
                         // 坏条目跳过, 其余节日保留
                     }

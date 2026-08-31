@@ -11,11 +11,10 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskStateManager;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.HarvestTarget;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ItemFilters;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.MaidFavorability;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.ToolJudge;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ToolJudge;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ToolStateReader;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ConnectedBlockSearch;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -155,6 +154,20 @@ public final class ChainHarvestExecute {
         return ItemFilters.isAllowed(state, lists.get(0), lists.get(1));
     }
 
+    /** v79.62.2 矿裸露判定: 6 邻面 (上下左右前后) 至少 1 面空气/流体 — 全实心包夹 = 不裸露 */
+    static boolean exposedToAir(ServerLevel world, BlockPos pos) {
+        BlockPos[] neighbors = {
+                pos.above(), pos.below(),
+                pos.north(), pos.south(), pos.east(), pos.west()
+        };
+        for (BlockPos n : neighbors) {
+            if (!world.hasChunk(n.getX() >> 4, n.getZ() >> 4)) continue;
+            BlockState ns = world.getBlockState(n);
+            if (ns.isAir() || !ns.getFluidState().isEmpty()) return true;
+        }
+        return false;
+    }
+
     private ChainHarvestExecute() {}
 
     // ── 主流程: 每 tick 执行 ──
@@ -162,7 +175,8 @@ public final class ChainHarvestExecute {
     /** TaskRegistry.TaskExecutor 入口 */
     public static TaskResult execute(ServerLevel world, EntityMaid maid, BlockPos pos,
                                      CompoundTag data, Mode mode) {
-        if (TaskStateManager.isCancelled(maid)) return TaskResult.FAILED;
+        // isCancelled 防御已删 (2026-08-16 实证: cancel 同帧 clearAll, FLOW_STATE 零残留
+        // 不跨 tick — 原不可达; 下方 flow 防御 (错题 #124 防线) 已覆盖终结后路径)
         // 防御 — 任务已终结/未挂载 (clearAll 后 getTask 空, 或非本模式) →
         // 不执行扫描/寻路 (覆盖 IExecutor 直调路径 — 绕过 TaskStateMachine.tick 的入口;
         // 错题 #124 同类)
@@ -223,8 +237,13 @@ public final class ChainHarvestExecute {
         }
 
         BlockState state = world.getBlockState(pos);
+        // v79.62.2 修「脚下矿一直在一个点看」: 脚下矿若 tryStartVein 失败已进跳过集 —
+        // 但本处每 tick 重新 matches 不查跳过集 → 失败矿永远被优先尝试 → 卡住.
+        // 加跳过集检查: 脚下矿在跳过集 → 不走 tryStartVein, 走 idleScan 找别的目标.
         if (target.matches(state) && allowed(maid, state)) {
-            return tryStartVein(world, maid, pos, data, target, tool);
+            if (!st.skipped.contains(pos.asLong())) {
+                return tryStartVein(world, maid, pos, data, target, tool);
+            }
         }
         return ChainScan.idleScan(world, maid, data, target, tool, false);
     }
@@ -237,14 +256,14 @@ public final class ChainHarvestExecute {
         BlockState state = world.getBlockState(pos);
 
         if (skip.contains(pos.asLong()) || !allowed(maid, state)) {
-            // v79.56 (错题 #184): 已跳过不刷新时间戳 — 原每 tick addSkip → expire 永 false →
-            // TTL 失效 → 目标永久跳过 (用户实测 "跳过集不能正常工作"); 已跳过也不 immediate
-            // 重扫 (60t 内全被过滤, immediate 绕过节流 = 每 tick 全量扫描风暴)
+            // v79.62.2 修「一直回一个点」: 原失败递归 idleScan(firstFail=immediate) → 找到
+            // 同一个不可达矿 → tryStartVein 又失败 → 又 idleScan 无限递归 (同 tick 循环).
+            // 改: 记跳过 (首次) + CONTINUE — 下 tick 自然重扫, 不递归 (对齐 failAndSkip 修法).
             boolean firstFail = !skip.contains(pos.asLong());
             if (firstFail) {
                 ChainScan.addSkip(st, pos.asLong(), world.getGameTime());
             }
-            return ChainScan.idleScan(world, maid, data, target, tool, firstFail);
+            return TaskResult.CONTINUE;
         }
 
         // 目标驱动换工具 — 先按方块合适类型换 (泥土→铲/矿→镐/树→斧)
@@ -264,6 +283,11 @@ public final class ChainHarvestExecute {
         }
         if (!target.validAt(world, pos)) {
             // WOOD 非天然树 (CHAIN_WOOD_NATURE_CHECK) — 防拆建筑, 设计静默
+            return ChainScan.failAndSkip(st, pos, world, maid, data, target, tool);
+        }
+        // v79.62.2 用户裁定: 矿必须裸露才挖 — 6 邻面 (上下左右前后) 至少 1 面空气,
+        // 否则进跳过集 (脚下被泥土全包的矿 → 跳过, 防女仆一直看挖不到).
+        if (!exposedToAir(world, pos)) {
             return ChainScan.failAndSkip(st, pos, world, maid, data, target, tool);
         }
 
@@ -316,7 +340,8 @@ public final class ChainHarvestExecute {
                 vein = vein.subList(0, cropped);
             }
             if (vein.isEmpty()) {
-                return ChainScan.idleScan(world, maid, data, target, tool, true);
+                // v79.62.2 修「一直回一个点」: 原递归 idleScan(true) 无限循环 — 改 CONTINUE
+                return TaskResult.CONTINUE;
             }
         }
 

@@ -47,6 +47,10 @@ public final class TamedMilkBucketItem extends Item {
     @Override
     public ItemStack finishUsingItem(ItemStack stack, Level level, LivingEntity entity) {
         if (!level.isClientSide && entity instanceof Player player) {
+            // 清负面 (共用开关, 默认开; 必须先清后加 — removeAllEffects 会连刚加的正面 buff 一起删)
+            if (WildKitsuneMilkConfig.CLEAR_NEGATIVE.get()) {
+                player.removeAllEffects();
+            }
             int resistance = WildKitsuneMilkConfig.TAMED_RESISTANCE_TICKS.get();
             int regen = WildKitsuneMilkConfig.TAMED_REGENERATION_TICKS.get();
             player.addEffect(new MobEffectInstance(MobEffects.DAMAGE_RESISTANCE, resistance, 1)); // II

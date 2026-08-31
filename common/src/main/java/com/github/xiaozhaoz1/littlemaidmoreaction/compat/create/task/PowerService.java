@@ -56,6 +56,30 @@ public final class PowerService {
         return null;
     }
 
+    /** 螺旋序收集全部目标动能方块 (近→远, v79.61x — 跳过集"换目标"用) */
+    public static java.util.List<BlockPos> findTargets(Level level, BlockPos center) {
+        java.util.List<BlockPos> found = new java.util.ArrayList<>();
+        for (int dr = 0; dr <= SEARCH_RANGE; dr++) {
+            for (int dx = -dr; dx <= dr; dx++) {
+                for (int dz = -dr; dz <= dr; dz++) {
+                    if (Math.abs(dx) != dr && Math.abs(dz) != dr) continue;
+                    BlockPos pos = center.offset(dx, 0, dz);
+                    for (int dy = -1; dy <= 1; dy++) {
+                        BlockPos p = pos.offset(0, dy, 0);
+                        BlockState state = level.getBlockState(p);
+                        if (isTargetBlock(state.getBlock())) {
+                            BlockEntity be = level.getBlockEntity(p);
+                            if (be instanceof KineticBlockEntity) {
+                                found.add(p.immutable());
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return found;
+    }
+
     /** 检查是否为目标方块类型 */
     public static boolean isTargetBlock(Block block) {
         for (Class<? extends Block> clazz : TARGET_BLOCKS) {

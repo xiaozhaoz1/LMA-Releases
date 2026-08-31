@@ -3,7 +3,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.task.behavior;
 import com.github.tartaricacid.touhoulittlemaid.entity.ai.brain.task.MaidCheckRateTask;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.google.common.collect.ImmutableMap;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.NearbyContainerService;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.container.NearbyContainerScanner;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.container.WirelessChestSpace;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.InteractionHand;
@@ -66,7 +66,7 @@ public class NearbyCollectBehavior extends MaidCheckRateTask {
     protected void start(ServerLevel level, EntityMaid maid, long gameTime) {
         Predicate<ItemStack> filter = filterProvider.apply(maid);
         if (filter == null) return;
-        ItemStack taken = NearbyContainerService.extractItem(
+        ItemStack taken = NearbyContainerScanner.extractItem(
             level, maid.blockPosition(), radius, filter, containerBlocks, includeWireless, maid);
         if (!taken.isEmpty()) putItem(maid, taken, level);
     }
