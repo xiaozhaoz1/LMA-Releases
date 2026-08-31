@@ -48,6 +48,7 @@
   "gui.littlemaidmoreaction.config.detail": "详细设置",
   "gui.littlemaidmoreaction.config.cloth_missing": "§c需要安装 Cloth Config 才能打开详细设置",
   "gui.littlemaidmoreaction.config.task_tree": "任务树",
+  "gui.littlemaidmoreaction.config.quest_tree": "成就树",
   "gui.littlemaidmoreaction.config.compat": "兼容模块",
   "gui.littlemaidmoreaction.config.debug": "调试: %s",
   "gui.littlemaidmoreaction.config.done": "完成",

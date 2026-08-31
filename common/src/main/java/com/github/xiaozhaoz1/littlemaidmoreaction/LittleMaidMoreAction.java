@@ -152,6 +152,22 @@ public final class LittleMaidMoreAction {
         MinecraftForge.EVENT_BUS.addListener((com.github.tartaricacid.touhoulittlemaid.api.event.client.DefaultGeckoAnimationEvent event)
                 -> com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationResourceRegistrar.registerCustomAnimations(event));
 
+        // 主人成就完成感知 (v79.63 用户裁定: 事件直连反应) — AdvancementEarnEvent 双平台同名,
+        // 差异只在取 id: 1.20.1 getAdvancement() 返回 Advancement / 1.21.1 返回 AdvancementHolder
+        // (stonecutter 条件化; 禁 modBus 注册 — 该事件非 IModBusEvent, 同 DefaultGecko 教训)
+        MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.event.entity.player.AdvancementEvent.AdvancementEarnEvent event) -> {
+            if (!(event.getEntity() instanceof net.minecraft.server.level.ServerPlayer player)) return;
+            net.minecraft.server.level.ServerLevel level =
+                    (net.minecraft.server.level.ServerLevel) player.level();
+            //? if 1.20.1 {
+            String advancementId = event.getAdvancement().getId().toString();
+            //?} else {
+            String advancementId = event.getAdvancement().id().toString();
+            //?}
+            com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSenseBroadcaster
+                    .onPlayerAdvancement(level, player, advancementId);
+        });
+
         MinecraftForge.EVENT_BUS.register(this);
     }
 

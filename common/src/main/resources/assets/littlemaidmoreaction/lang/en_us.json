@@ -52,6 +52,7 @@
   "gui.littlemaidmoreaction.config.cloth_missing": "§cCloth Config is required for detailed settings",
   "gui.littlemaidmoreaction.config.debug": "Debug: %s",
   "gui.littlemaidmoreaction.config.task_tree": "Task Tree",
+  "gui.littlemaidmoreaction.config.quest_tree": "Quest Tree",
   "gui.littlemaidmoreaction.config.compat": "Compat Modules",
   "gui.littlemaidmoreaction.config.done": "Done",
   "screen.littlemaidmoreaction.compat": "Compat Modules",

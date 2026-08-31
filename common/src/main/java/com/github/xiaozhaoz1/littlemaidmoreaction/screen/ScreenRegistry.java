@@ -68,6 +68,10 @@ public final class ScreenRegistry {
         registerConfigButton("task_tree",
                 Component.translatable("gui.littlemaidmoreaction.config.task_tree"),
                 (btn, parent) -> Minecraft.getInstance().setScreen(new TaskTreeScreen(parent)));
+        // 成就树入口 (v79.63: 复刻 FTB Quests 任务树, 数据=原版成就, 自动布局)
+        registerConfigButton("quest_tree",
+                Component.translatable("gui.littlemaidmoreaction.config.quest_tree"),
+                (btn, parent) -> Minecraft.getInstance().setScreen(new LmaQuestScreen(parent)));
         // 女仆独立选择入口 (独立屏, 非 TLM 容器屏)
         registerConfigButton("maid_list",
                 Component.translatable("gui.littlemaidmoreaction.maid_list.button"),

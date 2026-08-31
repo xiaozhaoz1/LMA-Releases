@@ -31,7 +31,7 @@ public final class TaskTree {
                     : net.minecraft.network.chat.Component.translatable(
                             "task." + com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.MOD_ID + "." + taskType)
                         .getString();
-            if (label.startsWith("task.") || label.equals(taskType)) {
+            if ((label.startsWith("task.") || label.equals(taskType)) && pipeline != null) {
                 label = pipeline.getClass().getSimpleName().replace("Pipeline", "");
             }
             List<TaskPipeline.TaskStep> steps = pipeline == null ? List.of() : pipeline.steps();

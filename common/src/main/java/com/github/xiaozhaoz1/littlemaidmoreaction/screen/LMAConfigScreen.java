@@ -29,14 +29,15 @@ public final class LMAConfigScreen extends Screen {
         // 去 TLM 棕面板 — 按钮组直接浮全景上, 居中排列 (6 按钮 × 28 间距)
         int y = this.height / 2 - 75;
 
-        // 按钮表枚举 — 常规列 160×20 (y+idx*28), done 条目按 name 独立定位 (80×20, y+140)
-        // (name 判定而非末位 — 外部 registerConfigButton 追加不挤乱 done 独立位)
+        // 按钮表枚举 — 常规列 160×20 (y+idx*28), done 条目按 name 独立定位 (80×20, y+170)
+        // (name 判定而非末位 — 外部 registerConfigButton 追加不挤乱 done 独立位;
+        //  v79.63: 7 按钮后 debug(i=5)=y+140 与 done 重叠 → done 下移到 y+170)
         var buttons = ScreenRegistry.configButtons();
         for (int i = 0; i < buttons.size(); i++) {
             ScreenRegistry.ConfigButton spec = buttons.get(i);
             boolean done = "done".equals(spec.name());
             int bx = done ? cx - 40 : cx - 80;
-            int by = done ? y + 140 : y + i * 28;
+            int by = done ? y + 170 : y + i * 28;
             this.addRenderableWidget(Button.builder(spec.title(),
                     btn -> spec.onPress().accept(btn, this))
                     .pos(bx, by).size(done ? 80 : 160, 20).build());

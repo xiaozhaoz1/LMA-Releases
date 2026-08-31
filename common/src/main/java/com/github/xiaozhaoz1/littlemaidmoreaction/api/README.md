@@ -6,7 +6,7 @@
 
 **依赖方向**: 可依赖全部下层; 被外部 mod 依赖 (扩展面 = 契约, 改动即破坏)。
 
-**代表**: LMAT (任务统一入口) / SenseApi / PathingApi / MaidChatBubbleApi / MaidEmojiApi / TaskResult
+**代表**: LMAT (任务统一入口) / SenseApi / PathingApi / MaidChatBubbleApi / MaidEmojiApi / TaskResult / **AdvancementSenseApi** (主人成就完成感知 — 事件直连反应: registerReaction 通配/精确, fire 触发; 见类 javadoc)
 
 **规划注意 (体检发现)**: 本包不止门面 — 还混了域模型 (RuleContext/InventoryReaderProvider) 与动画域 (AnimationDurationManager/AnimationResourceRegistrar)。新增类先问: 是门面还是域模型? 域模型该去对应领域包。
 

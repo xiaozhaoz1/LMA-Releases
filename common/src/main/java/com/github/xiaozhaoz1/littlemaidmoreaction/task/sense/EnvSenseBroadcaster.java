@@ -347,6 +347,35 @@ public final class EnvSenseBroadcaster {
         PENDING.add(new PendingSignal(maid, signalId));
     }
 
+    // ── 主人成就完成感知 (v79.63 用户裁定: 事件直连反应, 不走 env: 信号) ──
+
+    /**
+     * 主人成就完成入口 — 由 {@code AdvancementEarnEvent} 监听层回调 (双平台差异在监听层消化)。
+     * 对玩家附近所有契约女仆触发 {@code AdvancementSenseApi} 反应链 (精确 id + 通配叠加)。
+     *
+     * <p>零 tick 开销 (事件驱动, 完成瞬间); 附近女仆半径复用 {@code ENV_DEFAULT_RADIUS} (不新增配置)。
+     */
+    public static void onPlayerAdvancement(ServerLevel level,
+                                           net.minecraft.server.level.ServerPlayer player,
+                                           String advancementId) {
+        if (level == null || player == null || advancementId == null || advancementId.isEmpty()) return;
+        List<EntityMaid> maids = collectOwnerMaids(level, player, PassiveTaskConfig.ENV_DEFAULT_RADIUS.get());
+        if (maids.isEmpty()) return;
+        for (EntityMaid maid : maids) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.api.AdvancementSenseApi.fire(level, maid, advancementId);
+        }
+    }
+
+    /** 玩家附近所有契约女仆 (主人匹配 + 存活; 复用稀有群系谓词语义 — 事件反应要发给全部, 不是选 1) */
+    private static List<EntityMaid> collectOwnerMaids(ServerLevel level,
+                                                      net.minecraft.server.level.ServerPlayer player,
+                                                      int radius) {
+        java.util.UUID owner = player.getUUID();
+        net.minecraft.world.phys.AABB box = new net.minecraft.world.phys.AABB(player.blockPosition()).inflate(radius);
+        return new java.util.ArrayList<>(level.getEntitiesOfClass(EntityMaid.class, box,
+                m -> m.isAlive() && owner.equals(m.getOwnerUUID())));
+    }
+
     /** 分发瞬态队列 — 统一走被动管线分发 (v77.4 后无 event: 前缀路由; 无快照也分发, 管线自行容错) */
     private static void flushPending(Map<String, Set<String>> needsCache) {
         PendingSignal p;
