@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (neo 全绿; forge 这轮暴露同族另两个 — 已记入基线行"flaky 家族 + 长期正解=轮询到截止" ✓)
 ### 验证
 双编译 ✓ · 单测 **88 类 557 用例 0 失败** ✓ (部署前门禁) · jar 内 `version = "0.9.74"` + 透明 PNG + 配方 +
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 ## 0.9.73 (2026-09-18) — 新功能: Token (可食用 · 女仆饰品)
 
 ### Added
@@ -39,6 +40,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **单测 `TokenSpecGuardTest`** (3 例): 效果数值常量 / 配方(形状 8 格环 + 空中心 + 青金石 + 产出 16 + 双平台目录与 result 格式) / 资源三件套 ✓
 ### 验证
 双编译 ✓ · 单测 **88 类 557 用例 0 失败** ✓ · gametest **117 例**(forge/neo 均仅既有 flaky 红:
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 `lmachainoreneighbourchunk` / `lmavoidexcavationmultimaid`) ✓ · jar 内 recipe/png/model/handler 齐 ✓ · 部署 `.bak-0917x` ✓
 ## 0.9.72 (2026-09-18) — 修「应力配置改了但读数不变」: 写 BE 字段 ≠ 生效, 必须 dirty 动能网络
 
@@ -61,6 +63,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 验证 (0.9.72)
 双编译 ✓ · 单测 **87 类 554 用例 0 失败 0 错误** ✓ · gametest **forge 116/116 全绿** ✓ · neo 仅既有 flaky
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 `lmavoidexcavationmultimaid` 红 (与本改动无关) · jar 内 `version = "0.9.72"` ✓ · 部署 `.bak-0917o` + md5 双端一致 ✓
 
 
@@ -109,6 +112,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### 验证 (0.9.71)
 双编译 ✓ · 单测 **87 类 554 用例 0 失败 0 错误** ✓ · gametest **forge 116/116 全绿** ✓ ·
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 neo 116 例仅 `lmavoidexcavationmultimaid` 红 = **既有 flaky** (与本改动无关: 同提交 forge 全绿) ✓ ·
 jar 内 `version = "0.9.71"` + 动画仅 haqi/maimeng ✓ · 部署 `.bak-0917n` + md5 双端一致 ✓
 
@@ -138,6 +142,7 @@ jar 内 `version = "0.9.71"` + 动画仅 haqi/maimeng ✓ · 部署 `.bak-0917n`
 
 ### 验证 (0.9.70)
 双编译 ✓ · 单测 **87 类 554 用例 0 失败 0 错误 0 跳过** ✓ · gametest **forge 115/115 · neoforge 115/115** ✓ ·
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 逐节点 clean+jar ✓ · jar 内 `version = "0.9.70"` + 动画仅 `haqi`/`maimeng` ✓ · 部署 `.bak-0917m` + md5 双端一致 ✓
 
 ### ⚠ 已知未修 (根因已查明, 见错题 #357)
@@ -170,6 +175,7 @@ jar 内 `version = "0.9.71"` + 动画仅 haqi/maimeng ✓ · 部署 `.bak-0917n`
 
 ### 验证 (0.9.69)
 双编译 ✓ · 单测 **86 类 550 用例 0 失败 0 跳过** ✓ · gametest **forge 114/114 · neoforge 114/114 全绿** ✓ ·
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 逐节点 clean+jar ✓ · jar 内 `version = "0.9.69"` + 反编译确认兜底代码在位 ✓ · 部署 `.bak-0917l` + md5 双端一致 ✓
 
 ## 0.9.68 (2026-09-17) — 修「排水换桶把主手物品弄没」: 换手改走 HandSwap 保全链 (错题 #162 丢物品族第三处)
@@ -195,6 +201,7 @@ jar 内 `version = "0.9.71"` + 动画仅 haqi/maimeng ✓ · 部署 `.bak-0917n`
 
 ### 验证 (0.9.68)
 双编译 ✓ · 单测 **86 类 550 用例 0 失败 0 跳过** ✓ · gametest **forge 114/114 · neoforge 114/114** ✓
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 (新用例双平台达成 20t; forge 另 1 例 `lmafarmplant` 为既有 flaky) · 逐节点 clean+jar ✓ ·
 jar 内 `version = "0.9.68"` ✓ · 部署 `.bak-0917k` + md5 双端一致 ✓
 
@@ -228,6 +235,7 @@ jar 内 `version = "0.9.68"` ✓ · 部署 `.bak-0917k` + md5 双端一致 ✓
 
 ### 验证 (0.9.67)
 双编译 ✓ · 单测 **85 类 549 用例 0 失败** ✓ · gametest **forge 113/113 + neoforge 113/113 全绿** ✓
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 (实测日志: `[VOID] min_y=-59 不低于标记层 start.y=-59 ⇒ 无可挖层, 已自愈为自动检测基岩层` ✓) ·
 逐节点 clean+jar ✓ · jar 内 `version = "0.9.67"` ✓ · 部署 `.bak-0917j` + md5 双端一致 ✓
 
@@ -257,6 +265,7 @@ jar 内 `version = "0.9.68"` ✓ · 部署 `.bak-0917k` + md5 双端一致 ✓
 
 ### 验证 (0.9.66)
 双编译 ✓ · 单测 **85 类 549 用例 0 失败** ✓ · gametest **forge 112/112 + neoforge 112/112 全绿** ✓
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 (实测日志: `[VOID-LAND] 第一层检查: 挖净传送落点 88,-58,200 (头位)` → `88,-59,200 (本体)`, 女仆在 93,-57,200 未受伤 ✓) ·
 逐节点 clean+jar ✓ · jar 内 `version = "0.9.66"` ✓ · 部署 `.bak-0917i` + md5 双端一致 ✓
 
@@ -293,6 +302,7 @@ jar 内 `version = "0.9.68"` ✓ · 部署 `.bak-0917k` + md5 双端一致 ✓
 
 ### 验证 (0.9.64.4 部署时实测 — 该版本内容已并入 0.9.65, 见本节顶部「版本说明」)
 双编译 ✓ · 单测 **85 类 549 用例 0 失败** ✓ · gametest **forge 111/111 + neoforge 111/111 全绿** ✓ ·
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 逐节点 clean+jar ✓ · jar 内 `version = "0.9.64.4"` ✓ · 部署 `.bak-0917g` + md5 双端一致 ✓
 
 ## 0.9.64.3 (2026-09-17) — 右键绑定**全量审计**: 另修 2 处手工 BlockPos 解析 (统一 NbtCodecs) (已部署双平台)
@@ -311,6 +321,7 @@ jar 内 `version = "0.9.68"` ✓ · 部署 `.bak-0917k` + md5 双端一致 ✓
 
 ### 验证 (0.9.64.3)
 双编译 ✓ · 单测 **84 类 547 用例 0 失败** ✓ · gametest **forge 111/111 + neoforge 111/111 全绿** ✓ ·
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 逐节点 clean+jar ✓ · jar 内 `version = "0.9.64.3"` ✓ · 部署 `.bak-0917f` + md5 双端一致 ✓
 
 ## 0.9.64.2 (2026-09-17) — 补丁: **修「右键交互绑定后方块信息丢失」** (木棍标记读写不对称) (已部署双平台)
@@ -337,6 +348,7 @@ jar 内 `version = "0.9.68"` ✓ · 部署 `.bak-0917k` + md5 双端一致 ✓
 
 ### 验证 (0.9.64.2)
 双编译 ✓ · 单测 **84 类 547 用例 0 失败** ✓ · gametest **111/111** (forge ✓ / neo 连跑 2 轮全绿 ✓) ·
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 逐节点 clean+jar ✓ · jar 内 `version = "0.9.64.2"` + lang 已打包 ✓ · 部署 `.bak-0917e` + md5 双端一致 ✓
 
 ## 0.9.64.1 (2026-09-17) — 补丁: **修崩服** (老农场区域导入递归) + 右键交互屏标签重叠 (已部署双平台)
@@ -356,6 +368,7 @@ jar 内 `version = "0.9.68"` ✓ · 部署 `.bak-0917k` + md5 双端一致 ✓
 
 ### 验证 (0.9.64.1)
 双编译 ✓ · 单测 83 类 544 用例 0 失败 ✓ · gametest **111/111** (forge ✓ / **neo 连跑 3 轮全绿** ✓; 其中新增 z_legacy 用例实测
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 `区域数=1 首区=1,2,3` = 导入正确执行且**无栈溢出** ✓) · 逐节点 clean+jar ✓ · jar 内 `version = "0.9.64.1"` ✓ ·
 部署 `.bak-0917d` + md5 双端一致 ✓
 
@@ -395,6 +408,7 @@ gametest **forge 110/110 ×3 轮 + neoforge 110/110 ×3 轮全绿** ✓ · 逐�
 
 ### 验证 (2026-09-17)
 双编译 ✓ · 单测 **83 类 544 用例 0 失败** ✓ · gametest **forge 110/110 ×3 轮** + **neo 110/110 ×3 轮** (全绿, 此前每次 1-3 例 flaky) ✓ ·
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 达成耗时更快 (跨区块 40t / 远矿 60t / 近远 60t) ✓ · 逐节点 clean+jar ✓ · 部署 `.bak-0917b` + md5 双端一致 ✓
 
 ## 0.9.63 / v79.63.25 (2026-09-17) — 引擎护栏用例**抗自动复活**修复 (治偶发假红) (已部署双平台)
@@ -413,6 +427,7 @@ gametest **forge 110/110 ×3 轮 + neoforge 110/110 ×3 轮全绿** ✓ · 逐�
 
 ### 验证
 双编译 ✓ · 单测 83 类 544 用例 0 失败 ✓ · gametest **neo 连跑 3 轮 panic 用例全绿** ✓ · 逐节点 clean+jar ✓ · 部署 `.bak-0917a` + md5 双端一致 ✓
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 
 ## 0.9.63 / v79.63.24 (2026-09-17) — 采矿用例**条件轮询**改造 (治时序 flaky) + gametest 口径修正 (已部署双平台)
 
@@ -434,6 +449,7 @@ gametest **forge 110/110 ×3 轮 + neoforge 110/110 ×3 轮全绿** ✓ · 逐�
 
 ### 验证 (2026-09-17)
 双编译 ✓ · 单测 **83 类 544 用例 0 失败** ✓ · gametest **forge 110/110** ✓ / **neo 110/110** ✓
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 (中间轮 neo 曾 1 例 `lmaenginepanicisolation` 红 = 既有 flaky, 非采矿) · 逐节点 clean+jar ✓ · 部署 `.bak-0916s` + md5 双端一致 ✓
 
 ## 0.9.63 / v79.63.23 (2026-09-16) — 作物区域改存**女仆 NBT** (对齐 TLM) + 记维度 / 老文件一次性导入 (已部署双平台)
@@ -462,6 +478,7 @@ gametest **forge 110/110 ×3 轮 + neoforge 110/110 ×3 轮全绿** ✓ · 逐�
 
 ### 验证 (2026-09-16 实测)
 双编译 ✓ · 单测 **83 类 544 用例 0 失败** ✓ (旧 uuid 版 6 例退役, 新纯函数 8 例) ·
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `release-0.9.74/` ✓
 gametest **forge 111/111** ✓ / neo 111 跑满 3 例 (2 塔视线 + 1 既有 flake `lmachainorenearbeforefar`) ✓ ·
 逐节点 clean+jar ✓ · 5b 双平台 (新类在位/旧类零残留/dimension+findMaid 在位/forge SRG 10-31 抽样正常) ✓ · 部署 `.bak-0916q` + md5 双端一致 ✓
 
