@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (neo 全绿; forge 这轮暴露同族另两个 — 已记入基线行"flaky 家族 + 长期正解=轮询到截止" ✓)
 ### 验证
 双编译 ✓ · 单测 **88 类 557 用例 0 失败** ✓ (部署前门禁) · jar 内 `version = "0.9.74"` + 透明 PNG + 配方 +
-Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `D:\claudecode\release-0.9.74\` ✓
+$LINE
 ## 0.9.73 (2026-09-18) — 新功能: Token (可食用 · 女仆饰品)
 
 ### Added
