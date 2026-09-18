@@ -38,54 +38,56 @@ public class BlockInteractConfigScreen extends LmaTaskConfigScreen<BlockInteract
 
     // ── initAdditionWidgets: 请求配置 + 添加按钮 (TLM 标准钩子; renderBg 基类默认委托) ──
 
+    /**
+     * 布局 (规范 v79.63.8 + **标签/控件分行** — 修用户实测"标签重叠" ✗):
+     * 行0 绑定方块标签 (renderAddition 写值) · 行1 定时间隔标签 · 行2 定时开关 (满宽) · 行3 间隔 ± 步进 (四等分) · 行4 清除绑定。
+     *
+     * <p>⚠ 原实现把标签画在 row0/row1、按钮也放 row0/row1 ⇒ **同排重叠** (错题 #331 第 7 条同款) ✗
+     * ⇒ 标签独占行, 控件整体下移 (挂钟屏同规范)。
+     */
     @Override
     protected void initAdditionWidgets() {
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), getTaskType());
 
-        int cx = contentX();
-        int y = contentY();
+        int rowW = contentRight() - contentX();
+        int rowX = contentX();
 
-        timerToggleBtn = Button.builder(getTimerLabel(), btn -> {
+        timerToggleBtn = tipBtn(getTimerLabel(), rowX, rowY(2) - 2, rowW, () -> {
             CompoundTag cfg = getMenu().getConfig();
             boolean cur = cfg.getBoolean(BlockInteractPipeline.KEY_TIMER_ENABLED);
             cfg.putBoolean(BlockInteractPipeline.KEY_TIMER_ENABLED, !cur);
             sendToggle(BlockInteractPipeline.KEY_TIMER_ENABLED);
-        }).pos(cx, y).size(80, 20).build();
+        }, Component.translatable("screen.littlemaidmoreaction.bi.timer.tip"));
         addRenderableWidget(timerToggleBtn);
 
-        y += 22;
-        int bx = cx;
-        addRenderableWidget(Button.builder(Component.literal("-10"),
-            btn -> changeInterval(m, -10)).pos(bx, y).size(30, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("-1"),
-            btn -> changeInterval(m, -1)).pos(bx + 34, y).size(25, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("+1"),
-            btn -> changeInterval(m, +1)).pos(bx + 64, y).size(25, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("+10"),
-            btn -> changeInterval(m, +10)).pos(bx + 94, y).size(30, 20).build());
+        int w1 = rowW / 4;
+        int y1 = rowY(3) - 2;   // v79.64.1: 原 row1 与标签同行 ⇒ 下移到 row3
+        addRenderableWidget(tipBtn(Component.literal("-10"), rowX, y1, w1, () -> changeInterval(m, -10),
+                Component.translatable("screen.littlemaidmoreaction.bi.interval.tip")));
+        addRenderableWidget(tipBtn(Component.literal("-1"), rowX + w1, y1, w1, () -> changeInterval(m, -1),
+                Component.translatable("screen.littlemaidmoreaction.bi.interval.tip")));
+        addRenderableWidget(tipBtn(Component.literal("+1"), rowX + w1 * 2, y1, w1, () -> changeInterval(m, +1),
+                Component.translatable("screen.littlemaidmoreaction.bi.interval.tip")));
+        addRenderableWidget(tipBtn(Component.literal("+10"), rowX + w1 * 3, y1, rowW - w1 * 3,
+                () -> changeInterval(m, +10),
+                Component.translatable("screen.littlemaidmoreaction.bi.interval.tip")));
 
-        y += 24;
-        addRenderableWidget(Button.builder(Component.literal("§c清除绑定"), btn -> {
-            getMenu().getConfig().remove(BlockInteractPipeline.KEY_POS);
-            sendRemove(BlockInteractPipeline.KEY_POS);
-        }).pos(cx, y).size(80, 20).build());
+        addRenderableWidget(tipBtn(Component.translatable("screen.littlemaidmoreaction.bi.clear"),
+                rowX, rowY(4) - 2, rowW, () -> {
+                    getMenu().getConfig().remove(BlockInteractPipeline.KEY_POS);
+                    sendRemove(BlockInteractPipeline.KEY_POS);
+                }, Component.translatable("screen.littlemaidmoreaction.bi.clear.tip")));
     }
 
-    // ── renderAddition: 从 menu.config 渲染文字 (TLM 标准钩子) ──
-
+    /** 标签: 行0 = 当前绑定方块 · 行1 = 当前定时间隔 (控件在 row2/3/4, **不同行 ⇒ 不再重叠** ✓) */
     @Override
     protected void renderAddition(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
         CompoundTag cfg = getMenu().getConfig();
-        int cx = contentX();
-        int y = topPos + 100;
-        g.drawString(font, Component.literal("绑定: " + getPosText(cfg)), cx, y, 0xFFFFFF);
-        y += 14;
         int interval = cfg.getInt(BlockInteractPipeline.KEY_TIMER_INTERVAL);
         if (interval <= 0) interval = ActiveTaskConfig.BI_TIMER_DEFAULT_INTERVAL.get();
-        g.drawString(font, Component.literal("间隔: " + interval + " tick"), cx, y, 0xFFFFFF);
-        y += 14;
-        g.drawString(font, Component.literal("按键: 默认 0 (选项→控制)"), cx, y, 0xAAAAAA);
+        drawLabel(g, Component.translatable("screen.littlemaidmoreaction.bi.bound", getPosText(cfg)), 0);
+        drawLabel(g, Component.translatable("screen.littlemaidmoreaction.bi.interval_label", interval), 1);
         timerToggleBtn.setMessage(getTimerLabel());
     }
 
@@ -106,12 +108,10 @@ public class BlockInteractConfigScreen extends LmaTaskConfigScreen<BlockInteract
     }
 
     private String getPosText(CompoundTag cfg) {
-        if (!cfg.contains(BlockInteractPipeline.KEY_POS)) return "未绑定";
-//? if 1.20.1 {
-        BlockPos pos = NbtUtils.readBlockPos(cfg.getCompound(BlockInteractPipeline.KEY_POS));
-//?} else {
-        BlockPos pos = BlockPos.of(cfg.getCompound(BlockInteractPipeline.KEY_POS).getLong("pos"));
-//?}
-        return pos.toShortString();
+        // ★ v79.64.3: 统一 NbtCodecs (单一真相源) — 原手工解析对坏数据会显示 "0, 0, 0" 而非"未绑定" ✗
+        BlockPos pos = com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs
+                .readBlockPos(cfg, BlockInteractPipeline.KEY_POS);
+        return pos == null ? Component.translatable("screen.littlemaidmoreaction.bi.unbound").getString()
+                : pos.toShortString();
     }
 }

@@ -34,9 +34,9 @@ public final class HeatSourceQuery {
      */
     public static BlockPos nearestHeatSource(ServerLevel world, BlockPos center, int radius) {
         List<BlockPos> candidates = new ArrayList<>();
-        for (BlockPos p : com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.BlockPatternCache
+        for (BlockPos p : com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache
                 .scanBlocks(world, center, radius,
-                        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.BlockPatternCache.PatternType.HEAT)) {
+                        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache.PatternType.HEAT)) {
             if (isHeatSource(world.getBlockState(p))) {
                 candidates.add(p);
             }

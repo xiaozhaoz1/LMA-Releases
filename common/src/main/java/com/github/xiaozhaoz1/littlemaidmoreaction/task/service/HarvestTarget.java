@@ -36,7 +36,9 @@ public abstract class HarvestTarget {
     public static final HarvestTarget ORE = new OreTarget();
 
     private static final int NATURE_CHECK_MAX_LOGS = 100;
-    public static final int TOOL_RESERVE_DURABILITY = 1;
+    /** v79.62.4 用户裁定: 工具可用 = 剩余耐久 > 0 (原 reserve=1 是为保护玩家珍惜工具的修复
+     *  预留; 女仆工具一次性消耗, 用坏直接消失自动换 — 剩余 1 点也允许挖最后 1 块) */
+    public static final int TOOL_RESERVE_DURABILITY = 0;
 
     /** 方块是否为本类型采集目标 */
     public abstract boolean matches(BlockState state);

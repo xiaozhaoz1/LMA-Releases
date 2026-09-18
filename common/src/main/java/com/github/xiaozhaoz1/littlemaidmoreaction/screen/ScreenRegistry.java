@@ -113,16 +113,28 @@ public final class ScreenRegistry {
 
     /** 打开入口 (有父屏上下文) — 未注册静默 (注册在 static init, 首用前必就绪) */
     public static void open(String name, Screen parent) {
+        ScreenLifecycleLog.requested(name);
         Function<Screen, Screen> opener = OPENERS.get(name);
         if (opener != null) {
-            Minecraft.getInstance().setScreen(opener.apply(parent));
+            Screen screen = opener.apply(parent);
+            ScreenLifecycleLog.constructed(name, screen);
+            Minecraft.getInstance().setScreen(screen);
+        } else {
+            ScreenLifecycleLog.openFailed(name);
         }
     }
 
     /** 打开入口工厂 (IConfigScreenFactory 用 — 返回新屏而非 setScreen); 未注册返回 null */
     public static Screen create(String name, Screen parent) {
+        ScreenLifecycleLog.requested(name);
         Function<Screen, Screen> opener = OPENERS.get(name);
-        return opener != null ? opener.apply(parent) : null;
+        if (opener == null) {
+            ScreenLifecycleLog.openFailed(name);
+            return null;
+        }
+        Screen screen = opener.apply(parent);
+        ScreenLifecycleLog.constructed(name, screen);
+        return screen;
     }
 
     /** 图鉴屏打开 (MaidCodexScreenPacket.opener 实现收敛于此 — 赋值点保留在双平台入口) */

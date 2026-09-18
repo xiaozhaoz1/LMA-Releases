@@ -34,14 +34,15 @@ public final class StartupLoader {
     static final Path CONFIG_DIR = LittleMaidMoreAction.CONFIG_DIR;
     static final Path ANIM_DIR = CONFIG_DIR.resolve("animations");
 
-    /** JAR 内置预设动画文件列表 — 按需扩展 */
-    private static final String[] ANIM_PRESETS = {
-            "execution.animation.json", "dodge.animation.json",
-            "taunt.animation.json", "parry.animation.json",
-            "man.animation.json", "ysm_slashblade.animation.json",
-            "haqi.animation.json", // 哈气动画 (ISS 注册 — TLM geckolib 模型播放; YSM 通道走模型包同名动画)
-            "maimeng.animation.json" // 对主人哈气动画 (YsmAnimInjector 同步注入 YSM 模型包)
-    };
+    /** JAR 内置预设动画文件列表 — 见 {@link com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationPresetNames#SHIPPED}。
+     *  <p>v79.70 精简 (用户裁定): 只保留**在用的两个** — 其余 6 个既无代码消费者、又随 TLM/GeckoLib
+     *  校验收紧而**崩溃** (dodge.animation.json 的 `animation.flash1` 关键帧非升序 ⇒
+     *  `Invalid keyframe data - multiple starting keyframes?`) ⇒ 见 {@code AnimationPresetNames#OBSOLETE}。 */
+    public static final java.util.List<String> ANIM_PRESETS =
+            com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationPresetNames.SHIPPED;
+
+    /** (v79.70) 废弃预设清单已在 {@link com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationPresetNames#syncConfigDir}
+     *  里**内联为"不在 JAR 就删"** — 见该类 javadoc (用户裁定: config 动画目录是 LMA 专属, 直接对照 JAR 清理) ✓ */
 
     // ★ SOUNDS DeferredRegister 已移至 init/LmaSounds.java
 
@@ -63,6 +64,7 @@ public final class StartupLoader {
             LittleMaidMoreAction.LOGGER.error("[LMA/Startup] 创建目录失败", e);
             return;
         }
+        syncConfigDir();   // ★ 必须先于 copy/scan: 清掉老存档残留的废弃预设 (畸形文件会崩 GeckoLib)
         copyPresetsFromJar();
         scanAnimations();
         LittleMaidMoreAction.LOGGER.info("[LMA/Startup] 加载完成 — {} 动画", animFiles.size());
@@ -74,9 +76,35 @@ public final class StartupLoader {
      */
     public static void reload() {
         LOADED.clear();
+        syncConfigDir();  // 资源重载也是清残留的时机 (玩家可能手动放回)
         copyPresetsFromJar();      // 检查是否有新预设需要复制
         scanAnimations();
         LittleMaidMoreAction.LOGGER.info("[LMA/Startup] 重载完成 — {} 动画", animFiles.size());
+    }
+
+    /**
+     * **废弃预设迁移** (v79.70) — 把 {@link #OBSOLETE_ANIM_PRESETS} 从动画目录**移动到 `removed/` 子目录**:
+     * 不删除 (玩家若自行改过可找回 ✓), 但不再位于扫描目录 ⇒ 不再注册给 TLM/GeckoLib ⇒ **崩溃消失** ✓
+     *
+     * <p>为什么必须做: 老玩家的 config 目录里已有这 6 个文件, 只从 JAR 里删掉**不会**让它们消失
+     * (JAR 里没有 ⇒ 也不会被覆盖), 而 `scanAnimations` 扫的是**目录** ⇒ 畸形文件继续被加载 ✗
+     * (外部玩家崩溃案例 = 错题 #356)。
+     *
+     * @return 本次迁移的文件数 (幂等 — 迁移后目录里不再有, 后续为 0)
+     */
+    static int syncConfigDir() {
+        java.util.List<String> removed = com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationPresetNames.syncConfigDir(ANIM_DIR);
+        if (!removed.isEmpty()) {
+            LittleMaidMoreAction.LOGGER.warn(
+                "[LMA/Startup] 已清理 {} 个不在 JAR 内的动画预设 (废弃/残留文件会崩 GeckoLib — 错题 #356): {}",
+                removed.size(), removed);
+        }
+        return removed.size();
+    }
+
+    /** 可测版本 (单元测试传临时目录) — 委托纯逻辑 {@link com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationPresetNames#syncConfigDir} */
+    public static java.util.List<String> syncConfigDir(java.nio.file.Path animDir) {
+        return com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationPresetNames.syncConfigDir(animDir);
     }
 
     // ======================== 预设复制 (扫描式) ========================

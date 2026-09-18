@@ -4,7 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.PassiveTaskConfig;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.MlgRescueCoordinator;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.MlgRescueCoordinator;
 
 /**
  * 自救摔落预触发 (v79.61x) — 掉血事件通道 (MaidDamageListener) 之外的第二触发口。

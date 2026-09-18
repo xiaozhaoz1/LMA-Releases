@@ -89,19 +89,17 @@ public class WorkEatBehavior extends MaidCheckRateTask {
 //?} else {
         if (!food.has(DataComponents.FOOD)) food = maid.getOffhandItem();
 //?}
+        // v79.62.3 修复 (用户实测: 加 LMA 后女仆把无限牛排吃没): 之前直接 maid.eat() →
+        // LivingEntity.eat → ItemStack.consume 纯 shrink, 绕过 USE_REMAINDER (1.21.x 无限食物
+        // 组件) → 牛排真消失. TLM 原生 MaidWorkMealTask 用 startUsingItem 走完整 use 流程
+        // (completeUsingItem → finishUsingItem → USE_REMAINDER 返还) — 对齐之.
+        // 食物留在手上让 vanilla 吃 (吃 32 tick 后自动 complete), 不清手槽不放回 (吃完自动处理).
 //? if 1.20.1 {
-        if (food.isEdible()) maid.eat(level, food);
+        if (food.isEdible()) {
 //?} else {
-        if (food.has(DataComponents.FOOD)) maid.eat(level, food);
+        if (food.has(DataComponents.FOOD)) {
 //?}
-        // 吃 1 个后先清手槽 (eat 只扣堆叠不清槽位 — 否则手+包双份, 审计 H1 修复),
-        // 剩余放回背包; 副手/主手腾空 (吃食让位灯, 下轮再拿)
-        maid.setItemInHand(eatHand, ItemStack.EMPTY);
-        if (!food.isEmpty()) {
-            ItemStack rest = ItemHandlerHelper.insertItemStacked(maid.getAvailableBackpackInv(), food, false);
-            if (!rest.isEmpty()) {
-                maid.spawnAtLocation(rest);  // 背包满 → 落地 (不吞物品, H-1 语义)
-            }
+            maid.startUsingItem(eatHand);
         }
     }
 

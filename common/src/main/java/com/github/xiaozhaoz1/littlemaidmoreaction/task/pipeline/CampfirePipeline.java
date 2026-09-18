@@ -44,43 +44,27 @@ public final class CampfirePipeline implements TaskPipeline {
 
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
-        // v79.62.2 不再依赖 TLM TARGET_POS (searchForDestination BFS 可能判不可达 → 永不设目标 →
-        // 永远"没有篝火"): 就近扫描找篝火 (仿 SmithingPipeline.findSmithingTable, TLM 导航到 TARGET_POS
-        // 由 tick 标定). 有篝火 且 (有可烤食物 或 篝火有烹饪物) 才通过
-        BlockPos target = findCampfire(level, maid);
-        if (target == null || !(level.getBlockEntity(target) instanceof CampfireBlockEntity)) {
+        // v79.62.5 对齐 furnace: 目标发现/移动全归 TLM brain — LmaFlowCoordinationBehavior
+        // 用 isTargetBlock + MAID_WORK_RANGE 搜索并设 TARGET_POS, validate 读 TARGET_POS 判定
+        // (同 furnace validate L71-72). 女仆移动靠 TLM MoveToTargetSink, LMA 不自扫不自设导航.
+        var mem = maid.getBrain().getMemory(com.github.tartaricacid.touhoulittlemaid.init.InitEntities.TARGET_POS.get());
+        BlockPos pos = mem.isEmpty() ? null : mem.get().currentBlockPosition();
+        // v79.63 修**鸡生蛋死锁** (同 furnace): TARGET_POS 由 Brain 在**任务启动后**写入 ⇒ validate 时必为空。
+        //   原实现在此判 failed("附近没有篝火") ⇒ submit 被拒 ⇒ 任务起不来 ⇒ Brain 不搜索 (死锁)。
+        //   修法: 目标未定时**放行**; 篝火是否存在交给运行时 gate (读 TARGET_POS, 空则等搜索)。
+        if (pos == null) {
+            return PipelineResult.ok("");
+        }
+        if (!(level.getBlockEntity(pos) instanceof CampfireBlockEntity)) {
             return PipelineResult.failed("附近没有篝火");
         }
         return PipelineResult.ok("");
     }
 
-    /** 就近找篝火 (扫描女仆周围 ±4 格, 仿 SmithingPipeline.findSmithingTable) */
-    public static BlockPos findCampfire(ServerLevel level, EntityMaid maid) {
-        BlockPos center = maid.blockPosition();
-        for (BlockPos p : BlockPos.betweenClosed(center.offset(-4, -2, -4), center.offset(4, 2, 4))) {
-            if (level.getBlockEntity(p) instanceof CampfireBlockEntity) return p.immutable();
-        }
-        return null;
-    }
-
     @Override
     public void tick(ServerLevel world, EntityMaid maid) {
-        // v79.62.2 自定目标: 就近找篝火 (不依赖 TLM searchForDestination BFS) —
-        // 找到且 TARGET_POS 不是它 → 设 TARGET_POS + WALK_TARGET (TLM 导航走过去)
-        BlockPos found = findCampfire(world, maid);
-        if (found == null) {
-            com.github.xiaozhaoz1.littlemaidmoreaction.api.navigation.NavigationMemory.clearAllNav(maid);
-            return;   // 无篝火 (会持续找)
-        }
-        var mem = maid.getBrain().getMemory(com.github.tartaricacid.touhoulittlemaid.init.InitEntities.TARGET_POS.get());
-        BlockPos cur = mem.isEmpty() ? null : mem.get().currentBlockPosition();
-        if (cur == null || !cur.equals(found)) {
-            maid.getBrain().setMemory(com.github.tartaricacid.touhoulittlemaid.init.InitEntities.TARGET_POS.get(),
-                    new net.minecraft.world.entity.ai.behavior.BlockPosTracker(found));
-            net.minecraft.world.entity.ai.behavior.BehaviorUtils
-                    .setWalkAndLookTargetMemories(maid, found, 1.0F, 0);
-        }
-
+        // v79.62.5 对齐 furnace: TARGET_POS/WALK_TARGET 由 TLM brain 管 (搜索+导航),
+        // tick 只做到达后的工作 (gate: 到达 + 节拍; 目标失效 TLM 重搜)
         BlockPos target = com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.WorkStationPipeline
                 .gate(world, maid, this);
         if (target == null) return;   // 未到达/节拍/目标失效

@@ -125,7 +125,29 @@ public final class FurnaceService {
      *  <p>v79.62.1: recipeType 按炉子类型动态 */
     public static String resolveSmeltIngredient(ServerLevel level, EntityMaid maid, RecipeType<?> recipeType) {
         String target = TaskMetaData.getTarget(maid);
-        if (target.isEmpty()) return "";
+        var lists0 = effectiveLists(maid);
+        List<String> black0 = lists0.get(0);
+        List<String> white0 = lists0.get(1);
+        // v79.63 修 (用户实机: "女仆能走到炉子, 背包有煤炭和矿却始终不烧"):
+        //   **空 target 是受支持的模式** — validateSmelt 明写 "空 target = 烧任何可烧的东西" (含燃料判定);
+        //   但本方法原来直接 return "" ⇒ validate 放行、运行时永不干活 (两边不一致)。
+        //   ⇒ 对称补齐: 空 target 时返回背包里**第一个可烧原料**, 与 validate 语义对齐。
+        if (target.isEmpty()) {
+            Map<Item, Integer> all0 = VanillaInputRegistry.readAllItems(maid);
+            for (AbstractCookingRecipe recipe : smeltingRecipes(level, recipeType)) {
+                for (ItemStack ing : recipe.getIngredients().get(0).getItems()) {
+                    if (!ItemFilters.isAllowed(ing.getItem(), black0, white0)) continue;
+                    if (all0.getOrDefault(ing.getItem(), 0) > 0) {
+//? if 1.20.1 {
+                        return net.minecraftforge.registries.ForgeRegistries.ITEMS.getKey(ing.getItem()).toString();
+//?} else {
+                        return net.minecraft.core.registries.BuiltInRegistries.ITEM.getKey(ing.getItem()).toString();
+//?}
+                    }
+                }
+            }
+            return "";   // 背包确实没有可烧原料
+        }
  //? if 1.20.1 {
         Item targetItem = ForgeRegistries.ITEMS.getValue(ResourceLocation.tryParse(target));
  //?} else {
@@ -150,6 +172,35 @@ public final class FurnaceService {
             }
         }
         if (allItems.getOrDefault(targetItem, 0) > 0) return target;
+        // v79.62.3 方案 D (用户裁定): addInput 把 min(8, 背包数) 全拿进炉 — 玩家只给 ≤8 个原料时
+        // 背包清零, 本方法查背包必空 → ADD_FUEL 相位永不加燃料 (任务死锁, 实测 8 矿复现:
+        // 8 矿全进炉后 fuelSlot=false; 64 矿留背包余量则正常). 回退: 炉内输入槽有同款料
+        // (正在烧) 且能烧成 target → 同样返回该料 id, addFuel 的「燃料≠输入物」判定据此
+        // 避开把输入物当燃料烧 (如原木→木炭场景, 原木本身是燃料).
+        var mem = maid.getBrain().getMemory(
+            com.github.tartaricacid.touhoulittlemaid.init.InitEntities.TARGET_POS.get());
+        if (mem.isPresent()) {
+            BlockPos furnacePos = mem.get().currentBlockPosition();
+            if (level.getBlockEntity(furnacePos) instanceof AbstractFurnaceBlockEntity f) {
+                int inSlot = SlotLayout.FURNACE.slot("input").orElse(0);
+                ItemStack inStack = f.getItem(inSlot);
+                if (!inStack.isEmpty() && ItemFilters.isAllowed(inStack.getItem(), black, white)) {
+                    Item inItem = inStack.getItem();
+                    for (AbstractCookingRecipe recipe : smeltingRecipes(level, recipeType)) {
+                        if (!recipe.getResultItem(level.registryAccess()).is(targetItem)) continue;
+                        for (ItemStack ing : recipe.getIngredients().get(0).getItems()) {
+                            if (ing.is(inItem)) {
+//? if 1.20.1 {
+                                return ForgeRegistries.ITEMS.getKey(inItem).toString();
+//?} else {
+                                return BuiltInRegistries.ITEM.getKey(inItem).toString();
+//?}
+                            }
+                        }
+                    }
+                }
+            }
+        }
         return "";
     }
 

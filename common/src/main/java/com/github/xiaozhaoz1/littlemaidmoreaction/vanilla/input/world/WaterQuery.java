@@ -23,9 +23,9 @@ public final class WaterQuery {
      */
     public static BlockPos nearestWaterSource(ServerLevel world, BlockPos center, int radius) {
         List<BlockPos> candidates = new ArrayList<>();
-        for (BlockPos p : com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.BlockPatternCache
+        for (BlockPos p : com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache
                 .scanBlocks(world, center, radius,
-                        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.BlockPatternCache.PatternType.WATER)) {
+                        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache.PatternType.WATER)) {
             var s = world.getBlockState(p);
             if (s.is(Blocks.WATER) && s.getFluidState().isSource()) {
                 candidates.add(p);

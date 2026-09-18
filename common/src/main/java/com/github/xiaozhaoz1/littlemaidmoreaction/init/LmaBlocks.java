@@ -48,6 +48,11 @@ public final class LmaBlocks {
                             () -> new MaidPowerBeltBlock(Block.Properties.of()
                                     .sound(SoundType.WOOL).strength(2.0f).noOcclusion()))
                     : null;
+
+    /** v79.62.3: 防御塔方块 (garage_kit_defense) — 无 Create 依赖, 恒注册 */
+    public static final RegistryObject<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlock> GARAGE_KIT_DEFENSE =
+            BLOCKS.register("garage_kit_defense",
+                    () -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlock());
 //?} else {
     public static final Supplier<MaidPowerBeltBlock> MAID_POWER_BELT =
             com.github.xiaozhaoz1.littlemaidmoreaction.compat.CompatToggle.isModuleEnabled("create")
@@ -56,6 +61,11 @@ public final class LmaBlocks {
                             () -> new MaidPowerBeltBlock(Block.Properties.of()
                                     .sound(SoundType.WOOL).strength(2.0f).noOcclusion()))
                     : null;
+
+    /** v79.62.3: 防御塔方块 (garage_kit_defense) — 无 Create 依赖, 恒注册 */
+    public static final Supplier<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlock> GARAGE_KIT_DEFENSE =
+            BLOCKS.register("garage_kit_defense",
+                    () -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlock());
 //?}
 
     public static void register(IEventBus bus) {

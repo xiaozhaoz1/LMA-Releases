@@ -9,7 +9,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class CraftChainConfigMenu extends LmaTaskConfigContainer {
 
     public CraftChainConfigMenu(int containerId, Inventory playerInv, int maidId) {
-        super(LmaMenus.CRAFT_CHAIN_CONFIG_MENU, containerId, playerInv, maidId);
+        super(LmaMenus.CRAFT_CHAIN_CONFIG_MENU.get(), containerId, playerInv, maidId);
     }
 
 }

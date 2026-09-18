@@ -77,13 +77,16 @@ public final class BlockInteractPipeline extends TaskStateMachine<BlockInteractP
     private static void interactBound(ServerLevel world, EntityMaid maid, BlockPos pos) {
         // 2026-08-11c 互斥 (全景 #8): 按键 (onPlayerTrigger) 与定时器 (handleWaiting)
         // 同 tick 双触发去重 — 1t 间隔 = 同 tick 第二次跳过, 下一 tick 放行
-        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                 .shouldFire(maid, "block_interact_interact", 1)) {
             return;
         }
+        // ★ v79.64.2: 区块未加载 ⇒ **不得**判定"方块被破坏" — getBlockState 对未加载区块也返回空气 ✗
+        //   (女仆远离/传送/跨维度时会把用户绑定静默清掉; 本仓既有规避用法见 MaidPowerBeltBlock L216)
+        if (!world.isLoaded(pos)) return;
         if (world.getBlockState(pos).isAir()) {
             // 被破坏 → 气泡提示 + 清除绑定 (原 BlockInteractService 内, 任务语义回归管线)
-            com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, "绑定方块已丢失");
+            com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.block_interact.lost"));
             com.github.xiaozhaoz1.littlemaidmoreaction.task.service.TaskConfigs.get(maid, "block_interact").remove(KEY_POS);
             return;
         }

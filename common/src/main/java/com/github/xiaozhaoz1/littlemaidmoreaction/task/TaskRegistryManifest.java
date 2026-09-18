@@ -11,7 +11,6 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.CraftChainPipeli
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.FurnacePipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.FarmPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.JukeboxPipeline;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.SmithingPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.CrankPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.MixPipeline;
@@ -20,9 +19,8 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.PressPipeli
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.RunningBeltPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.ExplorerMapPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.HaqiPipeline;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.MilkPipeline;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.JiuhuMilkPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.SelfRescuePipeline;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.TempAdaptPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.TorchLightPipeline;
 
 import java.util.List;
@@ -38,11 +36,41 @@ import java.util.function.Supplier;
  * <p>规格表按门控分组; 顺序 = 注册顺序 = 任务树展示顺序 (LinkedHashMap), 改序即改显示。
  * 变体任务 (如 collect_wood/collect_ore) 用构造参数化 — 一个类一个构造参数, 不建工厂类
  * (v79.61 架构裁定, ChainHarvestPipeline 先例)。
+ *
+ * <p><b>v79.63 Drive (驱动模式) — 本表是「谁 tick 我」的唯一真相源:</b>
+ * 驱动模式曾由引擎侧 3 处手写 {@code String} 集合维护 (GMPM_PIPELINES/STANDALONE), 漏加一个名字
+ * 即**静默死链** (注册了、可配置、测试直调仍绿, 但生产从不 tick — 错题 #157 同型, 2026-09-11 实测
+ * jiuhu_milk/explorer_map 两条死链)。现改为本表声明 + {@code TaskRegistry.verifyManifest} 启动期
+ * fail-fast + {@code GameTickPipelineManager} 按 Drive 分派 — 漏声明 = **启动即炸**, 不再静默。
  */
 public final class TaskRegistryManifest {
 
-    /** 注册规格 — (taskType, 构造引用); 构造引用惰性求值 (factory().get()) */
-    public record TaskSpec(String taskType, Supplier<TaskPipeline> factory) {}
+    /**
+     * 驱动模式 — 决定「谁 tick 我」。新增任务必须显式选择 (主动组默认 {@link #ACTIVE})。
+     *
+     * <p>{@link #isPassive()} = 不挂 TLM 任务栏; {@code TaskRegistry.registerPassive} 侧校验必须为被动类。
+     */
+    public enum Drive {
+        /** 主动任务: TLM 任务栏提交 → {@code GameTickPipelineManager.tickActive} */
+        ACTIVE,
+        /** 被动: {@code tickPassiveFor} 驱动 (FSM/时间关键; 坐下不暂停) */
+        GMPM_PASSIVE,
+        /** 被动: {@code tickStandalonePassives} 独立心跳 (动作型, 管线内节流自持; 坐下暂停) */
+        STANDALONE_PASSIVE,
+        /** 被动: 无 tick — {@code PassiveDispatcher} 信号驱动 (无 pipeline 占位条目) */
+        TRIGGER_PASSIVE;
+
+        /** 是否被动驱动 (无 TLM 任务栏条目) */
+        public boolean isPassive() { return this != ACTIVE; }
+    }
+
+    /** 注册规格 — (taskType, 构造引用, 驱动模式); 构造引用惰性求值 (factory().get()) */
+    public record TaskSpec(String taskType, Supplier<TaskPipeline> factory, Drive drive) {
+        /** 主动任务便捷构造 (drive = ACTIVE) — 主动组 21 条零重复声明 */
+        public TaskSpec(String taskType, Supplier<TaskPipeline> factory) {
+            this(taskType, factory, Drive.ACTIVE);
+        }
+    }
 
     /** 无条件注册的主动任务 (9) — TaskRegistry clinit 恒注册 */
     public static final List<TaskSpec> ALWAYS = List.of(new TaskSpec[]{
@@ -58,8 +86,6 @@ public final class TaskRegistryManifest {
             new TaskSpec("farm", FarmPipeline::new),
             // v79.62.2 填坝排水: 大海排水前置 — 外圈筑重力方块墙 + 排空区域内水
             new TaskSpec("dam_fill", com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.DamFillPipeline::new),
-            // v79.62 锻造: 钻石装备+下界合金锭→下界合金装备 (无需模板)
-            new TaskSpec("smithing", SmithingPipeline::new),
             // v79.62 刷子: 女仆自动刷可疑方块 (沙子/沙砾 → 掉落)
             new TaskSpec("brush", BrushPipeline::new),
             // v79.62.1 篝火: 女仆自动烤食物 (放生食+捡熟食掉落)
@@ -93,22 +119,26 @@ public final class TaskRegistryManifest {
     });
 
     /**
-     * 被动任务管线 (4) — PassiveSenseRegistration.init 注册 (哈气默认关闭 — HAQI_ENABLED 门控)。
-     * 纯触发型 2 (structure_sense/festival) 已脱管线 (v79.61x) — 无 pipeline 占位 + PassiveDispatcher,
-     * 不在本表 (见 init 分派)。v79.62: snow_shovel 已删 (TLM 原版清雪覆盖, 用户裁定)。
+     * 被动任务管线 (5) — PassiveSenseRegistration.init 注册。
+     * 纯触发型 3 (structure_sense/festival/rare_biome) 已脱管线 (v79.61x) — 无 pipeline 占位
+     * + PassiveDispatcher (TRIGGER_PASSIVE), 不在本表 (见 init 分派)。
+     * v79.62: snow_shovel 删; v79.62.5: temp_adapt 删 (TLM 温度机制覆盖, 用户裁定)。
+     *
+     * <p><b>2026-09-11 修复</b>: 原 jiuhu_milk/explorer_map 未进任何引擎驱动集合 = 生产死链
+     * (测试直调掩盖)。现显式声明 Drive: jiuhu_milk = STANDALONE (动作型 + 管线内节流, 坐下暂停);
+     * explorer_map = GMPM (纯信息气泡, 坐下不暂停 — 用户裁定)。
      */
     public static final List<TaskSpec> PASSIVE = List.of(new TaskSpec[]{
-            new TaskSpec("temp_adapt", TempAdaptPipeline::new),
             // 哈气 (默认关闭 — HAQI_ENABLED 门控; 触发走 MAID_NEARBY 信号; 底层覆盖 — 运行中其他被动不执行)
-            new TaskSpec("haqi", HaqiPipeline::new),
-            // v79.47: 黑暗自动点亮 (DARKNESS → 副手火把/提灯)
-            new TaskSpec("torch_light", TorchLightPipeline::new),
-            // v79.58: 自救被动 (掉血触发 → 被埋瞬破; 暂停主动任务不清理数据, 自救完恢复)
-            new TaskSpec("self_rescue", SelfRescuePipeline::new),
-            // v79.62 奶桶喂食 (空管线占位, 默认关闭)
-            new TaskSpec("jiuhu_milk", MilkPipeline::new),
-            // v79.62 探险家地图: 检测到背包有探险家地图 → 气泡报宝藏坐标 (一次)
-            new TaskSpec("explorer_map", ExplorerMapPipeline::new),
+            new TaskSpec("haqi", HaqiPipeline::new, Drive.GMPM_PASSIVE),
+            // v79.47: 黑暗自动点亮 (DARKNESS → 副手火把/提灯; 动作型 — 坐下暂停)
+            new TaskSpec("torch_light", TorchLightPipeline::new, Drive.STANDALONE_PASSIVE),
+            // v79.58: 自救被动 (掉血触发 → 被埋瞬破; 时间关键 — 与主动任务并行)
+            new TaskSpec("self_rescue", SelfRescuePipeline::new, Drive.GMPM_PASSIVE),
+            // v79.62 奶桶喂食 (per-maid 开关; 动作型 — 主人低血喂奶, 坐下暂停)
+            new TaskSpec("jiuhu_milk", JiuhuMilkPipeline::new, Drive.STANDALONE_PASSIVE),
+            // v79.62 探险家地图: 检测到背包有探险家地图 → 气泡报宝藏坐标 (一次; 纯信息, 不受坐下限制)
+            new TaskSpec("explorer_map", ExplorerMapPipeline::new, Drive.GMPM_PASSIVE),
     });
 
     private TaskRegistryManifest() {}

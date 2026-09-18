@@ -34,7 +34,9 @@ import java.util.HashMap;
 //?}
 public final class TlmTaskMonitor {
 
-    private static final Map<Integer, ResourceLocation> LAST_TASK = new HashMap<>();
+    /** 上轮 TLM 任务 uid (键 = 女仆 UUID, v79.63 统一 — 见 {@code task.data.MaidKey})。
+     *  原为实体 ID 键: ID 复用 + 漏清理会让新女仆继承旧女仆的 uid → 首次 tick 误判"切换"并写 TLM_SWITCH 标记。 */
+    private static final Map<java.util.UUID, ResourceLocation> LAST_TASK = new HashMap<>();
 
     private TlmTaskMonitor() {}
 
@@ -46,7 +48,8 @@ public final class TlmTaskMonitor {
         var maidTask = maid.getTask();
         if (maidTask == null) return;
         ResourceLocation currentTask = maidTask.getUid();
-        ResourceLocation lastTask = LAST_TASK.put(maid.getId(), currentTask);
+        ResourceLocation lastTask = LAST_TASK.put(
+                com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidKey.uuid(maid), currentTask);
 
         if (lastTask != null && !lastTask.equals(currentTask)) {
             // 写 NBT 标记 → 轮询消费 (门面收编)
@@ -56,8 +59,8 @@ public final class TlmTaskMonitor {
         }
     }
 
-    /** HashMap key 闭环 — 女仆离开世界时清理 */
-    public static void onMaidLeave(int entityId) {
-        LAST_TASK.remove(entityId);
+    /** HashMap key 闭环 — 女仆离开世界时清理 (v79.63 键改 UUID, 形参随之) */
+    public static void onMaidLeave(EntityMaid maid) {
+        LAST_TASK.remove(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidKey.uuid(maid));
     }
 }

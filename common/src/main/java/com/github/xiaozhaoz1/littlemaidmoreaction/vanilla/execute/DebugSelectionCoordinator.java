@@ -1,6 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute;
 
-import com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Camera;
@@ -68,11 +68,27 @@ public final class DebugSelectionCoordinator {
     private static BlockPos end = null;
     private static String dim = "";
 
+    /**
+     * 木棒判定 (标记/绑定物品) — **由客户端入口注入**。
+     *
+     * <p>v79.63 架构审计 A4: 本类原直接 import {@code event.StickBindUtil} (vanilla → event 反向越层)。
+     * 判定本质需要 config (哪个物品算木棒), 而 vanilla 层不得读 config/event → 改为**注入**:
+     * 认识两边的客户端入口 ({@code LmaForgeClientEntry} / {@code LmaNeoForgeClientEntry}) 在 setup 时注入一次。
+     *
+     * <p>未注入时默认 false → 选区调试功能静默禁用 (纯调试工具, 不影响玩法)。
+     */
+    private static java.util.function.Predicate<ItemStack> stickCheck = stack -> false;
+
+    /** 注入木棒判定 (客户端 setup 调用一次; null → 复位为禁用) */
+    public static void bindStickCheck(java.util.function.Predicate<ItemStack> check) {
+        stickCheck = check == null ? stack -> false : check;
+    }
+
     // ── 交互 (客户端入口监听 PlayerInteractEvent.RightClickBlock 调用) ──
 
     /** 选区判定 — 潜行 + 木棒 (标记/绑定物品) → 记录选区点 (纯观察, 不 cancel 事件流 — 用户裁定) */
     public static boolean isSelectionClick(ItemStack held, boolean shiftDown) {
-        return shiftDown && (StickBindUtil.isMarkItem(held) || StickBindUtil.isBindItem(held));
+        return shiftDown && stickCheck.test(held);
     }
 
     /** 手持木棍判定 (渲染门控 — 2026-08-16 用户裁定: 有木棍才显示选区; 主手/副手任一) */
@@ -81,8 +97,7 @@ public final class DebugSelectionCoordinator {
         if (player == null) return false;
         ItemStack main = player.getMainHandItem();
         ItemStack off = player.getOffhandItem();
-        return (StickBindUtil.isMarkItem(main) || StickBindUtil.isBindItem(main))
-                || (StickBindUtil.isMarkItem(off) || StickBindUtil.isBindItem(off));
+        return stickCheck.test(main) || stickCheck.test(off);
     }
 
     /**
@@ -264,7 +279,7 @@ public final class DebugSelectionCoordinator {
             edge(vc, pose, x0 + 16, y, z0 + 16, x0, y, z0 + 16, 0.4F, 1.0F, 0.4F);
             edge(vc, pose, x0, y, z0 + 16, x0, y, z0, 0.4F, 1.0F, 0.4F);
         }
-        for (long[] c : com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanCache.GLOBAL.coveredChunks(sl)) {
+        for (long[] c : com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.EntityScanCache.GLOBAL.coveredChunks(sl)) {
             double x0 = c[0] * 16, z0 = c[1] * 16;
             edge(vc, pose, x0, y, z0, x0 + 16, y, z0, 0.4F, 0.6F, 1.0F);
             edge(vc, pose, x0 + 16, y, z0, x0 + 16, y, z0 + 16, 0.4F, 0.6F, 1.0F);

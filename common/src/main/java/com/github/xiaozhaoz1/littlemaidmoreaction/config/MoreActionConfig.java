@@ -65,11 +65,12 @@ public final class MoreActionConfig {
 
     private MoreActionConfig() {}
 
-    /** 三段 Spec 统一落盘 — Cloth 屏/编辑器保存的唯一入口 */
+    /** 四段 Spec 统一落盘 — Cloth 屏/编辑器保存的唯一入口 (v79.62.3 +defense_tower) */
     public static void saveAll() {
         SPEC.save();
         ActiveTaskConfig.ACTIVE_SPEC.save();
         PassiveTaskConfig.PASSIVE_SPEC.save();
+        DefenseTowerConfig.SPEC.save();
         com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.KITSUNE_SPEC.save();
     }
 

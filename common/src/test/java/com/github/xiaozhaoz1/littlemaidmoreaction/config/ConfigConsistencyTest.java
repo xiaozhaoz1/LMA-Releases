@@ -23,7 +23,11 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
  * 测试仅运行于 forge 节点 (forge/build.gradle sourceSets.test 配置, neoforge 无 test 任务)。
  *
  * <p>GUI 项数一致性 (ClothSettingsScreen 手写逐项枚举, 无 ACTIVE_VALUES 循环引用,
- * Screen 是客户端类纯 JVM 不可加载) — 无法自动关联, 人工核对条目数 (36/27),
+ * Screen 是客户端类纯 JVM 不可加载) — 无法自动关联, 人工核对条目数
+ * (**2026-09-16 实测: `grep -c "eb.start"` → ClothSettingsScreen 45 / TaskSettingsScreen 43**;
+ * 旧值 36/27 已严重漂移 — 本轮补杂项+稀有群系+dam_fill 时顺手更正)。
+ *
+ * <p>⚠ 本注释不会自动过期 —— 增删 GUI 项后**必须重跑上面那条 grep** 并回写。
  * 见批次报告 fix-registry-c-2026-08-11c.md。
  */
 class ConfigConsistencyTest {

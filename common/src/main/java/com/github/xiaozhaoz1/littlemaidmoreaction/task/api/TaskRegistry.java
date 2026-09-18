@@ -20,7 +20,23 @@ import java.util.Set;
  */
 public final class TaskRegistry {
 
+    /**
+     * 注册表 — **写侧** (仅 register* 在锁内写; 保留插入顺序 = 任务树展示顺序)。
+     * v79.63 并发修复 (评审 P1-5): 原为裸 LinkedHashMap + 无同步 register, 而 {@code LMAT}
+     * javadoc **明确允许"更晚注册"**(外部 mod 可在任意时机注册) → 与服务端 tick 期的读/遍历
+     * 并发即 CME / 丢更新。现改为「写侧加锁 + 读侧 volatile 不可变快照」:
+     * <ul>
+     *   <li>写: {@link #REGISTER_LOCK} 串行化 (插入顺序稳定, 无需 ConcurrentHashMap 丢序)</li>
+     *   <li>读: {@link #SNAPSHOT} / {@link #passiveCache} — volatile 不可变视图, 无锁无 CME</li>
+     * </ul>
+     */
     private static final Map<String, TaskHandler> HANDLERS = new LinkedHashMap<>();
+
+    /** 注册锁 — 串行化注册 (注册频次极低: 启动期 + 外部 mod 注册) */
+    private static final Object REGISTER_LOCK = new Object();
+
+    /** 读侧快照 — 每次注册后整体替换 (volatile 发布; 读方永不看到半成品/并发修改) */
+    private static volatile Map<String, TaskHandler> SNAPSHOT = Map.of();
 
     /** 被动任务缓存 — register() 重建 (唯一写入口实证); 避免每女仆每 tick 新建 Stream */
     private static volatile List<TaskHandler> passiveCache = List.of();
@@ -83,25 +99,52 @@ public final class TaskRegistry {
      * TaskToggle.isVisible 运行期管理)。主动任务出现在 TLM 任务栏 GUI。
      */
     public static void register(String taskType, TaskPipeline pipeline) {
-        if (HANDLERS.containsKey(taskType)) {
-            throw new IllegalStateException("[LMA] 任务重复注册: " + taskType);
-        }
-        HANDLERS.put(taskType, new TaskHandler(taskType, pipeline, true));
-        rebuildPassiveCache();
+        register(taskType, pipeline, TaskRegistryManifest.Drive.ACTIVE);
     }
 
-    /** 被动缓存重建 — register 是 HANDLERS 唯一写入口 (LMAT.register/LMAT.registerPassive 全汇聚于此) */
+    /** 注册任务 (显式驱动模式) — 主动任务必须 {@code Drive.ACTIVE} (registerPassive 侧拒绝被动类) */
+    public static void register(String taskType, TaskPipeline pipeline, TaskRegistryManifest.Drive drive) {
+        if (drive.isPassive()) {
+            throw new IllegalStateException("[LMA] 主动注册不接受被动驱动: " + taskType + " drive=" + drive);
+        }
+        putLocked(taskType, new TaskHandler(taskType, pipeline, true, drive), "任务");
+    }
+
+    /** 被动缓存重建 — register 是 HANDLERS 唯一写入口 (LMAT.register/LMAT.registerPassive 全汇聚于此)。
+     *  必须在 {@link #REGISTER_LOCK} 内调用 (读 HANDLERS 写两个 volatile 快照)。
+     *  注意用 {@code unmodifiableMap(new LinkedHashMap<>())} 而非 {@code Map.copyOf} —
+     *  后者**不保证迭代顺序**, 会破坏"注册顺序 = 任务树展示顺序"不变量。 */
     private static void rebuildPassiveCache() {
         passiveCache = HANDLERS.values().stream().filter(h -> !h.showInBar()).toList();
+        SNAPSHOT = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(HANDLERS));
+    }
+
+    /** 注册写点 (锁内: 重名检查 + 写入 + 快照重建) — 三个 register* 唯一汇聚处 */
+    private static void putLocked(String taskType, TaskHandler handler, String kind) {
+        synchronized (REGISTER_LOCK) {
+            if (HANDLERS.containsKey(taskType)) {
+                throw new IllegalStateException("[LMA] " + kind + "重复注册: " + taskType);
+            }
+            HANDLERS.put(taskType, handler);
+            rebuildPassiveCache();
+        }
     }
 
     /** 注册被动任务 (内部 showInBar=false — 不显示在 TLM 任务栏, 由事件/环境信号触发) */
     public static void registerPassive(String taskType, TaskPipeline pipeline) {
-        if (HANDLERS.containsKey(taskType)) {
-            throw new IllegalStateException("[LMA] 被动任务重复注册: " + taskType);
+        registerPassive(taskType, pipeline, TaskRegistryManifest.Drive.GMPM_PASSIVE);
+    }
+
+    /**
+     * 注册被动任务 (显式驱动模式) — drive 必须为被动类, 否则启动即炸 (v79.63 Drive 单一真相源:
+     * 驱动模式漏声明/声明错 = 静默死链, 故在此 fail-fast)。
+     */
+    public static void registerPassive(String taskType, TaskPipeline pipeline,
+                                       TaskRegistryManifest.Drive drive) {
+        if (!drive.isPassive()) {
+            throw new IllegalStateException("[LMA] 被动注册必须声明被动驱动: " + taskType + " drive=" + drive);
         }
-        HANDLERS.put(taskType, new TaskHandler(taskType, pipeline, false));
-        rebuildPassiveCache();
+        putLocked(taskType, new TaskHandler(taskType, pipeline, false, drive), "被动任务");
     }
 
     /**
@@ -110,40 +153,54 @@ public final class TaskRegistry {
      * 不经 GMPM tick (从不写 in_progress 键)。
      */
     public static void registerPassive(String taskType) {
-        if (HANDLERS.containsKey(taskType)) {
-            throw new IllegalStateException("[LMA] 被动任务重复注册: " + taskType);
-        }
-        HANDLERS.put(taskType, new TaskHandler(taskType, null, false));
-        rebuildPassiveCache();
+        registerPassive(taskType, null, TaskRegistryManifest.Drive.TRIGGER_PASSIVE);
     }
 
     /**
-     * 注册完整性 fail-fast (v79.61 批 3c C3) — 无条件任务必须全注册,
-     * 漂移 (改名/漏注册) 启动即炸 (PacketRegistry.validatePlatformNames 同款防线)。
+     * 注册完整性 fail-fast (v79.61 批 3c C3 → v79.63 扩 Drive 校验) — 无条件任务必须全注册,
+     * 且**驱动模式必须与注册面一致** (漂移 = 静默死链, 启动即炸;
+     * PacketRegistry.validatePlatformNames 同款防线)。
      */
     private static void verifyManifest() {
         for (TaskRegistryManifest.TaskSpec s : TaskRegistryManifest.ALWAYS) {
-            if (!HANDLERS.containsKey(s.taskType())) {
+            if (!SNAPSHOT.containsKey(s.taskType())) {
                 throw new IllegalStateException("[LMA] 任务注册缺失: " + s.taskType());
+            }
+            TaskHandler h = SNAPSHOT.get(s.taskType());
+            if (h != null && h.drive() != s.drive()) {
+                throw new IllegalStateException("[LMA] 任务驱动漂移: " + s.taskType()
+                        + " 声明=" + s.drive() + " 注册=" + h.drive());
+            }
+        }
+        // 被动表: 必须是被动驱动 + 注册面一致 (v79.63 — jiuhu_milk/explorer_map 死链教训)
+        for (TaskRegistryManifest.TaskSpec s : TaskRegistryManifest.PASSIVE) {
+            if (!s.drive().isPassive()) {
+                throw new IllegalStateException("[LMA] 被动表条目必须声明被动驱动: "
+                        + s.taskType() + " drive=" + s.drive());
             }
         }
     }
 
     public static PipelineResult validate(EntityMaid maid, String taskType, String taskId,
                                           String target, int targetCount) {
-        TaskHandler handler = HANDLERS.get(taskType);
+        TaskHandler handler = SNAPSHOT.get(taskType);
         if (handler == null) return PipelineResult.failed("未知任务类型: " + taskType);
         if (handler.pipeline() == null) return PipelineResult.failed("无管道任务: " + taskType);
         if (!(maid.level() instanceof ServerLevel level)) return PipelineResult.failed("仅在服务端可用");
         return handler.pipeline().validate(level, maid, new PipelineContext(target, targetCount, taskId));
     }
 
-    public static TaskHandler get(String taskType) { return HANDLERS.get(taskType); }
-    public static Set<String> taskTypes() { return HANDLERS.keySet(); }
+    public static TaskHandler get(String taskType) { return SNAPSHOT.get(taskType); }
+
+    /**
+     * 全部任务类型 — 返回**不可变快照** (v79.63: 原直返 {@code HANDLERS.keySet()} 是内部活视图,
+     * 外部/客户端屏遍历时会随注册变动 → CME 风险; 且暴露内部结构)。
+     */
+    public static Set<String> taskTypes() { return SNAPSHOT.keySet(); }
 
     /** 是否在 TLM 任务栏显示 */
     public static boolean isShowInBar(String taskType) {
-        TaskHandler h = HANDLERS.get(taskType);
+        TaskHandler h = SNAPSHOT.get(taskType);
         return h != null && h.showInBar();
     }
 
@@ -152,6 +209,22 @@ public final class TaskRegistry {
         return passiveCache;
     }
 
-    /** executor 字段删除 — 执行归管线 (GMPM tick / WorkStationPipeline); pipeline 可空 (纯触发型占位) */
-    public record TaskHandler(String taskType, TaskPipeline pipeline, boolean showInBar) {}
+    /**
+     * 按驱动模式取被动条目 (v79.63 Drive 分派) — 引擎按此分桶, 取代原引擎侧手写 String 集合。
+     * 返回不可变快照 (调用方每 tick 遍历 — 不暴露内部视图)。
+     */
+    public static List<TaskHandler> passivesByDrive(TaskRegistryManifest.Drive drive) {
+        return passiveCache.stream().filter(h -> h.drive() == drive).toList();
+    }
+
+    /**
+     * executor 字段删除 — 执行归管线 (GMPM tick / WorkStationPipeline)。
+     * v79.63: 增 {@code drive} (驱动模式, 来自 manifest — 「谁 tick 我」的唯一真相源);
+     * {@code pipeline} 仅 TRIGGER_PASSIVE 占位条目为 null。
+     */
+    public record TaskHandler(String taskType, TaskPipeline pipeline, boolean showInBar,
+                              TaskRegistryManifest.Drive drive) {
+        /** 纯触发型占位条目 (无 pipeline) */
+        public boolean isTriggerPlaceholder() { return pipeline == null; }
+    }
 }

@@ -89,7 +89,7 @@ public final class AiControlPipeline implements TaskPipeline, TaskConfigurable {
                 } else {
                     missing = "Numen/YSM";
                 }
-                MaidChatBubbleApi.showFail(maid, "缺少前置: " + missing + " — 无法变身");
+                MaidChatBubbleApi.showFail(maid, Component.translatable("bubble.littlemaidmoreaction.ai.missing_pre", missing));
             }
             return true;
         }

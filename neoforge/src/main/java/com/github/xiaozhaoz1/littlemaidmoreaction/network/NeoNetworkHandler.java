@@ -43,13 +43,14 @@ public final class NeoNetworkHandler {
             Map.entry("maid_chat_bubble", (reg, def) -> play(reg, def, MaidChatBubblePacket.TYPE, MaidChatBubblePacket.STREAM_CODEC, MaidChatBubblePacket::handlePayload)),
             Map.entry("maid_codex_screen", (reg, def) -> play(reg, def, MaidCodexScreenPacket.TYPE, MaidCodexScreenPacket.STREAM_CODEC, MaidCodexScreenPacket::handlePayload)),
             Map.entry("maid_env_sense_toggle", (reg, def) -> play(reg, def, MaidEnvSenseTogglePacket.TYPE, MaidEnvSenseTogglePacket.STREAM_CODEC, MaidEnvSenseTogglePacket::handlePayload)),
+            Map.entry("maid_gomoku_toggle", (reg, def) -> play(reg, def, MaidGomokuTogglePacket.TYPE, MaidGomokuTogglePacket.STREAM_CODEC, MaidGomokuTogglePacket::handlePayload)),
+            Map.entry("maid_gomoku_state", (reg, def) -> play(reg, def, MaidGomokuStatePacket.TYPE, MaidGomokuStatePacket.STREAM_CODEC, MaidGomokuStatePacket::handlePayload)),
             Map.entry("maid_list_query", (reg, def) -> play(reg, def, MaidListQueryPacket.TYPE, MaidListQueryPacket.STREAM_CODEC, MaidListQueryPacket::handlePayload)),
             Map.entry("maid_list_response", (reg, def) -> play(reg, def, MaidListResponsePacket.TYPE, MaidListResponsePacket.STREAM_CODEC, MaidListResponsePacket::handlePayload)),
             // v79.62 作物区域编辑/同步 (双平台)
             Map.entry("farm_region_edit", (reg, def) -> play(reg, def, FarmRegionEditPacket.TYPE, FarmRegionEditPacket.STREAM_CODEC, FarmRegionEditPacket::handlePayload)),
             Map.entry("farm_region_sync", (reg, def) -> play(reg, def, FarmRegionSyncPacket.TYPE, FarmRegionSyncPacket.STREAM_CODEC, FarmRegionSyncPacket::handlePayload)),
             Map.entry("farm_container_bind", (reg, def) -> play(reg, def, FarmContainerBindPacket.TYPE, FarmContainerBindPacket.STREAM_CODEC, FarmContainerBindPacket::handlePayload)),
-            Map.entry("smithing_craft", (reg, def) -> play(reg, def, SmithingCraftPacket.TYPE, SmithingCraftPacket.STREAM_CODEC, SmithingCraftPacket::handlePayload)),
             Map.entry("farm_region_bind", (reg, def) -> play(reg, def, FarmRegionBindPacket.TYPE, FarmRegionBindPacket.STREAM_CODEC, FarmRegionBindPacket::handlePayload))
     );
 

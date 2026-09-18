@@ -183,7 +183,9 @@ public final class RecipeTreeResolver {
 //? if 1.20.1 {
                 recipes.size(), best.getId(), bestScore);
 //?} else {
-                recipes.size(), registryAccess.registryOrThrow(net.minecraft.core.registries.Registries.RECIPE).getKey(best), bestScore);
+                // 不打印配方 key: gametest 的 RegistryAccess 无 recipe 注册表 (registryOrThrow 会炸),
+                // 且行为上 key 只用于日志 — 降级为类名, 零 registry 依赖 (v79.62.3 双平台修复)
+                recipes.size(), best.getClass().getSimpleName(), bestScore);
 //?}
         return best;
     }
@@ -200,13 +202,18 @@ public final class RecipeTreeResolver {
                 best = m;
             }
         }
-        if (bestCount <= 0) {
-            // 无库存变体时优先可再合成的变体 (tag 内木板等), 否则保持确定性取首个
-            for (ItemStack m : matches) {
-                if (!index.recipesProducing(m.getItem()).isEmpty()) return m;
-            }
+        if (bestCount > 0) return best;   // ① 有库存 ⇒ 取库存最多的变体 (原逻辑)
+        // ② v79.63.2 修 (用户实测「拿其他原木 + 木棍就搜不到配方」):
+        //    原实现挑"第一个**抽象上**可合成的变体" ⇒ 挑中橡木木板, 而橡木木板配方要求 #oak_logs
+        //    ⇒ 拿云杉原木者整链失败 ✗。现改为: 优先挑"**能用现有材料做出来**"的变体 (递归浅判定)。
+        for (ItemStack m : matches) {
+            if (canProduceFrom(m.getItem(), available, index, VARIANT_LOOKAHEAD_DEPTH)) return m;
         }
-        return best;
+        // ③ 兜底 (保持确定性): 任一可合成变体 → 首个变体
+        for (ItemStack m : matches) {
+            if (!index.recipesProducing(m.getItem()).isEmpty()) return m;
+        }
+        return matches[0];
     }
 
     private static int score(CraftingRecipe recipe, Map<Item, Integer> available,
@@ -311,4 +318,32 @@ public final class RecipeTreeResolver {
         Set<Item> dependsOn,
         java.util.List<Item> selectedInputs
     ) {}
+
+    /** 变体选择的前瞻深度 (tag 链: 木板→原木 只需 2 层; 留 3 层余量) */
+    private static final int VARIANT_LOOKAHEAD_DEPTH = 3;
+
+    /**
+     * **用现有材料能否产出该物品** (纯判定, 不消耗) — 变体选择用 (v79.63.2)。
+     *
+     * <p>为什么要它: 同一 tag 的变体虽然等价, 但其**配方上游**可能不同 ——
+     * 例如 #planks 的 11 个变体里, 橡木木板要 #oak_logs、云杉木板要 #spruce_logs;
+     * 只看"抽象可合成"会挑到玩家没有的那种木头 ⇒ 整链失败 (用户实测)。
+     */
+    private static boolean canProduceFrom(Item item, Map<Item, Integer> available, RecipeIndex index, int depth) {
+        if (available.getOrDefault(item, 0) > 0) return true;
+        if (depth <= 0) return false;
+        for (CraftingRecipe r : index.recipesProducing(item)) {
+            boolean ok = true;
+            for (Ingredient ing : r.getIngredients()) {
+                if (ing.isEmpty()) continue;
+                boolean ingOk = false;
+                for (ItemStack v : ing.getItems()) {
+                    if (canProduceFrom(v.getItem(), available, index, depth - 1)) { ingOk = true; break; }
+                }
+                if (!ingOk) { ok = false; break; }
+            }
+            if (ok) return true;
+        }
+        return false;
+    }
 }

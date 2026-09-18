@@ -29,7 +29,7 @@ public final class LmaTaskProgressDisplay {
 
     /** 任务开始气泡 */
     public static void showTaskStart(EntityMaid maid, String taskType) {
-        MaidChatBubbleApi.showInfo(maid, "开始执行: " + friendlyName(taskType));
+        MaidChatBubbleApi.showInfo(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.progress.start", friendlyName(taskType)));
     }
 
     /**
@@ -57,7 +57,6 @@ public final class LmaTaskProgressDisplay {
         return switch (taskType) {
             case "craft_chain"  -> "配方链合成";
             case "furnace"      -> "熔炉烧炼";
-            case "brewing"      -> "炼药";
             case "bell_ring"    -> "敲钟";
             case "jukebox"      -> "唱片机";
             case "arm_transfer" -> "搬运";
@@ -69,6 +68,19 @@ public final class LmaTaskProgressDisplay {
             case "collect_ore"  -> "连锁挖矿";
             case "maid_assembly" -> "便携装配";
             case "block_interact" -> "方块交互";
+            case "farm" -> "种地";
+            case "dam_fill" -> "填坝排水";
+            case "brush" -> "刷扫";
+            case "campfire" -> "篝火烤食物";
+            case "void_excavation" -> "挖空置域";
+            case "ai_control" -> "AI 操控";
+            case "running_belt" -> "跑步发电";
+            case "cannon_load" -> "装填炮弹";
+            case "haqi" -> "哈气";
+            case "torch_light" -> "黑暗点亮";
+            case "self_rescue" -> "自救";
+            case "jiuhu_milk" -> "酒狐奶";
+            case "explorer_map" -> "探险家地图";
             default -> taskType;
         };
     }

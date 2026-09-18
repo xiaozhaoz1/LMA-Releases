@@ -60,5 +60,10 @@ public final class LmaRegistrar {
         LmaItems.register(modBus);
     }
 
+    /** v79.62.3: 注册配方序列化器 (自定义防御塔合成 — 保留手办 NBT) */
+    public static void registerRecipeSerializers(IEventBus modBus) {
+        LmaRecipeSerializers.register(modBus);
+    }
+
     private LmaRegistrar() {}
 }

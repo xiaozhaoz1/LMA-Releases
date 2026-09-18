@@ -28,12 +28,19 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
 /** v79.45: 工作站基类 — GMPM 驱动, 节拍/计数/完成归 WorkStationPipeline */
 public final class CraftChainPipeline extends WorkStationPipeline implements TaskConfigurable {
 
+    /** per-maid 产物上限键 ({@code pipelineConfig}, -1=无限) — 屏与管线**同源** (v79.63 由裸字面量收敛) */
+    public static final String KEY_MAX_PRODUCTS = "max_products";
+
+
     @Override
     public String taskType() { return "craft_chain"; }
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return s.is(net.minecraft.world.level.block.Blocks.CRAFTING_TABLE); }
 
     @Override
     public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            
         return List.of(
             new TaskStep("resolve", "解析配方", StepType.COLLECT, List.of()),
             new TaskStep("gather", "收集材料", StepType.COLLECT, List.of("resolve")),
@@ -54,8 +61,8 @@ public final class CraftChainPipeline extends WorkStationPipeline implements Tas
         if (available.isEmpty()) return PipelineResult.failed("empty inventory");
         // 产物数量上限 (per-maid max_products 覆盖全局, -1=无限)
         CompoundTag cfg = pipelineConfig(maid);
-        int maxProducts = cfg.contains("max_products")
-                ? cfg.getInt("max_products")
+        int maxProducts = cfg.contains(KEY_MAX_PRODUCTS)
+                ? cfg.getInt(KEY_MAX_PRODUCTS)
                 : ActiveTaskConfig.CRAFT_MAX_PRODUCTS.get();
         if (maxProducts > 0 && FlowTaskData.getCounter(maid) >= maxProducts)
             return PipelineResult.failed("已达产物上限 (" + maxProducts + ")");
@@ -83,7 +90,7 @@ public final class CraftChainPipeline extends WorkStationPipeline implements Tas
         CompoundTag cfg = pipelineConfig(maid);
         String target = cfg.contains("target") ? cfg.getString("target") : TaskMetaData.getTarget(maid);
         t.putString("target", target);
-        if (cfg.contains("max_products")) t.putInt("max_products", cfg.getInt("max_products"));
+        if (cfg.contains(KEY_MAX_PRODUCTS)) t.putInt(KEY_MAX_PRODUCTS, cfg.getInt(KEY_MAX_PRODUCTS));
         return t;
     }
 
@@ -118,10 +125,17 @@ public final class CraftChainPipeline extends WorkStationPipeline implements Tas
      * 默认产物 → 运行期提交数据 TASK_TARGET)。validate/executeOne 共用, 单一事实源 (错题 #182)。
      */
     private String resolveTarget(EntityMaid maid, String submitTarget) {
+        // 回退序 (v79.62.5 修: 运行期提交/TASK_TARGET 优先于默认产物 — 原默认产物
+        // CRAFT_DEFAULT_PRODUCT 非空时永远吞掉 AI/GUI 提交的 stick 等目标, 多步链只跑到默认
+        // 产物 oak_planks 一步 (lmacraftchainmultistep 实证: target=minecraft:oak_planks)):
+        //   ① 显式提交目标 (call 参数)
+        //   ② per-maid pipelineConfig.target (GUI 设置)
+        //   ③ 运行期提交数据 TASK_TARGET (TaskDispatcher.submit 写入)
+        //   ④ Cloth Config 默认产物 (最后兜底)
         if (submitTarget != null && !submitTarget.isEmpty()) return submitTarget;
         String target = pipelineConfig(maid).getString("target");
-        if (target.isEmpty()) target = ActiveTaskConfig.CRAFT_DEFAULT_PRODUCT.get();
         if (target.isEmpty()) target = maid.getPersistentData().getString(TaskKeys.TASK_TARGET);
+        if (target.isEmpty()) target = ActiveTaskConfig.CRAFT_DEFAULT_PRODUCT.get();
         return target;
     }
 

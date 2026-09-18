@@ -27,6 +27,12 @@ public final class MaidAssemblyScreen extends AbstractSimiContainerScreen<MaidAs
 
     public MaidAssemblyScreen(MaidAssemblyMenu menu, Inventory inv, Component title) {
         super(menu, inv, title);
+        // v79.63: 兼容屏构造留痕 — **门控优先**: 模块未启用/未加载 Create 时该方法直接 return,
+        // 不执行任何逻辑 (用户裁定: 别人没有该 mod 的环境里这段代码不执行)
+        // 门控: 模块启用即可 — "mod 是否加载"由屏注册面保证 (CreateCompatClient 注册本屏时已判 ModList,
+        // 且任务注册门控同条件), 故此处不重复判 ModList (也不用平台 API — 双平台同一份源码)
+        com.github.xiaozhaoz1.littlemaidmoreaction.screen.ScreenLifecycleLog.compatConstructed("maid_assembly",
+                com.github.xiaozhaoz1.littlemaidmoreaction.compat.CompatToggle.isModuleEnabled("create"));
     }
 
     @Override

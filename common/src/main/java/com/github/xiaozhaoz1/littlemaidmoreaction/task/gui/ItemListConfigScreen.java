@@ -56,30 +56,43 @@ public class ItemListConfigScreen extends LmaTaskConfigScreen<ItemListConfigMenu
 
     // ── initAdditionWidgets: 请求配置 + EditBox + 应用按钮 (renderBg 基类默认委托) ──
 
+    /**
+     * 布局 (v79.63.5 统一规范): 起点 y = topPos + 40 · 行距 26 · 控件高 20 · 标签左对齐 contentX()
+     * 控件宽 150 右对齐 contentRight() (面板不够宽时自动缩 ✓)。熔炉/砍树共用本屏, 仅 taskType 不同 ✓
+     */
     @Override
     protected void initAdditionWidgets() {
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), taskType);
 
-        int cx = contentX();
-        // 整体下移 (标题框 7-28 之下), 标签置框上方
-        int y = topPos + 46;
+        int labelX = contentX();
+        int rowW = Math.min(150, Math.max(80, contentRight() - (labelX + 60)));
+        int rowX = Math.max(labelX + 60, contentRight() - rowW);
+        int y = rowY(0);
 
-        blackBox = new EditBox(font, cx, y, 140, 20, Component.literal("黑名单"));
-        whiteBox = new EditBox(font, cx, y + 28, 140, 20, Component.literal("白名单"));
+        blackBox = new EditBox(font, rowX, y - 2, rowW, 20,
+                Component.translatable("screen.littlemaidmoreaction.item_list.black"));
+        blackBox.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
+                Component.translatable("screen.littlemaidmoreaction.item_list.black.tip")));
+        whiteBox = new EditBox(font, rowX, y + 26 - 2, rowW, 20,
+                Component.translatable("screen.littlemaidmoreaction.item_list.white"));
+        whiteBox.setTooltip(net.minecraft.client.gui.components.Tooltip.create(
+                Component.translatable("screen.littlemaidmoreaction.item_list.white.tip")));
         addRenderableWidget(blackBox);
         addRenderableWidget(whiteBox);
 
-        addRenderableWidget(Button.builder(Component.literal("应用名单"),
-                btn -> applyLists(m)).pos(cx, y + 56).size(80, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("清空"),
-                btn -> {
-                    blackBox.setValue("");
-                    whiteBox.setValue("");
-                    applyLists(m);
-                }).pos(cx + 90, y + 56).size(50, 20).build());
+        int by = rowY(2);
+        int half = rowW / 2;
+        addRenderableWidget(Button.builder(Component.translatable("screen.littlemaidmoreaction.item_list.apply"),
+                btn -> applyLists(m)).pos(rowX, by - 2).size(half - 4, 20)
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(
+                        Component.translatable("screen.littlemaidmoreaction.item_list.apply.tip"))).build());
+        addRenderableWidget(Button.builder(Component.translatable("screen.littlemaidmoreaction.item_list.clear"),
+                btn -> { blackBox.setValue(""); whiteBox.setValue(""); applyLists(m); })
+                .pos(rowX + half, by - 2).size(rowW - half, 20)
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(
+                        Component.translatable("screen.littlemaidmoreaction.item_list.clear.tip"))).build());
     }
-
     // ── renderAddition: 从 menu.config 同步 EditBox 值 ──
 
     @Override
@@ -92,8 +105,9 @@ public class ItemListConfigScreen extends LmaTaskConfigScreen<ItemListConfigMenu
         }
         // 中文标签 (黑名单框 topPos+46, 白名单框 +74; 标签置框上方 12px)
         int cx = contentX();
-        g.drawString(font, Component.literal("黑名单"), cx, topPos + 34, 0xFFFFFF);
-        g.drawString(font, Component.literal("白名单"), cx, topPos + 62, 0xFFFFFF);
+        // v79.63.5 规范: 标签左列 (contentX, 行 y + 6), 与右侧控件同排 ✓ + i18n ✓
+        g.drawString(font, Component.translatable("screen.littlemaidmoreaction.item_list.black"), cx, topPos + 44, 0xFFFFFF);
+        g.drawString(font, Component.translatable("screen.littlemaidmoreaction.item_list.white"), cx, topPos + 70, 0xFFFFFF);
     }
 
     // ── 业务 ──

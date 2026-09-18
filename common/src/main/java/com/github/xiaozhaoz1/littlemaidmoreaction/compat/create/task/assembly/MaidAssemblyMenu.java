@@ -54,15 +54,19 @@ public class MaidAssemblyMenu extends AbstractContainerMenu {
     private boolean matLockedSynced;
 
     public MaidAssemblyMenu(int id, Inventory playerInv, EntityMaid maid) {
-        super(LmaMenus.MAID_ASSEMBLY_MENU, id);
+        super(LmaMenus.MAID_ASSEMBLY_MENU.get(), id);
         this.maid = maid;
         this.inv = MaidAssemblyInventory.of(maid); // 服务端共享单例
+        LittleMaidMoreAction.LOGGER.warn("[AssemblyMenu] ctor(服务端) menuType={} maid={}",
+                menuTypeState(), maid != null);
         addDataAndSlots(playerInv);
     }
 
     public MaidAssemblyMenu(int id, Inventory playerInv, FriendlyByteBuf data) {
-        super(LmaMenus.MAID_ASSEMBLY_MENU, id);
+        super(LmaMenus.MAID_ASSEMBLY_MENU.get(), id);
         this.maid = MaidAssemblyNetwork.getMaidFromMenu(playerInv, data);
+        LittleMaidMoreAction.LOGGER.warn("[AssemblyMenu] ctor(客户端) menuType={} maid={} inv={}",
+                menuTypeState(), maid != null, playerInv != null);
         this.inv = MaidAssemblyInventory.client(this.maid); // 客户端独立实例
         addDataAndSlots(playerInv);
     }
@@ -149,5 +153,11 @@ public class MaidAssemblyMenu extends AbstractContainerMenu {
         MachineSlot(IItemHandler h, int i, int x, int y) { super(h, i, x, y); }
         @Override public int getMaxStackSize() { return 1; }
         @Override public int getMaxStackSize(ItemStack s) { return 1; }
+    }
+
+    /** 诊断用: 菜单类型供应商状态 (v79.63 排查"装配屏打不开"; 只做诊断, 不参与逻辑) */
+    private static String menuTypeState() {
+        var sup = com.github.xiaozhaoz1.littlemaidmoreaction.LmaMenus.MAID_ASSEMBLY_MENU;
+        return sup == null ? "SUPPLIER-NULL" : (sup.get() != null ? "ok" : "NULL!");
     }
 }

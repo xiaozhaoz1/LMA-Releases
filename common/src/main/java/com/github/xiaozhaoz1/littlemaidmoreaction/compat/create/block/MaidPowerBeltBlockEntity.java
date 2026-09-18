@@ -117,6 +117,16 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
         }
 
         collectedGeneratedSpeed = getStrongerSpeed(collectedGeneratedSpeed, speed);
+        // ★ v79.72 (用户方案, 错题 #362): 配置 ≥0 ⇒ **在源头固定总应力** —— 不乘蛋糕, **也不受夹制** ✗
+        //   原因: 下面那个 `getMaxStressCapacity()` = beltLength × (MAX_GENERATED_RPM × 4) = **段数 × 1024**
+        //   ⇒ **一段皮带永远只能算到 1024** ✓ 这就是"配置 100000 却读 1024"的最后一环 ✓
+        //   ⇒ 直接路径与表面链路从此**产出同一个值**(配置值) ⇒ 不再互相覆盖 ✓
+        //   (用户裁定: 1024/2048/4096 这些固定值都是 LMA 自己写的 ⇒ 就在生成处检查配置, 别在写入仲裁层打补丁 ✓)
+        int customStress = com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.POWER_BELT_STRESS.get();
+        if (customStress >= 0) {
+            collectedStressCapacity = customStress;
+            return;
+        }
         // v79.62.1 蛋糕应力倍率: cakeMult = 2^蛋糕数 (1/2/4) — 应力 = RPM×4×cakeMult
         // (绕开 MAX_GENERATED_RPM=256 封顶对速度→应力的拖累, 1 蛋糕×2 / 2 蛋糕×4)
         collectedStressCapacity =
@@ -159,6 +169,11 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
         if (!shouldApplyDetectedOutput(speed, capacity))
             return;
 
+        // ★ v79.72 fix (错题 #360): 直接输出 (女仆 sprint 时的配置值) 在窗口内是**权威** ⇒ 本链路让位 ✓
+        //   (否则配置的 100000 会被采样值覆盖成 1024 ✗ — 这就是"改了没变"的最后一层根因)
+        if (level != null && level.getGameTime() - lastDirectOutputTick < DIRECT_OVERRIDE_TICKS)
+            return;
+
         setGeneratedOutput(speed, capacity);
     }
 
@@ -199,6 +214,14 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
     }
 
     private float roundToGeneratedStressStep(float stressCapacity) {
+        // ★ v79.72 (用户方案, 错题 #362 真根因): 配置 ≥0 ⇒ **不做量化, 也不夹上限** —— 直接以配置值为准 ✓
+        //   ✗ 原来这里 `Mth.clamp(…, 0, getMaxStressCapacity())`, 而上限 = beltLength × (256×4) = **段数 × 1024**
+        //   ⇒ 检测链路 (`applyDetectedSurfaceMovement` → 本方法) 算出的 100000 **在这里被压回 1024** ✓✓
+        //   ⇒ 日志里那条 `capacity/每RPM=10.666667 ⇒ 总应力=1024.0` (= 1024/96) 就是它产出的 ✓ (与实测完全吻合)
+        int customStress = com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.POWER_BELT_STRESS.get();
+        if (customStress >= 0) {
+            return customStress;
+        }
         float generatedStressStep = GENERATED_RPM_STEP * STRESS_CAPACITY_PER_RPM;
         if (generatedStressStep <= 0)
             return 0;
@@ -222,13 +245,42 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
     }
 
     private void setGeneratedOutput(float speed, float capacity) {
+        // ★ v79.72 (用户方案, 错题 #362): **唯一写入口处强制配置值** —— 不管调用方算出来什么
+        //   (direct 路径 / 表面速度链路 / 检测平均链路 / 以后新增的任何路径), 只要配置 ≥0, 就一律
+        //   以「配置总应力 ÷ 转速」作为每 RPM 容量 ✓
+        //   教训: 我先前只在 `collectSurfaceMovement` 一处加检查 ⇒ 仍有一条链路产出 `capacity=10.666667`
+        //   (即 96×10.667=1024, = `STRESS_CAPACITY_PER_RPM`) 把值盖回去 ✗ ⇒ 改成在**字段写入点**统一强制 ✓
+        int customStress = com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.POWER_BELT_STRESS.get();
+        if (customStress >= 0) {
+            if (Mth.equal(speed, 0)) {
+                capacity = 0;
+            } else {
+                capacity = customStress / Math.abs(speed);
+            }
+        }
         if (Mth.equal(generatedSpeed, speed) && Mth.equal(generatedCapacity, capacity))
-            return;
+            return;   // 值没变 ⇒ 直接返回 (调用方每 tick 调, 这里就是幂等闸门 ✓)
 
         generatedSpeed = speed;
         generatedCapacity = capacity;
         updateGeneratedRotation();
+        // ★ v79.72 (错题 #359): **写字段 ≠ 生效** — Create 把应力容量缓存在**网络**里, 必须显式 dirty 才会重算。
+        //   入口 = `KineticBlockEntity.networkDirty` (fact-forcing: javap 本地 create-1.20.1-6.0.8.jar 实证
+        //   `public boolean networkDirty;` ✓, 另有 updateSpeed 只管转速路径 ✓)。
+        //   原实现只写 generatedSpeed/generatedCapacity 不 dirty ⇒ 用户把"皮带发电应力"改成 100000 后,
+        //   日志里字段已是 100000 ✓ 但 Create 护目镜仍显示 1024 (网络缓存的旧容量) ✗ —— 本行修的就是它 ✓
+        networkDirty = true;
+        // 日志按**用户看到的量** (总应力) 判定 — 转速/换算容量随蛋糕数抖动时不刷屏 (实测曾 600~5842 行 ✗)
+        float totalStress = speed * capacity;
+        if (!Mth.equal(lastLoggedTotalStress, totalStress)) {
+            lastLoggedTotalStress = totalStress;
+            LittleMaidMoreAction.LOGGER.info("[MaidPowerBelt] 输出变更: rpm={} capacity/每RPM={} ⇒ 总应力={}",
+                    speed, capacity, totalStress);
+        }
     }
+
+    /** 上次打日志的总应力 (见上: 只在用户可见量变化时打 ✓) */
+    private float lastLoggedTotalStress = Float.NaN;
 
     /**
      * 直接设置发电输出 (v79.62.1) — 绕开表面速度采样链路, 精确控制最终应力.
@@ -239,12 +291,21 @@ public class MaidPowerBeltBlockEntity extends GeneratingKineticBlockEntity {
     public void setDirectOutput(float rpm, float stress) {
         MaidPowerBeltBlockEntity controllerBE = isController() ? this : getControllerBE();
         if (controllerBE == null) return;
+        // ★ v79.72 fix (错题 #360): **直接输出必须是权威 writer** —— 表面速度链路
+        //   (`applyDetectedSurfaceMovement` → `setGeneratedOutput`) 每个检测周期都会覆盖它 ✗
+        //   (实测: 配置 100000 写进去了, 但紧接着被采样值 1024 盖回去 ⇒ 护目镜永远 1024)
+        //   ⇒ 记录"最后一次直接输出的时刻", 窗口内让表面链路 yield ✓ (她停了 sprint 后窗口过期, 采样链路自然接管 ✓)
+        controllerBE.lastDirectOutputTick = controllerBE.level != null ? controllerBE.level.getGameTime() : 0L;
         if (Mth.equal(rpm, 0)) {
             controllerBE.setGeneratedOutput(0, 0);
             return;
         }
         controllerBE.setGeneratedOutput(rpm, stress / Math.abs(rpm));
     }
+
+    /** 直接输出的权威窗口 (tick) — 窗口内表面速度链路不得覆盖 (女仆 sprint 期间每 tick 刷新 ⇒ 持续权威 ✓) */
+    private static final int DIRECT_OVERRIDE_TICKS = 40;
+    private long lastDirectOutputTick = Long.MIN_VALUE;
 
     @Override
     public float getGeneratedSpeed() {

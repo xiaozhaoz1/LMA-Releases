@@ -27,7 +27,10 @@ public final class BellRingPipeline extends WorkStationPipeline implements TaskC
 
     @Override public String taskType() { return "bell_ring"; }
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return s.getBlock() instanceof net.minecraft.world.level.block.BellBlock; }
-    @Override public List<TaskStep> steps() { return List.of(new TaskStep("ring", "敲响钟", StepType.INTERACT, List.of())); }
+    @Override public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            return List.of(new TaskStep("ring", "敲响钟", StepType.INTERACT, List.of())); }
 
     /** 纯验证 — 敲钟无前置条件，始终可用 */
     @Override
@@ -44,7 +47,7 @@ public final class BellRingPipeline extends WorkStationPipeline implements TaskC
         int interval = cfg.contains(KEY_RING_INTERVAL)
                 ? cfg.getInt(KEY_RING_INTERVAL)
                 : com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.BELL_RING_INTERVAL.get();
-        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                 .shouldFire(m, "bell_ring", interval)) {
             return TaskResult.CONTINUE;
         }

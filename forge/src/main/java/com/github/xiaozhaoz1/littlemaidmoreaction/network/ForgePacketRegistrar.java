@@ -53,6 +53,10 @@ public final class ForgePacketRegistrar {
                     MaidCodexScreenPacket::encode, MaidCodexScreenPacket::decode, MaidCodexScreenPacket::handle, dir(def.direction()))),
             Map.entry("maid_env_sense_toggle", (ch, def) -> ch.registerMessage(def.id(), MaidEnvSenseTogglePacket.class,
                     MaidEnvSenseTogglePacket::encode, MaidEnvSenseTogglePacket::decode, MaidEnvSenseTogglePacket::handle, dir(def.direction()))),
+            Map.entry("maid_gomoku_toggle", (ch, def) -> ch.registerMessage(def.id(), MaidGomokuTogglePacket.class,
+                    MaidGomokuTogglePacket::encode, MaidGomokuTogglePacket::decode, MaidGomokuTogglePacket::handle, dir(def.direction()))),
+            Map.entry("maid_gomoku_state", (ch, def) -> ch.registerMessage(def.id(), MaidGomokuStatePacket.class,
+                    MaidGomokuStatePacket::encode, MaidGomokuStatePacket::decode, MaidGomokuStatePacket::handle, dir(def.direction()))),
             Map.entry("farm_region_edit", (ch, def) -> ch.registerMessage(def.id(), FarmRegionEditPacket.class,
                     FarmRegionEditPacket::encode, FarmRegionEditPacket::decode, FarmRegionEditPacket::handle, dir(def.direction()))),
             Map.entry("farm_region_sync", (ch, def) -> ch.registerMessage(def.id(), FarmRegionSyncPacket.class,
@@ -60,9 +64,7 @@ public final class ForgePacketRegistrar {
             Map.entry("farm_container_bind", (ch, def) -> ch.registerMessage(def.id(), FarmContainerBindPacket.class,
                     FarmContainerBindPacket::encode, FarmContainerBindPacket::decode, FarmContainerBindPacket::handle, dir(def.direction()))),
             Map.entry("farm_region_bind", (ch, def) -> ch.registerMessage(def.id(), FarmRegionBindPacket.class,
-                    FarmRegionBindPacket::encode, FarmRegionBindPacket::decode, FarmRegionBindPacket::handle, dir(def.direction()))),
-            Map.entry("smithing_craft", (ch, def) -> ch.registerMessage(def.id(), SmithingCraftPacket.class,
-                    SmithingCraftPacket::encode, SmithingCraftPacket::decode, SmithingCraftPacket::handle, dir(def.direction())))
+                    FarmRegionBindPacket::encode, FarmRegionBindPacket::decode, FarmRegionBindPacket::handle, dir(def.direction())))
     );
 
     /** 清单驱动注册 — commonSetup enqueueWork 内调用; 漂移 (缺/幽灵条目) fail-fast */

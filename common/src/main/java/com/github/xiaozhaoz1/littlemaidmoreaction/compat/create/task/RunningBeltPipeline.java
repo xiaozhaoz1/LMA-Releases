@@ -47,7 +47,10 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
     private static final float SPRINT_SPEED = 0.2f;
 
     @Override public String taskType() { return "running_belt"; }
-    @Override public List<TaskStep> steps() { return List.of(new TaskStep("run", "跑步发电", StepType.INTERACT, List.of())); }
+    @Override public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            return List.of(new TaskStep("run", "跑步发电", StepType.INTERACT, List.of())); }
     @Override public PipelineResult validate(ServerLevel l, EntityMaid m, PipelineContext c) { return PipelineResult.ok(""); }
 
     // executor/execute 删除 (v79.45) — 执行全归 GMPM tick 驱动
@@ -63,11 +66,32 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
         // 若 target 处是发电皮带但女仆不在跑步 (converted!=true, 如世界重启后任务未启动/中途打断)
         // → revertToRegularBelt(anchor) 从 anchor 反走找 controller 还原整条链 (旁边格扩散).
         // 正在跑步 (converted=true) 不检查 — 女仆在用.
+        // ★ v79.71 修「魂符收放后不再变发电」(用户实测, 错题 #358): `converted` 是 **FSM 分派键**, 而魂符
+        //   收走时 `onMaidUnload` 原本**只清 target 不清 converted** ✗ ⇒ 女仆被放回后 `converted=true`
+        //   但 target 已无 ⇒ 永远走不到"站上去 → 转换"的 tickSearching 分支 ✗
+        //   ⇒ ① 失效/残留锚点一律清**两个**键 (死绑定只会误导 FSM) ② onMaidUnload 也清 converted ✓
         if (!"true".equals(pd.getString("converted"))) {
             BlockPos anchor = BlockTargetNavigation.parseTarget(pd.getString("target"));
-            if (anchor != null && MaidPowerBeltBlock.isMaidPowerBelt(world.getBlockState(anchor))) {
-                RunningBeltService.revertToRegularBelt(world, anchor);
+            if (anchor != null) {
+                if (MaidPowerBeltBlock.isMaidPowerBelt(world.getBlockState(anchor))) {
+                    RunningBeltService.revertToRegularBelt(world, anchor);
+                }
                 pd.remove("target");
+                pd.remove("converted");
+            }
+        } else {
+            // converted=true 时也要校验绑定是否仍然有效 — 锚点已被外部还原成普通皮带 ⇒ 立即清绑定回 searching
+            BlockPos bound = BlockTargetNavigation.parseTarget(pd.getString("target"));
+            if (bound == null || !MaidPowerBeltBlock.isMaidPowerBelt(world.getBlockState(bound))) {
+                if (bound != null && isHorizontalBelt(world.getBlockState(bound))) {
+                    // 皮带还在 (只是被还原成普通皮带) ⇒ 清绑定 ⇒ 下一 tick 重新走"站上去 → 转换" ✓
+                    pd.remove("target");
+                    pd.remove("converted");
+                    pd.putInt("cooldown", 0);
+                } else {
+                    revertAndClear(world, maid, pd);   // 皮带已不在/不可用 ⇒ 走原清理 (含冷却) ✓
+                }
+                return;
             }
         }
 
@@ -89,7 +113,7 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
         }
         // v79.61x: 缺皮带/缺食物静默 → 600t 节流气泡
         if (beltPos == null) {
-            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                     .shouldFire(maid, "running_belt_no_belt", 600)) {
                 com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
                         .showFail(maid, "脚下没有水平皮带");
@@ -97,7 +121,7 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
             return;
         }
         if (RunningBeltService.findFoodItem(maid) == null) {
-            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                     .shouldFire(maid, "running_belt_no_food", 600)) {
                 com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
                         .showFail(maid, "背包里没有食物");
@@ -125,12 +149,16 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
             return;
         }
 
+        // ★ v79.63.9 (用户裁定 2026-09-14): **删掉"直接吃"** — 原来每 100t 调 RunningBeltService.consumeFood
+        //   (= EntityMaid.eat() ✗) 直接扣背包食物: 绕过"拿在手上吃"的归还流程 ⇒ **永久食物被吃没** ✗
+        //   (用户实测: 女仆偶尔吃两次 — 一次直接吃(这里) + 一次拿在手上吃(TLM 自身) ✓)
+        //   现只保留 TLM 的手持吃法 (会正确归还容器/留下永久食物 ✓); 本任务仍**要求背包有食物**才跑
+        //   (下方 102 行的前置判定 ✓), 但**只检查不消耗** ✗。
         int foodTimer = pd.getInt("foodTimer") + 1;
         if (foodTimer >= FOOD_INTERVAL) {
             var food = RunningBeltService.findFoodItem(maid);
             if (food == null) { revertAndClear(world, maid, pd); return; }
-            RunningBeltService.consumeFood(maid, food.slotIndex());
-            foodTimer = 0;
+            foodTimer = 0;   // 仅重置计时 (不消耗 ✗ — v79.63.9 用户裁定)
         }
         pd.putInt("foodTimer", foodTimer);
 
@@ -159,12 +187,12 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
         NavigationUtil.keepAlive(world, maid);
         maid.getNavigation().stop();
         com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.PathingApi.clearNav(maid);
-        maid.setHomeModeEnable(true);
+        maid.setHomeModeEnable(true);   // 站桩跑步: 强制 home (2026-09-17 用户确认**这是设计意图**, 非 bug)
 
         // 顺带摇周围 2 格内曲柄 (最多 2 个 — 跑步不移动, 就近摇; 发电上报式不中断)
         var cranks = CrankService.findCranks(world, maid.blockPosition(), 2, 2);
         if (!cranks.isEmpty()) {
-            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, 20);
+            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.MaidSwing.onInterval(maid, 20);
         }
         for (BlockPos c : cranks) {
             CrankService.crank(world, c);
@@ -175,7 +203,7 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
 
     public void cleanup(EntityMaid maid) {
         maid.setSprinting(false);
-        maid.setHomeModeEnable(false);   // 恢复 home 模式 (跑步时强制开启)
+        maid.setHomeModeEnable(false);   // 站桩结束: 关 home (2026-09-17 用户确认**这是设计意图**, 非 bug)
         if (!(maid.level() instanceof ServerLevel world)) return;
         revertAndClear(world, maid, pipelineData(maid));
         NavigationMemory.clearAllNav(maid);
@@ -187,6 +215,11 @@ public final class RunningBeltPipeline implements TaskPipeline, TaskConfigurable
     public static void onMaidUnload(EntityMaid maid) {
         if (!(maid.level() instanceof ServerLevel world)) return;
         CompoundTag pd = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.pl(maid, "running_belt");
+        // ★ v79.71 (错题 #358): **必须最先清 FSM 分派键** — 它是"绑定态"的核心:
+        //   ① 原实现放在 anchor 检查之后 ⇒ 锚点为 null 时直接 return, `converted="true"` 被魂符带走 ✗
+        //   ② 清键与"是否触及 Create 方块"无关 ⇒ 放最前也让状态契约能被独立验证 ✓ (gametest 环境 Create 不可用)
+        //   ③ 女仆离开世界 ⇒ 下次回来必须回到 searching (重新站上去转换) ✓
+        pd.remove("converted");
         BlockPos anchor = BlockTargetNavigation.parseTarget(pd.getString("target"));
         if (anchor == null) return;
         if (MaidPowerBeltBlock.isMaidPowerBelt(world.getBlockState(anchor))) {

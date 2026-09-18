@@ -1,5 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.network;
 
+import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
+
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.LmaTaskConfigContainer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.nbt.CompoundTag;
@@ -59,7 +61,7 @@ public record ReplyTaskConfigPacket(int maidId, String taskType, CompoundTag con
 //?}
 //? if !1.20.1 {
     public static final CustomPacketPayload.Type<ReplyTaskConfigPacket> TYPE =
-        new CustomPacketPayload.Type<>(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("littlemaidmoreaction", "reply_task_config"));
+        new CustomPacketPayload.Type<>(net.minecraft.resources.ResourceLocation.fromNamespaceAndPath(LittleMaidMoreAction.MOD_ID, "reply_task_config"));
 
     @Override
     public CustomPacketPayload.Type<? extends CustomPacketPayload> type() { return TYPE; }

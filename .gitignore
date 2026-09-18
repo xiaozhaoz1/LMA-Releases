@@ -26,3 +26,6 @@ docs/
 CLAUDE.md
 MIGRATION-STATE.md
 resources-tlm-reference/
+
+build-logs/
+*.log

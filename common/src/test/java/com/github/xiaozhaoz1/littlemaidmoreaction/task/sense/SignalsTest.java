@@ -15,7 +15,6 @@ class SignalsTest {
     void envof_roundtrip() {
         assertEquals("env:SNOWING", Signals.envOf(EnvSignal.SNOWING));
         assertEquals("env:FESTIVAL_ENTER", Signals.envOf(EnvSignal.FESTIVAL_ENTER));
-        assertTrue(Signals.envOf(EnvSignal.TEMP_COLD).startsWith(Signals.ENV_PREFIX));
     }
 
     @Test

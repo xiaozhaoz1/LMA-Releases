@@ -34,6 +34,9 @@ public final class PowerPipeline extends MoveToBlockStateMachine<PowerPipeline.S
 
     @Override
     public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            
         return List.of(new TaskStep("power", "提供动力", StepType.INTERACT, List.of()));
     }
 
@@ -62,7 +65,7 @@ public final class PowerPipeline extends MoveToBlockStateMachine<PowerPipeline.S
                 BlockPos target = PowerService.findTargets(world, maid.blockPosition())
                         .stream().filter(p -> !isSkipped(maid, p, now)).findFirst().orElse(null);
                 if (target == null) {
-                    if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                    if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                             .shouldFire(maid, "power_no_target", 600)) {
                         com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
                                 .showFail(maid, "附近没有可提供动力的机器");
@@ -107,7 +110,7 @@ public final class PowerPipeline extends MoveToBlockStateMachine<PowerPipeline.S
                 }
                 if (!arrived(maid, target)) { stopPower(maid); yield State.NAVIGATING; }
                 PowerService.providePower(world, target, PowerService.DEFAULT_RPM);
-                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, 20);
+                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.MaidSwing.onInterval(maid, 20);
                 yield null;
             }
         };

@@ -111,10 +111,16 @@ public final class ActiveTaskConfig {
     // ── 挖空置域 (v79.62) ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.IntValue VOID_DEFAULT_CHUNKS;
+    /** v79.63.12: 发电皮带自定义应力容量 (-1 = 用原公式 1024/2048/4096 随蛋糕 ✓; ≥0 = 固定值 ✓) */
+    public static final ForgeConfigSpec.IntValue POWER_BELT_STRESS;
+    public static final ForgeConfigSpec.IntValue DAM_FILL_DEFAULT_CHUNKS; /** v79.63.15 (用户裁定): 填坝排水**自己的**默认区域 (不再借用/写死 ✗ — 独立于挖空置域 ✓) */
     public static final ForgeConfigSpec.ConfigValue<java.util.List<? extends String>> VOID_DESTROY_LIST;
     public static final ForgeConfigSpec.BooleanValue VOID_NO_PATHFIND;
 //?} else {
     public static final ModConfigSpec.IntValue VOID_DEFAULT_CHUNKS;
+    /** v79.63.12: 发电皮带自定义应力容量 (-1 = 用原公式 ✓; ≥0 = 固定值 ✓) */
+    public static final ModConfigSpec.IntValue POWER_BELT_STRESS;
+    public static final ModConfigSpec.IntValue DAM_FILL_DEFAULT_CHUNKS; /** v79.63.15 (用户裁定): 填坝排水**自己的**默认区域 (不再借用/写死 ✗ — 独立于挖空置域 ✓) */
     public static final ModConfigSpec.ConfigValue<java.util.List<? extends String>> VOID_DESTROY_LIST;
     public static final ModConfigSpec.BooleanValue VOID_NO_PATHFIND;
 //?}
@@ -295,9 +301,21 @@ public final class ActiveTaskConfig {
                 .defineInRange("timer_default_interval", 200, 20, 12000);
         b.pop();
 
+        b.push("running_belt");
+        POWER_BELT_STRESS = b
+                .comment("发电皮带自定义应力容量: -1 = 用原公式(1024/2048/4096, 随蛋糕加成); ≥0 = 固定应力容量(转速仍由蛋糕控制 96/192/256 RPM)")
+                .defineInRange("stress", -1, -1, 1000000);
+        b.pop();
+
+        b.push("dam_fill");
+        DAM_FILL_DEFAULT_CHUNKS = b
+                .comment("填坝排水默认区域区块数 (起点为中心 N×N 区块; 单选单区块; 单女仆可在任务设置页覆盖)")
+                .defineInRange("default_chunks", 1, 1, 256);
+        b.pop();
+
         b.push("void_excavation");
         VOID_DEFAULT_CHUNKS = b
-                .comment("挖空置域默认区块数 (单女仆 TLM 任务栏可覆盖; 起点为中心 N×N 区块, 全挖)")
+                .comment("挖空置域默认区块数 (起点为中心 N×N 区块, 从起点高度**向下挖到最低高度**(默认自动探测基岩层); 对所有女仆生效)")
                 .defineInRange("default_chunks", 32, 1, 256);
         VOID_DESTROY_LIST = b
                 .comment("挖空置域销毁名单 (物品id列表; 名单内物品挖出即销毁消失, 不进背包不落地; 单女仆 TLM 设置可覆盖)")
@@ -400,6 +418,8 @@ public final class ActiveTaskConfig {
         MoreActionConfig.reg(ACTIVE_VALUES, "active", CRAFT_MAX_PRODUCTS);
         // v79.62 挖空置域配置 (默认区块数 + 销毁名单 + 关寻路 — reg 同步, 防 ConfigConsistencyTest 红)
         MoreActionConfig.reg(ACTIVE_VALUES, "active", VOID_DEFAULT_CHUNKS);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", POWER_BELT_STRESS);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", DAM_FILL_DEFAULT_CHUNKS);   // v79.63.15 填坝独立区域   // v79.63.12 发电皮带应力
         MoreActionConfig.reg(ACTIVE_VALUES, "active", VOID_DESTROY_LIST);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", VOID_NO_PATHFIND);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", FURNACE_BLACKLIST);

@@ -145,7 +145,7 @@ public final class ToolJudge {
                 ? ToolStateReader.isAxe(tool)
                 : ToolStateReader.isPickaxe(tool);
         return intervalTicksForTier(ToolStateReader.getTierLevel(tool),
-                properTool, isToolUsable(tool, 1));
+                properTool, isToolUsable(tool, 0));   // v79.62.4 用户裁定: 剩余耐久 > 0 即可用 (不再留 1)
     }
 
     /** 纯逻辑: 按 tier 查破坏间隔 (v79.57 抽层 — 无 MC 依赖, 纯 JVM 可测) */

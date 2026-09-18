@@ -188,7 +188,7 @@ public final class MaidAssemblyService {
     }
 
     public static ItemStack extractNearbyItem(Level level, BlockPos pos, ItemStack target) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.container.NearbyContainerScanner.extractItem(
+        return com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.container.ContainerExtractor.extractItem(
             level, pos, SEARCH_RADIUS, st -> ItemStackHelper.isSameItem(st, target), java.util.Set.of());
     }
 

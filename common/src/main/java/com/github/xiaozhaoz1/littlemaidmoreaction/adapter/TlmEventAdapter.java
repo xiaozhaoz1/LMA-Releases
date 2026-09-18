@@ -50,6 +50,17 @@ public final class TlmEventAdapter {
         if (!(e.getEntity() instanceof EntityMaid maid)) return;
         if (maid.level().isClientSide()) return;
 
+        // v79.63 schema 迁移入口 (幂等) — 删除任务 / 改键结构后, 旧存档残留键在此收口。
+        // 必须先于下面的任务恢复逻辑: 迁移可能清掉"孤儿任务状态"(如已删的 smithing),
+        // 否则下面会按残留 task 名尝试恢复一个不存在的任务 (评审 P1-4)。
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskDataSchema.ensure(maid);
+
+        // ⚠ 2026-09-18 回滚注记 (错题 #357): 曾在此加"空置域调度坐标自愈" (标记还原 + 旧存档形态启发式修复)
+        // 以修「空置域已关闭仍被拉回」— 该处**所有 maid join 都会经过**, 实测 (a) 形态启发式会**误命中运行中的
+        // 空置域女仆** (她正被劫持到区块中心, 与故障态同形) ⇒ 重置坐标 ⇒ TLM restrict 拉走 ⇒ 多女仆 dug=0/4 ✗;
+        // (b) 即便只留标记还原, `lmavoidexcavationmultimaid` 仍稳定失败 ✗ ⇒ **此处不留逻辑**;
+        // 未决方案见错题 #357 (需专项定位 SchedulePos 写入时机与 SchedulePos.tick 的 restrict 抖动)
+
         var data = maid.getPersistentData();
         // 门面收编 (remove 段保留 — 键常量已有)
         String task = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getTask(maid);
@@ -108,7 +119,7 @@ public final class TlmEventAdapter {
         }
 
         // 清理链采 BFS/缓存 (跨session和魂符都需要)
-        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest
             .ChainHarvestExecute.clearChainData(data);
 
         // 仅跨session重提交, 魂符由Brain自然激活

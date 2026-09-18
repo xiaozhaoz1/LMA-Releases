@@ -54,7 +54,8 @@ public final class PacketRegistry {
             new PacketDef(18, "farm_container_bind", FarmContainerBindPacket.class, PacketDef.Direction.C2S, false),
             // v79.62 区域制绑定: 选区+女仆 → 服务端建区域 (C2S)
             new PacketDef(19, "farm_region_bind", FarmRegionBindPacket.class, PacketDef.Direction.C2S, false),
-            new PacketDef(20, "smithing_craft", SmithingCraftPacket.class, PacketDef.Direction.C2S, false),
+            new PacketDef(21, "maid_gomoku_toggle", MaidGomokuTogglePacket.class, PacketDef.Direction.C2S, false),
+            new PacketDef(22, "maid_gomoku_state", MaidGomokuStatePacket.class, PacketDef.Direction.S2C, false),
             //? if !1.20.1 {
             new PacketDef(-1, "numen_companions", NumenCompanionSyncPayload.class, PacketDef.Direction.S2C, true),
             new PacketDef(-1, "maid_voice", LmaMaidVoicePayload.class, PacketDef.Direction.S2C, true)

@@ -24,10 +24,9 @@ public record EnvSnapshot(long gameTime,
                           WorldInfo world) {
 
     /**
-     * 世界状态快照 — 温度/降水判定与 TLM 对齐。
+     * 世界状态快照 — 温度档经 TLM {@code IMaid.getAtBiomeTemp()} 读 (v79.62.5 删 LMA 自采集/
+     * tempCategory+temperature 字段 — 用户裁定: TLM 温度机制已覆盖)。
      *
-     * @param tempCategory  温度档: COLD(<0.15) / OCEAN(<0.55) / MEDIUM(<0.95) / WARM
-     * @param temperature   biome 基础温度 {@code getBaseTemperature()}
      * @param precipitation 女仆位置降水类型: NONE / RAIN / SNOW
      * @param dayTime       当日时间 0-23999
      * @param timeSegment   时间段: DAY(0-11999) / DUSK(12000-13799) / NIGHT(13800-22199) / DAWN(22200-23999)
@@ -36,7 +35,6 @@ public record EnvSnapshot(long gameTime,
      */
     public record WorldInfo(boolean day, boolean raining, boolean thundering,
                             int moonPhase, int lightAtMaid, String dimension,
-                            String tempCategory, float temperature,
                             String precipitation, long dayTime, String timeSegment,
                             String biomeId, String structuresAt) {}
 

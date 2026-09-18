@@ -1,4 +1,6 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.ai.context;
+
+import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ItemStackHelper;
 //? if !1.20.1 {
@@ -31,9 +33,9 @@ import net.neoforged.fml.common.EventBusSubscriber;
  * 将食物名写入玩家的 PersistentData，供 AI 上下文读取。
  */
 //? if 1.20.1 {
-@Mod.EventBusSubscriber(modid = "littlemaidmoreaction")
+@Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID)
 //?} else {
-@EventBusSubscriber(modid = "littlemaidmoreaction")
+@EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID)
 //?}
 public final class OwnerFoodTracker {
 

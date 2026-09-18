@@ -3,11 +3,14 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.commands;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskToggle;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.TaskTree;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.network.chat.Component;
 //? if 1.20.1 {
 import net.minecraftforge.event.RegisterCommandsEvent;
@@ -26,7 +29,20 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.common.EventBusSubscriber;
 //?}
 
+import java.util.List;
+import java.util.stream.Collectors;
 
+/**
+ * v79.62.5 重写为正式 Brigadier 命令树 — 子命令逐级 literal + 参数 suggests 补全
+ * (原 greedyString 手拆无 Tab 补全 — 用户实测不会用)。
+ *
+ * <pre>/lma
+ *  ├─ task list | tree | debug [uuid]
+ *  ├─ task enable|disable|show|hide &lt;type&gt;   (Tab 补全任务类型)
+ *  ├─ festival &lt;name&gt;                         (Tab 补全节日 id/名)
+ *  └─ structure fire &lt;kind&gt; | state | reset   (fire Tab 补全 discover/refresh/enter/leave)
+ * </pre>
+ */
 //? if 1.20.1 {
 @Mod.EventBusSubscriber(modid = LittleMaidMoreAction.MOD_ID)
 //?} else {
@@ -34,65 +50,114 @@ import net.neoforged.fml.common.EventBusSubscriber;
 //?}
 public final class LmaCommand {
 
+    // ── 补全数据源 ──
+
+    /** 任务类型建议 (Tab: /lma task enable &lt;type&gt;) — 注册表全量 */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_TASK = (ctx, b) ->
+            SharedSuggestionProvider.suggest(TaskRegistry.taskTypes().stream().sorted().collect(Collectors.toList()), b);
+
+    /** 节日建议 (Tab: /lma festival &lt;name&gt;) — 节日表 id + 名称 */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_FESTIVAL = (ctx, b) -> {
+        // ★ v79.64 (用户实测: "怎么还有中文" ✗): 原实现把 **id + 中文名** 都列进 Tab 建议 ✗ —
+        //   而参数类型是 word() (只认 ASCII ✗) ⇒ 用户 Tab 选到中文 ⇒ 必被拒 ✓
+        //   ⇒ 现**只给 id** ✓ (handleFestival 里 FestivalTable.byName 两者都认 ✓ 但用法统一走 id ✓)
+        List<String> names = com.github.xiaozhaoz1.littlemaidmoreaction.storage.FestivalTable.all().stream()
+                .map(f -> f.id())
+                .collect(Collectors.toList());
+        return SharedSuggestionProvider.suggest(names, b);
+    };
+
+    /** 结构信号建议 (Tab: /lma structure fire &lt;kind&gt;) */
+    private static final SuggestionProvider<CommandSourceStack> SUGGEST_STRUCT_KIND = (ctx, b) ->
+            SharedSuggestionProvider.suggest(List.of("discover", "refresh", "enter", "leave"), b);
+
     @SubscribeEvent
     public static void register(RegisterCommandsEvent event) {
         CommandDispatcher<CommandSourceStack> d = event.getDispatcher();
         d.register(Commands.literal("lma")
             .requires(s -> s.hasPermission(2))
+            // ── task ──
             .then(Commands.literal("task")
-                .then(Commands.argument("args", StringArgumentType.greedyString())
-                    .executes(LmaCommand::handleTask)))
+                .then(Commands.literal("list").executes(LmaCommand::handleTaskList))
+                .then(Commands.literal("tree").executes(LmaCommand::handleTaskTree))
+                .then(Commands.literal("debug")
+                    .executes(LmaCommand::handleTaskDebug)
+                    .then(Commands.argument("uuid", StringArgumentType.word())
+                        .executes(LmaCommand::handleTaskDebug)))
+                .then(Commands.literal("enable")
+                    .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(SUGGEST_TASK)
+                        .executes(ctx -> toggleTask(ctx, true))))
+                .then(Commands.literal("disable")
+                    .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(SUGGEST_TASK)
+                        .executes(ctx -> toggleTask(ctx, false))))
+                .then(Commands.literal("show")
+                    .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(SUGGEST_TASK)
+                        .executes(ctx -> toggleVisible(ctx, true))))
+                .then(Commands.literal("hide")
+                    .then(Commands.argument("type", StringArgumentType.word())
+                        .suggests(SUGGEST_TASK)
+                        .executes(ctx -> toggleVisible(ctx, false)))))
+            // ── festival ──
             .then(Commands.literal("festival")
                 .then(Commands.argument("name", StringArgumentType.word())
+                    .suggests(SUGGEST_FESTIVAL)
                     .executes(LmaCommand::handleFestival)))
+            // ── structure ──
             .then(Commands.literal("structure")
                 .then(Commands.literal("fire")
                     .then(Commands.argument("kind", StringArgumentType.word())
+                        .suggests(SUGGEST_STRUCT_KIND)
                         .executes(LmaCommand::handleStructureFire)))
                 .then(Commands.literal("state").executes(LmaCommand::handleStructureState))
                 .then(Commands.literal("reset").executes(LmaCommand::handleStructureReset)))
         );
     }
 
-    /** 统一任务命令解析: /lma task list|tree|enable X|disable X|reload */
-    private static int handleTask(CommandContext<CommandSourceStack> ctx) {
-        String raw = StringArgumentType.getString(ctx, "args");
-        String[] parts = raw.split("\\s+");
-        if (parts.length == 0) return send(ctx, "§7用法: /lma task list|tree|enable|disable|show|hide|reload");
+    // ── task handlers ──
 
-        return switch (parts[0]) {
-            case "list"  -> taskList(ctx);
-            case "tree"  -> taskTree(ctx);
-            case "enable"-> toggleTask(ctx, parts, true);
-            case "disable"->toggleTask(ctx, parts, false);
-            case "show"  -> toggleVisible(ctx, parts, true);
-            case "hide"  -> toggleVisible(ctx, parts, false);
-            case "debug"  -> taskDebug(ctx, parts);   // 任务运行时快照
-            default      -> send(ctx, "§c未知: " + parts[0]);
-        };
+    /** /lma task list — 任务列表 */
+    private static int handleTaskList(CommandContext<CommandSourceStack> ctx) {
+        return send(ctx, TaskTree.buildText());
     }
 
-    private static int toggleTask(CommandContext<CommandSourceStack> ctx, String[] parts, boolean enable) {
-        if (parts.length < 2) return send(ctx, "§7用法: /lma task " + (enable ? "enable" : "disable") + " <类型>");
-        TaskToggle.setEnabled(parts[1], enable);
-        return send(ctx, "§a" + parts[1] + (enable ? " 已启用" : " 已禁用"));
-    }
-    private static int toggleVisible(CommandContext<CommandSourceStack> ctx, String[] parts, boolean show) {
-        if (parts.length < 2) return send(ctx, "§7用法: /lma task " + (show ? "show" : "hide") + " <类型>");
-        TaskToggle.setVisible(parts[1], show);
-        return send(ctx, "§a" + parts[1] + (show ? " 显示在任务栏" : " 隐藏(被动)"));
+    /** /lma task tree — 任务树带步骤/分组 */
+    private static int handleTaskTree(CommandContext<CommandSourceStack> ctx) {
+        var nodes = TaskTree.build();
+        StringBuilder sb = new StringBuilder("§6═══ 任务树 ═══\n");
+        for (var n : nodes) {
+            sb.append(n.enabled() ? "§a✔" : "§c✖");
+            sb.append(n.visible() ? " §f" : " §8");
+            sb.append(n.taskType());
+            if (!n.steps().isEmpty()) {
+                sb.append(" §7");
+                n.steps().forEach(s -> sb.append(s.label()).append(" "));
+            }
+            sb.append("\n");
+        }
+        sb.append("\n§6═══ 分组 ═══\n");
+        for (var g : TaskTree.buildGroups()) {
+            sb.append("§f📁 ").append(g.label()).append(" §7→ ").append(String.join(", ", g.tasks())).append("\n");
+        }
+        return send(ctx, sb.toString());
     }
 
-    // ── task display ──
-
-    /** /lma task debug [uuid] — 任务运行时快照 (状态/游标/最后转换/最后错误) */
-    private static int taskDebug(CommandContext<CommandSourceStack> ctx, String[] parts) {
+    /** /lma task debug [uuid] — 任务运行时快照 */
+    private static int handleTaskDebug(CommandContext<CommandSourceStack> ctx) {
+        String uuidStr = null;
+        try {
+            uuidStr = StringArgumentType.getString(ctx, "uuid");
+        } catch (IllegalArgumentException e) {
+            // 无 uuid 参数 — 全部女仆
+        }
         java.util.UUID filter = null;
-        if (parts.length >= 2) {
+        if (uuidStr != null) {
             try {
-                filter = java.util.UUID.fromString(parts[1]);
+                filter = java.util.UUID.fromString(uuidStr);
             } catch (IllegalArgumentException e) {
-                return send(ctx, "§7用法: /lma task debug [uuid]");
+                return send(ctx, "§c非法 uuid: " + uuidStr + " (§7用法: /lma task debug [uuid])");
             }
         }
         var server = ctx.getSource().getServer();
@@ -108,13 +173,12 @@ public final class LmaCommand {
                     sb.append("§8").append(maid.getName().getString()).append(": §7空闲\n");
                     continue;
                 }
-                var handler = com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry.get(task);
+                var handler = TaskRegistry.get(task);
                 if (handler == null) {
                     sb.append("§8").append(maid.getName().getString()).append(": §7任务 ").append(task).append(" 未注册\n");
                     continue;
                 }
                 sb.append("§8").append(maid.getName().getString()).append("\n");
-                // FSM 调试分支随 FsmPipeline 删除 — 统一代码管线提示
                 sb.append("§7代码管线 ").append(task).append(" (无调试快照)\n");
             }
         }
@@ -122,46 +186,49 @@ public final class LmaCommand {
         return send(ctx, sb.toString());
     }
 
-    private static int taskList(CommandContext<CommandSourceStack> ctx) { return send(ctx, "§6" + TaskTree.buildText()); }
-    private static int taskTree(CommandContext<CommandSourceStack> ctx) {
-        var nodes = TaskTree.build();
-        StringBuilder sb = new StringBuilder("§6═══ 任务树 ═══\n");
-        for (var n : nodes) {
-            sb.append(n.enabled() ? "§a✔" : "§c✖");
-            sb.append(n.visible() ? " §f" : " §8");
-            sb.append(n.taskType());
-            if (!n.steps().isEmpty()) { sb.append(" §7"); n.steps().forEach(s -> sb.append(s.label()).append(" ")); }
-            sb.append("\n");
-        }
-        sb.append("\n§6═══ 分组 ═══\n");
-        for (var g : TaskTree.buildGroups()) sb.append("§f📁 ").append(g.label()).append(" §7→ ").append(String.join(", ", g.tasks())).append("\n");
-        return send(ctx, sb.toString());
+    /** /lma task enable|disable &lt;type&gt; */
+    private static int toggleTask(CommandContext<CommandSourceStack> ctx, boolean enable) {
+        String type = StringArgumentType.getString(ctx, "type");
+        if (TaskRegistry.get(type) == null) return send(ctx, "§c未知任务类型: " + type + " (Tab 补全列表)");
+        TaskToggle.setEnabled(type, enable);
+        return send(ctx, "§a" + type + (enable ? " 已启用" : " 已禁用"));
     }
 
-    /** /lma festival <name> — 触发节日信号 (调试节日礼物/气泡) */
+    /** /lma task show|hide &lt;type&gt; */
+    private static int toggleVisible(CommandContext<CommandSourceStack> ctx, boolean show) {
+        String type = StringArgumentType.getString(ctx, "type");
+        if (TaskRegistry.get(type) == null) return send(ctx, "§c未知任务类型: " + type + " (Tab 补全列表)");
+        TaskToggle.setVisible(type, show);
+        return send(ctx, "§a" + type + (show ? " 显示在任务栏" : " 隐藏(被动)"));
+    }
+
+    // ── festival ──
+
+    /** /lma festival &lt;name&gt; — 触发节日信号 (调试节日礼物/气泡) */
     private static int handleFestival(CommandContext<CommandSourceStack> ctx) {
         var src = ctx.getSource();
         if (!(src.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) {
             return send(ctx, "§c该指令需玩家执行");
         }
         String name = StringArgumentType.getString(ctx, "name");
-        var f = com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.FestivalTable.byName(name);
-        if (f == null) return send(ctx, "§c未知节日: " + name + " (支持 id 或名称, 如 spring_festival/春节)");
+        var f = com.github.xiaozhaoz1.littlemaidmoreaction.storage.FestivalTable.byName(name);
+        if (f == null) return send(ctx, "§c未知节日: " + name + " (Tab 补全; 空表 = 节日数据未加载)");
         var level = (net.minecraft.server.level.ServerLevel) sp.level();
+        int triggered = 0;
         for (var e : level.getEntities().getAll()) {
             if (!(e instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid)) continue;
             if (maid.getOwner() != sp) continue;
-            // 直接触发对应节日的礼物+气泡 (绕过日期查表 — 调试用)
             com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.impl.FestivalPassiveTask
                     .debugTrigger(level, maid, f);
-            return send(ctx, "§a已触发: " + f.name() + " → " + maid.getName().getString());
+            triggered++;
         }
-        return send(ctx, "§7附近没有你的女仆");
+        if (triggered == 0) return send(ctx, "§7附近没有你的女仆 (需先驯服女仆且在同维度)");
+        return send(ctx, "§a已触发: " + f.name() + " → " + triggered + " 只女仆");
     }
 
-    // ── structure 调试 ──
+    // ── structure ──
 
-    /** /lma structure fire <kind> — 立即发射结构信号 (气泡+聊天真实链路, 绕过节流/状态机) */
+    /** /lma structure fire &lt;kind&gt; — 立即发射结构信号 (discover/refresh/enter/leave) */
     private static int handleStructureFire(CommandContext<CommandSourceStack> ctx) {
         var src = ctx.getSource();
         if (!(src.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) {

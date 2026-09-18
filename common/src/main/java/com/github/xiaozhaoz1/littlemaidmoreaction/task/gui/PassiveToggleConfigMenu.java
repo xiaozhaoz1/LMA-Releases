@@ -11,7 +11,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class PassiveToggleConfigMenu extends LmaTaskConfigContainer {
 
     public PassiveToggleConfigMenu(int containerId, Inventory playerInv, int maidId) {
-        super(LmaMenus.PASSIVE_TOGGLE_CONFIG_MENU, containerId, playerInv, maidId);
+        super(LmaMenus.PASSIVE_TOGGLE_CONFIG_MENU.get(), containerId, playerInv, maidId);
     }
 
 }

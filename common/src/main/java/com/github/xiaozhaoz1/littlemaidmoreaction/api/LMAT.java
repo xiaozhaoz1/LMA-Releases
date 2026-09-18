@@ -58,6 +58,22 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskStateMachine;
  */
 public final class LMAT {
 
+    /**
+     * 对外 API 版本 (v79.63 契约评审 D-5) — 第三方 mod 可在启动期探测并决定兼容策略。
+     *
+     * <p><b>兼容承诺</b>: 门面方法**只加不减** (ADR-C7); 已发布签名视为冻结。破坏性变更
+     * (删方法 / 改签名 / 改语义) → MAJOR 递增。
+     * <ul>
+     *   <li>MAJOR — 破坏性 (自 v79.63 起登记; 此前无版本号可探测)</li>
+     *   <li>MINOR — 新增方法 / 新增能力接口</li>
+     *   <li>PATCH — 实现与文档修正, 契约不变</li>
+     * </ul>
+     *
+     * <p>用法: 启动期读 {@code LMAT.API_VERSION} 判断目标版本是否支持所需方法;
+     * 低版本走退化路径 (如不注册任务, 只记日志)。
+     */
+    public static final int API_VERSION = 1;
+
     private LMAT() {}
 
     // ── 快捷类型 (消除外部 import) ──

@@ -86,8 +86,13 @@ public final class AnimationDurationManager {
         }
     }
 
+    /** 自检表 (DEBUG 模式) — 随包发布的动画键 + 中文名。
+     *  <p>v79.70 精简 (用户裁定: 只留哈气/卖萌): 原 4 项 (execution/animation.flash1/animation.Mock1/parry)
+     *  随 6 个废弃预设文件一起删除 (它们无代码消费者, 且 dodge 的 flash1 关键帧畸形会崩 GeckoLib — 错题 #356)。 */
+    public static final String[][] FALLBACK_ANIMATIONS = {{"haqi", "哈气"}, {"maimeng", "卖萌"}};
+
     static boolean checkFallbackAnimations() {
-        String[][] fallbacks = {{"execution","处决"},{"animation.flash1","闪避"},{"animation.Mock1","嘲讽"},{"parry","弹反"}};
+        String[][] fallbacks = FALLBACK_ANIMATIONS;
         boolean allOk = true;
         for (String[] fb : fallbacks) {
             if (!DURATIONS.containsKey(fb[0])) {

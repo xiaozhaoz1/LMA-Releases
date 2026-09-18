@@ -46,6 +46,15 @@ public abstract class LmaTaskConfigScreen<T extends TaskConfigContainer> extends
         return leftPos + 88;
     }
 
+    /**
+     * **可用右缘** (距面板右缘 20px) — v79.63.5 统一布局规范用:
+     * 标签左对齐 {@code contentX()}, 控件右对齐到本值; 控件宽 150 (放不下时自动缩)。
+     * 面板尺寸由宿主 TLM {@code MaidTaskConfigGui} 决定, 故此处只能"尽量贴右"而非硬位移 ✗。
+     */
+    protected int contentRight() {
+        return leftPos + this.imageWidth - 20;
+    }
+
     /** 内容区起点 Y (原各屏魔数 topPos + 34) */
     protected int contentY() {
         return topPos + 34;
@@ -94,5 +103,58 @@ public abstract class LmaTaskConfigScreen<T extends TaskConfigContainer> extends
         p.putString("key", key);
         p.putString("value", value);
         sendAction(TaskConfigurable.ACTION_SET_LIST, p);
+    }
+
+    // ── 统一布局规范 (v79.63.8, 用户裁定) ──
+    /** 行距 (tick) */
+    protected static final int ROW_H = 26;
+    /** 控件高 */
+    protected static final int CTRL_H = 20;
+    /** 控件目标宽 (面板窄时自动缩到可用宽度) */
+    protected static final int CTRL_W = 150;
+
+    /** 第 row 行的起始 y (0 起): topPos + 40 + row*26 ✓ */
+    protected int rowY(int row) {
+        return topPos + 40 + row * ROW_H;
+    }
+
+    /** 控件可用宽: 规范 150, 但受面板右缘限制 (contentRight = leftPos + imageWidth - 20) */
+    protected int ctrlW() {
+        return Math.min(CTRL_W, Math.max(60, contentRight() - (contentX() + 60)));
+    }
+
+    /** 控件左 x (右对齐到 contentRight; 规范下 = contentX + 150) */
+    protected int ctrlX() {
+        return ctrlXFor(ctrlW());
+    }
+
+    /** 指定宽度时的控件左 x (仍右对齐, 不越界) */
+    protected int ctrlXFor(int w) {
+        int width = Math.min(Math.max(20, w), Math.max(20, contentRight() - (contentX() + 60)));
+        return Math.max(contentX() + 60, contentRight() - width);
+    }
+
+    /** 标签: 左列 (contentX, 行 y + 6) — 与右侧控件同排 ✓ */
+    protected void drawLabel(GuiGraphics g, net.minecraft.network.chat.Component text, int row) {
+        g.drawString(font, text, contentX(), rowY(row) + 6, 0xFFFFFF);
+    }
+
+    /** 带 tooltip 的按钮 (统一 20 高) */
+    protected net.minecraft.client.gui.components.Button tipBtn(
+            net.minecraft.network.chat.Component text, int x, int y, int w, Runnable onClick,
+            net.minecraft.network.chat.Component tip) {
+        return net.minecraft.client.gui.components.Button.builder(text, b -> onClick.run())
+                .pos(x, y).size(Math.max(20, w), CTRL_H)
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(tip)).build();
+    }
+
+    /** 带 tooltip 的输入框 (统一 20 高) */
+    protected net.minecraft.client.gui.components.EditBox tipBox(
+            int x, int y, int w, net.minecraft.network.chat.Component hint,
+            net.minecraft.network.chat.Component tip) {
+        net.minecraft.client.gui.components.EditBox box =
+                new net.minecraft.client.gui.components.EditBox(font, x, y, Math.max(20, w), CTRL_H, hint);
+        box.setTooltip(net.minecraft.client.gui.components.Tooltip.create(tip));
+        return box;
     }
 }

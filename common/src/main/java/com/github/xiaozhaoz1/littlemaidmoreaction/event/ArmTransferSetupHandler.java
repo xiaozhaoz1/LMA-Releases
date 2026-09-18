@@ -9,6 +9,7 @@ import net.minecraft.core.component.DataComponents;
 import com.github.tartaricacid.touhoulittlemaid.api.event.InteractMaidEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
+import com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.ArmTransferPipeline;
 import net.minecraft.core.BlockPos;
@@ -87,7 +88,7 @@ CompoundTag tag = _cd.copyTag();
         if ("farm".equals(taskType)) {
             boolean hasBox = tag.contains("farm_seed") || tag.contains("farm_harvest");
             if (!hasBox) {
-                player.sendSystemMessage(comp("§c请先用木棍右键容器菜单标记种子源箱 / 收获目标箱"));
+                player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.arm.need_seed_harvest"));
                 return;
             }
             // 本次右键已由客户端发送 FarmRegionBindPacket — 事件仅置位防止 TLM 打开女仆界面
@@ -100,9 +101,9 @@ CompoundTag tag = _cd.copyTag();
         BlockPos takePos = readPos(tag, "take");
         BlockPos depositPos = readPos(tag, "deposit");
 
-        if (takePos == null) { player.sendSystemMessage(comp("§c请先用木棍右键容器菜单标记取出点")); return; }
-        if (depositPos == null) { player.sendSystemMessage(comp("§c请再用木棍右键容器菜单标记放入点")); return; }
-        if (maid.getAvailableInv(false).getSlots() <= 0) { player.sendSystemMessage(comp("§c女仆没有背包")); return; }
+        if (takePos == null) { player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.arm.need_take")); return; }
+        if (depositPos == null) { player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.arm.need_deposit")); return; }
+        if (maid.getAvailableInv(false).getSlots() <= 0) { player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.arm.no_backpack")); return; }
 
         var data = maid.getPersistentData();
         //? if !1.20.1 {
@@ -119,17 +120,20 @@ CompoundTag tag = _cd.copyTag();
         tag.remove("deposit");
 
         event.setCanceled(true);
-        player.sendSystemMessage(comp("§a女仆开始搬运: " + takePos.toShortString() + " → " + depositPos.toShortString()));
+        player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.arm.started", takePos.toShortString(), depositPos.toShortString()));
     }
 
     // ── 工具 ──
 
+    /**
+     * 读木棍标记 — 统一 {@link NbtCodecs} (v79.64.3).
+     *
+     * <p>原实现手工双平台解析 ({@code NbtUtils.readBlockPos(getCompound(key))} / {@code getCompound(key).getLong("pos")}),
+     * 与写入侧 ({@link com.github.xiaozhaoz1.littlemaidmoreaction.network.FarmContainerBindPacket} 用 NbtCodecs) **各写一套** ⇒
+     * 就是「绑定坐标丢失」(错题 #348) 的同款隐患 (重复实现必漂移; 且 1.20.1 分支缺"坏数据→null"校验, 会静默得 (0,0,0)) ✗
+     */
     private static BlockPos readPos(CompoundTag tag, String key) {
-//? if 1.20.1 {
-        return tag.contains(key) ? NbtUtils.readBlockPos(tag.getCompound(key)) : null;
-//?} else {
-        return tag.contains(key) ? BlockPos.of(tag.getCompound(key).getLong("pos")) : null;
-//?}
+        return NbtCodecs.readBlockPos(tag, key);
     }
 
     private static net.minecraft.network.chat.Component comp(String s) {

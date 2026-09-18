@@ -80,6 +80,9 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
     }
 
     @Override public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            
         return List.of(new TaskStep("assemble", "装配加工", StepType.INTERACT, List.of()));
     }
 
@@ -331,7 +334,7 @@ public final class MaidAssemblyPipeline extends TaskStateMachine<MaidAssemblyPip
                 bp.extractItem(s, 1, false); return;
             }
         }
-        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.container.NearbyContainerScanner.extractItem(
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.container.ContainerExtractor.extractItem(
             maid.level(), maid.blockPosition(), MaidAssemblyService.SEARCH_RADIUS,
             st -> ItemStackHelper.isSameItem(st, target), java.util.Set.of(), true, maid);
     }

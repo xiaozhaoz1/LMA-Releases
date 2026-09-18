@@ -16,6 +16,23 @@ import java.util.List;
  */
 public final class TaskKeys {
 
+    /**
+     * **通用方块标记槽** (木棍 NBT, NbtCodecs blockPos) — 木棍右键**非容器方块**即写入。
+     *
+     * <p>v79.63 (用户裁定): 原先各任务 handler 各写各的键 ({@code void_start}/{@code lma_bind_pos}) ⇒ 相互抢键,
+     * "标记了却说没标记"。现统一到本键, 各任务**只读不抢写**; 旧键仅作兼容读 (§兼容)。
+     * 容器(箱子)不走此处 — 右键容器开角色菜单, 见 {@code FarmContainerScreen} + {@code FarmContainerBindPacket}。
+     */
+    public static final String MARK1 = "lma_mark1";
+
+
+    /**
+     * 区域任务起始点键 ({@code pipelineConfig} 内, NbtCodecs blockPos) — **dam_fill 与 void_excavation 共用**。
+     *
+     * <p>v79.63: 原本两个管线各自硬编码 {@code "start"} (per-task 键守护发现) ⇒ 收敛到此, 改名即静默失效的风险消除。
+     */
+    public static final String CFG_START = "start";
+
     // ── 流程任务核心 ──
     public static final String FLOW_TASK      = "lma_flow_task";
     public static final String FLOW_TASK_ID   = "lma_flow_task_id";
@@ -89,9 +106,9 @@ public final class TaskKeys {
     public static final String ARM_TAKE = "lma_arm_take";
     public static final String ARM_DEPOSIT = "lma_arm_deposit";
     public static final String ARM_ITEM = "lma_arm_item";
-    // v79.62 作物区域: 种子源箱 / 收获目标箱 (女仆 PD 键 — 容器菜单绑定)
-    public static final String FARM_SEED_CONT = "lma_farm_seed_cont";
-    public static final String FARM_HARVEST_CONT = "lma_farm_harvest_cont";
+    // v79.63 命名评审 D-1: 删死键 FARM_SEED_CONT / FARM_HARVEST_CONT ("lma_farm_seed_cont" /
+    //   "lma_farm_harvest_cont") — v79.62 容器从「女仆 PD 全局」迁移到「per-region (FarmRegion
+    //   record 字段)」后, 这两个键全源集零引用 (名与字面量双向 grep 实证), 属迁移遗留。
 
     // ── 女仆属性 ──
     public static final String RESIST_PREFIX = "lma_resist_";
@@ -127,6 +144,9 @@ public final class TaskKeys {
     public static final String CODEX = "lma_codex";
     /** 假人绑定 UUID (NumenMaidBridge) */
     public static final String COMPANION_UUID = "lma_companion_uuid";
+    /** 数据 schema 版本 (int) — 女仆加入世界时按此补跑迁移 (v79.63, 见 {@link TaskDataSchema})。
+     *  用途: 删除任务 / 改键结构后, 旧存档残留键有明确收口入口 (此前全项目零 schema 键 — 评审 P1-4) */
+    public static final String SCHEMA_VERSION = "lma_schema";
     /** 前缀 — 管线临时数据 (内存态, MaidData) / 管线持久配置 / 状态机状态 */
     public static final String PL_PREFIX = "lma_pl_";
     public static final String CFG_PREFIX = "lma_cfg_";

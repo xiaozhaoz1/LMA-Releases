@@ -169,10 +169,16 @@ public class MaidPowerBeltBlock extends HorizontalKineticBlock
             int cakes = Math.min(countCakesAround(level, maid.blockPosition(), maidFacing), 2);
             float rpm = cakes == 0 ? 96f : (cakes == 1 ? 192f : 256f);
             float stress = cakes == 0 ? 1024f : (cakes == 1 ? 2048f : 4096f);
+            // ★ v79.63.12 (用户裁定): **自定义应力容量** — 全局配置 ≥0 时覆盖上式 (不再随蛋糕变 ✓),
+            //   -1 (默认) 保持原公式 ✓; **转速仍由蛋糕控制** ✓ (用户明确: 其他需要 mixin 的不做 ✗)
+            int customStress = com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.POWER_BELT_STRESS.get();
+            if (customStress >= 0) {
+                stress = customStress;
+            }
             if (level.isClientSide) return;
             BlockEntity blockEntity = level.getBlockEntity(pos);
             if (blockEntity instanceof MaidPowerBeltBlockEntity powerBelt) {
-                LittleMaidMoreAction.LOGGER.info("[MaidPowerBeltBlock] direct rpm={} stress={} cakes={} at {}", rpm, stress, cakes, pos);
+                // v79.72: 日志已移入 BE 的"值真的变了"分支 (原每 sprint tick 都打 ⇒ 实测刷 5842 行 ✗)
                 powerBelt.setDirectOutput(rpm, stress);
             }
             return;

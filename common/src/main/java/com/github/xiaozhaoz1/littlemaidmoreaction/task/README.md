@@ -20,12 +20,36 @@ task/
 ├── api/         写新Pipeline? → 看这里 (接口 + 注册 + 配置GUI工厂)
 ├── runtime/      调度/驱动/FSM/卸载清理  → 看这里
 ├── data/         键表/数据门面/开关      → 看这里
-├── sense/        环境信号 (扫描/边沿/常量; 与 pipeline/sense 被动配对)
+├── sense/        环境信号 (扫描/边沿/常量/缓存; 与 pipeline/sense 被动配对)
 ├── gui/          任务树 + 配置屏 (无独立 README, 见下方「写一个新Pipeline」与 api/)
-├── behavior/     Brain 默认行为 (吃/收集)
-├── pipeline/     任务实现 (8 主动 + sense 6 被动)
-└── service/      业务算法服务 (配方/名单/工具/乘区/执行细节)
+├── behavior/     Brain 默认行为 (吃/收集/修/可爱闲置)
+├── passive/      脱管线被动骨架: PassiveTask + PassiveDispatcher (四道闸) + PassiveConfigUtil; impl/ = 纯触发型 3 (结构/节日/稀有群系)
+├── quest/        任务树数据层: QuestNode + QuestTreeLoader + QuestTreeLayout + QuestProgressReader (占位未接线)
+├── pipeline/     任务实现 (16 顶层主动管线 + sense/ 7 被动管线)
+└── service/      业务算法服务 (配方/名单/工具/乘区/执行细节) + [harvest/](service/harvest/README.md) 采集/导航/自救/空置域四域协调器 (V5 自 vanilla/execute 迁入)
 ```
+
+> 数量口径: **一律以 `docs/ARCHITECTURE.md` 顶部实测基线表为准** (本 README 不抄数字)。
+> 任务清单: `docs/design/pipeline-inventory.md` (主动 21 + 被动 5 管线 + 纯触发 3)。
+
+## 子包索引 (131 类, 逐包 `find` 实测 2026-09-13 — 改结构必须同步此表)
+
+| 子包 | 类数 | 一句话职责 | 明细 README |
+|---|---|---|---|
+| **顶层** `TaskRegistryManifest.java` (145 行) | 1 | **任务注册唯一事实源**: 5 个列表 (ALWAYS 13 / NUMEN 1 / CREATE 6 / CBC 2 / PASSIVE 5) + **启动期 fail-fast 三连** (被动注册缺失 / 被动驱动漂移 / 纯触发注册缺失) + `Drive` 声明 (谁 tick 我); **加任务只改这里** | (本节) |
+| `api/` | 7 | **接口契约** (管线/可配置/注册中心/信号/屏工厂/UID) — 改它影响全部管线 | [api/README.md](api/README.md) |
+| `pipeline/` | 23 | **流程判定**: 21 主动管线 + 被动 sense 子包 (14 类中部分) | [pipeline/README.md](pipeline/README.md) |
+| `service/` | 31 | **业务算法 + 单拍编排** (含 harvest 子包 13 类: 采集/导航安全/自救/空置域) | [service/README.md](service/README.md) |
+| `runtime/` | 11 | **运行态**: GMPM 驱动 / Dispatcher 生命周期 / FSM 基类 / 看门狗 / 卸载清理 | [runtime/README.md](runtime/README.md) |
+| `data/` | 10 | **NBT 读写唯一入口** (键常量/缓存纪律/清理) | [data/README.md](data/README.md) |
+| `gui/` | 20 | **per-task 配置屏** (屏↔任务↔配置键 + 配置读写链路) | [gui/README.md](gui/README.md) |
+| `sense/` | 14 | **环境感知层 (信号生产)**: 扫描/规则/边沿/预算/缓存/结构感知/广播 — ⚠ **与 `pipeline/sense` 是两个包** (那边是信号消费的 7 个被动管线) | [sense/README.md](sense/README.md) |
+| `behavior/` | 5 | **女仆行为** (吃/修/等 brain 行为补充) | (见包内注释) |
+| `passive/` | 6 | **纯触发型被动** (structure_sense/festival/rare_biome — 无 pipeline, PassiveDispatcher 驱动) | [passive/README.md](passive/README.md) |
+| `quest/` | 4 | **任务/成就树** 数据/加载/布局 | [quest/README.md](quest/README.md) |
+
+> **改结构必读**: 本表类数由 `find <子包> -name '*.java' | wc -l` 实测; `docs/ARCHITECTURE.md` 顶部基线表是**唯一数字真相源**, 改完同步两处。
+> **子包 README 义务**: 新增类必须写进对应子包 README (守护测试 `ReadmeDriftGuardTest.folderReadmesCoverTheirOwnClasses` 会让"只加代码不写文档"变红)。
 
 ## 快速导航
 
@@ -33,9 +57,9 @@ task/
 | 文件 | 什么 |
 |------|------|
 | `TaskPipeline.java` | 核心接口 **11 方法**, 仅 `taskType()` 抽象: `tick(w,m)` (GMPM 每 tick 驱动) / `executeInterval()` (工作站节拍, WorkStationPipeline 覆写 30) / `workPointTask()` (骑乘调度) / 生命周期 `interrupt()` `onCleanup()` `isLongRunning()` `priority()`; 验证/展示 `validate()` `steps()` `isTargetBlock()`。全默认安全空 |
-| `TaskConfigurable.java` | 配置维度 (按需 implements, 全默认)。配置GUI/`handleConfigAction`/`pipelineData`(PL 内存态)/`pipelineConfig`/`collectFilter`/`enableWorkEat` |
+| `TaskConfigurable.java` | 配置维度 (按需 implements, 全默认)。配置GUI/`handleConfigAction`/`pipelineData`(PL 内存态)/`pipelineConfig`/`collectFilter`/`enableWorkEat`/**`switchScope()` 开关归属声明** (GLOBAL/PER_MAID — 提交门/运行判定/清理三处同源, v79.63) |
 | `TaskSignalListener.java` | 信号维度 (按需 implements)。`onSignal()` 环境信号、`onPlayerTrigger()` 按键触发 |
-| `TaskRegistry.java` | 注册入口: `register(type, pipeline)` (主动) / `registerPassive(type, pipeline)` (被动)。可见性由任务树 TaskToggle 管理 |
+| `TaskRegistry.java` | 注册入口: `register(type, pipeline[, drive])` (主动) / `registerPassive(type, pipeline[, drive])` (被动) / `registerPassive(type)` (纯触发占位)。**`drive` = 驱动模式声明, 与 `TaskRegistryManifest` 同源**; 2 参重载默认主动 ACTIVE / 被动 GMPM_PASSIVE; 注册面传错驱动/与规格表漂移 → **启动即炸** (v79.63)。可见性由任务树 TaskToggle 管理 |
 | `TaskConfigGuiFactory.java` | 配置 GUI 工厂 (黑白名单/自定义屏) |
 
 ### runtime/ — 任务怎么跑起来的
@@ -43,11 +67,11 @@ task/
 |------|------|
 | `TaskDispatcher.java` | 生命周期门面: `submit()` `cancel()` `complete()` `fail()` `timeout()` `submitPassive()` `cancelPassive()`。**无重试** — 主动任务 TLM 任务栏自动重启, 被动靠信号重触发 |
 | `GameTickPipelineManager.java` | **单一驱动源**: 每 tick 驱动所有 in_progress 主动管线 tick; 心跳 20t (仅 isLongRunning) / 看门狗 / 被动位掩码节流 / PL flush |
-| `TaskStateMachine.java` | FSM 基类 (9 common + forge CannonLoad): 子类定义 `S` 枚举 → `tick(S, w, m)` 返回下状态; 状态内存化 (MaidData.pl); 转换图校验 + onEnter/onExit 钩子; workStationGated 复用 WorkStationPipeline.gate (furnace/jukebox) |
+| `TaskStateMachine.java` | FSM 基类 (10 = 9 common + CannonLoad (CBC 门控, 双平台)): 子类定义 `S` 枚举 → `tick(S, w, m)` 返回下状态; 状态内存化 (MaidData.pl); 转换图校验 + onEnter/onExit 钩子; workStationGated 复用 WorkStationPipeline.gate (furnace/jukebox) |
 | `TaskTickHandler.java` | 事件入口: ServerTick → 驱动; ServerStopping → PL flush + 广播节流归零 |
 | `TaskStateManager.java` | 状态写入: `init()` `heartbeat()` `clearAll()` |
 | `MaidUnloadRegistry.java` + `EntityCleanupListener.java` | 卸载统一清理 (13 静态缓存 + PL flush, 幂等) |
-| `WatchdogMath.java` / `PassiveRotation.java` | 纯函数 (超时判定/轮转) |
+| `WatchdogMath.java` | 纯函数 (超时判定)。注: 原并列的 `PassiveRotation.java` 已随被动系统脱管线改造 (2026-08-16) **删除** — 被动不再用轮转预算 |
 
 ### data/ — 数据和配置
 | 文件 | 什么 |

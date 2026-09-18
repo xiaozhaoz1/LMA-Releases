@@ -35,6 +35,9 @@ public final class MixPipeline extends MoveToBlockStateMachine<MixPipeline.State
 
     @Override
     public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            
         return List.of(new TaskStep("mix", "搅拌混合", StepType.INTERACT, List.of()));
     }
 
@@ -56,7 +59,7 @@ public final class MixPipeline extends MoveToBlockStateMachine<MixPipeline.State
                 BlockPos target = MixService.findBasins(world, maid.blockPosition())
                         .stream().filter(p -> !isSkipped(maid, p, now)).findFirst().orElse(null);
                 if (target == null) {
-                    if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                    if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                             .shouldFire(maid, "mix_no_target", 600)) {
                         com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
                                 .showFail(maid, "附近没有搅拌盆");

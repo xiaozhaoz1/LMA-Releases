@@ -49,13 +49,16 @@ public final class MaidListScreen extends Screen {
     private static final int LIST_X = 16;
     private static final int LIST_Y = 32;
     private static final int LIST_W = 170;
-    private static final int LIST_H = 190;
+    /** v79.62.3: 190→146 — 底部腾出两行按钮 (行1 y188 / 行2 y214) */
+    private static final int LIST_H = 146;
     private static final int ROW_H = 22;
-    /** 右侧预览区 (宽 320-16-200=104) — 1.21 区域版高 150 (完整女仆) */
+    /** 右侧预览区 (宽 320-16-200=104).
+     * v79.62.3: 高 150→120 — 两行按钮 (y188/214) 提上后, 预览下名字/信息 (y=36+120+6=162 / +20=176)
+     * 需在按钮上方 (<188); 模型区 py+36..py+156 半身完整 */
     private static final int PREVIEW_X = 200;
     private static final int PREVIEW_Y = 36;
     private static final int PREVIEW_W = 104;
-    private static final int PREVIEW_H = 150;
+    private static final int PREVIEW_H = 120;
     /** 本地实体探测范围 (仅邻近女仆有实体引用可进属性屏; 列表本身全维度) */
     private static final int LOCAL_PROBE_RANGE = 512;
     /** 本地探测 20t 节流 (512 格 box 遍历有开销, 不必每 tick) */
@@ -77,6 +80,7 @@ public final class MaidListScreen extends Screen {
     private Button attrButton;
     private Button envButton;
     private Button farmButton;
+    private Button otherButton;
 
     public MaidListScreen(Screen parent) {
         super(Component.translatable("screen.littlemaidmoreaction.maid_list"));
@@ -89,28 +93,41 @@ public final class MaidListScreen extends Screen {
         int py = (this.height - PANEL_H) / 2;
         // 打开即请求服务端全维度扫描 (C2S)
         MaidListQueryPacket.sendToServer();
-        // v79.62 底部按钮一行 4 个 (宽 320 面板, 不重叠):
-        //   back 16..86 / env 90..156 / farm 160..232 / attr 236..304
+        // v79.62.3 底部两行按钮 (面板 320×240; LIST_H 已缩至 146 → 列表底 py+178):
+        //   行1 y=188: back 16..66 / env 70..128 / farm 132..196 / attr 200..252
+        //   行2 y=214: 其他设置 16..136
+        int row1Y = py + 188;
         this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.back"),
                 btn -> Minecraft.getInstance().setScreen(parent))
-                .pos(px + LIST_X, py + PANEL_H - 26).size(70, 20).build());
-        this.attrButton = this.addRenderableWidget(Button.builder(
-                Component.translatable("gui.littlemaidmoreaction.maid_list.open_attr"),
-                btn -> openAttribute())
-                .pos(px + 236, py + PANEL_H - 26).size(68, 20).build());
-        this.attrButton.active = false;
-        // v79.47: per-maid 环境感知开关 (选中行可切; 服务端翻转 PD, 默认开)
+                .pos(px + LIST_X, row1Y).size(50, 20).build());
         this.envButton = this.addRenderableWidget(Button.builder(
                 Component.literal(""), btn -> toggleEnv())
-                .pos(px + 90, py + PANEL_H - 26).size(66, 20).build());
+                .pos(px + 70, row1Y).size(58, 20).build());
         this.envButton.active = false;
-        // v79.62: 种植区域管理 (v79.62 修: 原 py+190 与预览下名字重叠, 再修与 env 重叠 → 一行 4 按钮)
         this.farmButton = this.addRenderableWidget(Button.builder(
                 Component.translatable("gui.littlemaidmoreaction.maid_list.farm_region"),
                 btn -> openFarmRegions())
-                .pos(px + 160, py + PANEL_H - 26).size(72, 20).build());
+                .pos(px + 132, row1Y).size(64, 20).build());
         this.farmButton.active = false;
+        this.attrButton = this.addRenderableWidget(Button.builder(
+                Component.translatable("gui.littlemaidmoreaction.maid_list.open_attr"),
+                btn -> openAttribute())
+                .pos(px + 200, row1Y).size(52, 20).build());
+        this.attrButton.active = false;
+        // 行2: 其他设置 — 选中女仆可用 (打开新界面)
+        this.otherButton = this.addRenderableWidget(Button.builder(
+                Component.translatable("gui.littlemaidmoreaction.maid_list.other_settings"),
+                btn -> openOtherSettings())
+                .pos(px + LIST_X, py + 214).size(120, 20).build());
+        this.otherButton.active = false;
+    }
+
+    /** 打开选中女仆的「其他设置」屏 (v79.62.3: 五子棋直接判你赢开关) */
+    private void openOtherSettings() {
+        if (entries.isEmpty() || selected < 0 || selected >= entries.size()) return;
+        MaidEntry e = entries.get(selected);
+        Minecraft.getInstance().setScreen(new MaidOtherSettingsScreen(this, e.uuid().toString(), e.name()));
     }
 
     /** 打开选中女仆的作物区域管理屏 (需本地实体有 uuid? 区域按 uuid 存 — 列表条目即有 uuid) */
@@ -163,6 +180,8 @@ public final class MaidListScreen extends Screen {
             updateEnvButton();
             // 种植区域按钮: 有选中即可 (区域按 uuid 存, 远端也可配)
             this.farmButton.active = !entries.isEmpty() && selected >= 0 && selected < entries.size();
+            // 其他设置按钮: 有选中即可 (配置存女仆 PD, 远端也可切)
+            this.otherButton.active = this.farmButton.active;
         }
     }
 
@@ -281,6 +300,7 @@ public final class MaidListScreen extends Screen {
             if (index >= 0 && index < entries.size()) {
                 selected = index;
                 updateEnvButton();
+                this.otherButton.active = true;
                 return true;
             }
         }

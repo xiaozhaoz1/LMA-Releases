@@ -4,7 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.MaidDamageEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.SelfRescueState;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.SelfRescueState;
 //? if 1.20.1 {
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;

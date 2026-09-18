@@ -67,6 +67,23 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
         searchForDestination(world, maid);
     }
 
+    /**
+     * v79.62.5 工作站 no-target 根治: TLM 搜索半径 = getRestrictRadius — 大区域任务 (void) 恢复时
+     * clearRestriction → restrictRadius=-1 → 工作站任务 (bell/furnace) 永不搜索 (用户实测 0 目标)。
+     * 但还原 restrict 会拉回大区域任务 (v79.62.2 修因)。解耦: 搜索半径不依赖 restrict —
+     * restrict 为正用 restrict (尊重用户设的小范围), 否则默认 MAID_WORK_RANGE 级半径 (12)。
+     */
+    @Override
+    protected int getHorizontalSearchRange(EntityMaid maid) {
+        // v79.63 修**工作站任务不走** (用户实测: 敲钟/烧炉女仆不移动; gametest 复现 TARGET_POS=false):
+        //   原实现 `r > 0 ? r : 12` 只看半径数值, **不看 home 模式开关**。女仆身上常残留一个
+        //   默认/上次的 restrict 半径 (实测 8.0) 而 home 模式其实是**关的** ⇒ 搜索被无谓限制在 8 格
+        //   ⇒ 10 格外的熔炉/钟**永远搜不到** ⇒ TARGET_POS 恒空 ⇒ 女仆不走、管线 gate 永不执行 (死等)。
+        //   修法: **只在 home 模式开启时才用 restrict 半径** (那才是"不许走远"的语义); 否则用工作范围 12。
+        int r = (int) maid.getRestrictRadius();
+        return (maid.isHomeModeEnable() && r > 0) ? r : 12;
+    }
+
     public LmaFlowCoordinationBehavior() {
         super(1.0F, 4);
         // 2026-08-16 用户实测「点任务好几秒才动」: TLM 父类默认 120t / 原 NAV_CHECK_INTERVAL 100t
@@ -145,6 +162,21 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
         if (handler == null) return;
 
         LittleMaidMoreAction.LOGGER.info("[LMA/Brain] start task={} at {}", taskType, maid.blockPosition().toShortString());
+        // TEMP-DIAG restrict 状态 + 手动扫目标 (工作站 no-target 排查)
+        if (world.getGameTime() % 400 == 0 || !maid.getBrain().hasMemoryValue(InitEntities.TARGET_POS.get())) {
+            int r = (int) maid.getRestrictRadius();
+            int bells = 0;
+            if ("bell_ring".equals(taskType)) {
+                for (int dx = -12; dx <= 12 && bells == 0; dx++) {
+                    for (int dz = -12; dz <= 12 && bells == 0; dz++) {
+                        if (world.getBlockState(maid.blockPosition().offset(dx, 0, dz)).getBlock()
+                                instanceof net.minecraft.world.level.block.BellBlock) bells++;
+                    }
+                }
+            }
+            LittleMaidMoreAction.LOGGER.warn("[FLOW-DIAG] task={} restrictR={} restrictCenter={} home={} bellsNear={}",
+                    taskType, r, maid.getRestrictCenter(), maid.isHomeModeEnable(), bells);
+        }
         searchThrottled(world, maid);
         if (maid.getBrain().hasMemoryValue(InitEntities.TARGET_POS.get())) {
             LittleMaidMoreAction.LOGGER.info("[LMA/Brain] navigating to target for {}", taskType);
@@ -175,6 +207,14 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
                     "[NAV-DBG] no-target maid={} pos={} walkTarget={} navTarget={} task={}",
                     maid.getStringUUID().substring(0, 8), maid.blockPosition().toShortString(),
                     hasWalk, hasNav, cachedTask);
+            }
+            // v79.62.5 修: start 首次搜索失败后永不重搜 — TARGET_POS 空时低频周期性重搜
+            // (用户实测: 钟在女仆旁边不敲 — 启动瞬间 searchForDestination 未找到 (区块未加载/
+            // 时序), 之后每 tick 空转, gate 读空 TARGET_POS → 永不执行.
+            // 防性能回归: 88 个 gametest 并发女仆若每 5t BFS 全扫 → 主线程负载飙升 (spawn 批量
+            // 失败); 200t 一次与 NAV-DBG 诊断同频, 足够覆盖"区块加载/时序"类延迟)
+            if (world.getGameTime() % 200 == 0) {
+                searchThrottled(world, maid);
             }
             return;
         }
@@ -237,7 +277,7 @@ public final class LmaFlowCoordinationBehavior extends MaidMoveToBlockTask {
         maid.getBrain().eraseMemory(InitEntities.TARGET_POS.get());
         maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
         NavProgressGuard.clear(maid);
-        MaidChatBubbleApi.showFail(maid, "到不了目标");
+        MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.nav.unreachable"));
     }
 
     @Override

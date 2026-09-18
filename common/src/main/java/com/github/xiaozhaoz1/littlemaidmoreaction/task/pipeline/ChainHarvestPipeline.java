@@ -2,7 +2,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.TaskResult;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.ChainHarvestExecute;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.ToolStateReader;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
@@ -108,6 +108,9 @@ public final class ChainHarvestPipeline implements TaskPipeline, TaskConfigurabl
 
     @Override
     public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            
         return isOre()
                 ? List.of(
                         new TaskStep("search", "寻找矿石", StepType.COLLECT, List.of()),

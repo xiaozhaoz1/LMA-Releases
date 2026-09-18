@@ -40,7 +40,7 @@ public final class ContainerOutput {
 
     /**
      * 按 ItemStack 匹配存取 (isSameItem — NBT 级) — ArmTransferService.execute*
-     * 溢出退还算法统一于此。返回实际存取数。
+     * 溢出退还算法统一于此 (v79.68.1: **退还余量也接** — 背包 → 满则落地, 绝不消失)。返回实际存取数。
      */
     public static int depositItemStack(EntityMaid maid, IItemHandler container,
                                        ItemStack item, int count) {
@@ -59,7 +59,14 @@ public final class ContainerOutput {
             }
             int after = taken.getCount();
             actual += (before - after);
-            if (after > 0) inv.insertItem(i, taken, false);
+            if (after > 0) {
+                // ★ v79.68.1 退还也要接余量 (错题 #354 族审计): 该槽刚被 extract ⇒ 正常必有空间 (不可复现);
+                //   余量交 HandSwap.stashOrDrop (背包 → 满则落地), 绝不消失 ✓
+                ItemStack back = inv.insertItem(i, taken, false);
+                if (!back.isEmpty()) {
+                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.item.HandSwap.stashOrDrop(maid, back);
+                }
+            }
         }
         return actual;
     }
@@ -82,7 +89,14 @@ public final class ContainerOutput {
             }
             int after = extracted.getCount();
             actual += (before - after);
-            if (after > 0) container.insertItem(i, extracted, false);
+            if (after > 0) {
+                // ★ v79.68.1 同上 (容器侧): 余量落地 (spawnForPickup 交女仆回收), 绝不消失 ✓
+                ItemStack back = container.insertItem(i, extracted, false);
+                if (!back.isEmpty()) {
+                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.item.ItemSpawner
+                            .spawnForPickup(maid, back);
+                }
+            }
         }
         return actual;
     }

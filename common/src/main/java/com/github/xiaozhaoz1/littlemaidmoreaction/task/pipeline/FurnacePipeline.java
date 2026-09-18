@@ -56,7 +56,10 @@ public final class FurnacePipeline extends TaskStateMachine<FurnacePipeline.Phas
     }
 
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return w.getBlockEntity(p) instanceof AbstractFurnaceBlockEntity; }
-    @Override public List<TaskStep> steps() { return List.of(new TaskStep("smelt", "熔炉烧炼", StepType.CRAFT, List.of())); }
+    @Override public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            return List.of(new TaskStep("smelt", "熔炉烧炼", StepType.CRAFT, List.of())); }
 
     /** 黑白名单配置 GUI (per-maid) */
     @Override @javax.annotation.Nullable
@@ -70,7 +73,14 @@ public final class FurnacePipeline extends TaskStateMachine<FurnacePipeline.Phas
         // 与 gateTarget 同款: TARGET_POS 记忆直接 get() 取 PositionTracker (var 推断)
         var mem = maid.getBrain().getMemory(com.github.tartaricacid.touhoulittlemaid.init.InitEntities.TARGET_POS.get());
         net.minecraft.core.BlockPos pos = mem.isEmpty() ? null : mem.get().currentBlockPosition();
-        var recipeType = FurnaceService.recipeTypeFor(level, pos);
+        // v79.63 修**鸡生蛋死锁** (用户实测"女仆不走去烧熔炉"): TARGET_POS 由 Brain **在任务启动后**搜索写入,
+        //   所以 validate 时它几乎必然为空。原实现拿空 pos → recipeTypeFor(null) → null → validateSmelt
+        //   必然失败 → submit 被拒 → 任务永远起不来 → Brain 永不搜索 → 女仆不走、不烧。
+        //   修法: 目标未知时按**默认冶炼配方**校验 (只判"背包里有没有可烧的东西"), 炉子有无交给运行时
+        //   WorkStationPipeline.gate (它读 TARGET_POS, 空则等 Brain 搜索, 找到后按实际炉型动态取配方)。
+        var recipeType = pos != null
+                ? FurnaceService.recipeTypeFor(level, pos)
+                : net.minecraft.world.item.crafting.RecipeType.SMELTING;
         String reason = FurnaceService.validateSmelt(level, maid, ctx.target(), recipeType);
         return reason == null ? PipelineResult.ok("") : PipelineResult.failed(reason);
     }
@@ -89,9 +99,9 @@ public final class FurnacePipeline extends TaskStateMachine<FurnacePipeline.Phas
         if (ingredientKey.isEmpty()) {
             // v79.61x S1-F2 (用户裁定): 无料不每拍刷失败气泡 — 1200t 冷却后重查 + 气泡提醒
             // (与看门狗同周期; 时间戳自过期, 料补上后自然恢复; 原每拍气泡 = 600t 节流刷屏)
-            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                     .shouldFire(maid, "furnace_no_ingredient", 1200)) {
-                com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, "furnace 失败");
+                com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.furnace.failed"));
             }
             return null;
         }

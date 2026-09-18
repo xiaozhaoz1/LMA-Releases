@@ -22,8 +22,8 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKit
  * <p>入口: {@link LMAConfigScreen}「详细设置」按钮。
  * 结构:
  * <ul>
- *   <li>全局分类: 规则引擎 / 调试 / 连锁采集 / 环境感知 / <b>右键交互</b> (木棍/距离直列)</li>
- *   <li><b>任务自定义</b> 分类: 每个任务一个 {@link ButtonEntry} → {@link TaskSettingsScreen} 子屏</li>
+ *   <li>全局分类: 规则引擎 / 调试 / 连锁采集 / 环境感知 / <b>右键交互</b> (木棍/距离直列) / <b>杂项</b> (真全局参数, 如发电皮带应力)</li>
+ *   <li><b>任务自定义</b> 分类: 每个任务一个 {@link ButtonEntry} → {@link TaskSettingsScreen} 子屏 (任务自己的默认值放这里)</li>
  * </ul>
  *
  * <p>API 模式对齐 TLM {@code compat/cloth/MenuIntegration}: ConfigBuilder + entryBuilder,
@@ -37,7 +37,19 @@ public final class ClothSettingsScreen {
     public static Screen create(Screen parent) {
         ConfigBuilder root = ConfigBuilder.create()
                 .setParentScreen(parent)
-                .setTitle(Component.literal("LittleMaidMoreAction 设置"));
+                .setTitle(Component.literal("LittleMaidMoreAction 设置"))
+                // ★ v79.72 修 (错题 #361): **Cloth 屏必须挂 setSavingRunnable** —— 原来只给每个条目设了
+                //   `setSaveConsumer` (那只把值写进**内存 spec** ✗, 不落盘), 于是用户改完设置**重启即回默认** ✓
+                //   实测: 用户把「杂项 → 发电皮带应力」改成 100000, 当次会话日志里确实是 100000 ✓, 但
+                //   `config/littlemaidmoreaction-*.toml` 里**根本没有这个键** ✗ ⇒ 重启读回 -1 ⇒ 应力永远 1024 ✗
+                //   (`TaskSettingsScreen` 早就挂了 ✓ — 本屏漏了 ⇒ 凡本屏可改的设置此前都不落盘 ✗)
+                //   ⚠ 并对齐 TaskSettingsScreen 的写法: 多人游戏时还要**把值同步到服务端** (否则只存本地 ✗)
+                .setSavingRunnable(() -> {
+                    MoreActionConfig.saveAll();
+                    if (!net.minecraft.client.Minecraft.getInstance().hasSingleplayerServer()) {
+                        com.github.xiaozhaoz1.littlemaidmoreaction.network.ConfigSyncPacket.send();
+                    }
+                });
         ConfigEntryBuilder eb = root.entryBuilder();
 
         // ── 调试 ──
@@ -120,18 +132,6 @@ public final class ClothSettingsScreen {
                 .setMin(1).setMax(256)
                 .setTooltip(Component.literal("每感知器命中结果上限"))
                 .setSaveConsumer(PassiveTaskConfig.ENV_MAX_HITS::set).build());
-        env.addEntry(eb.startDoubleField(Component.literal("太冷阈值"),
-                        PassiveTaskConfig.ENV_COLD_THRESHOLD.get())
-                .setDefaultValue(PassiveTaskConfig.ENV_COLD_THRESHOLD.getDefault())
-                .setMin(-1.0).setMax(2.0)
-                .setTooltip(Component.literal("低于此值触发 env_too_cold (TLM COLD 档默认 0.15)"))
-                .setSaveConsumer(PassiveTaskConfig.ENV_COLD_THRESHOLD::set).build());
-        env.addEntry(eb.startDoubleField(Component.literal("太热阈值"),
-                        PassiveTaskConfig.ENV_HOT_THRESHOLD.get())
-                .setDefaultValue(PassiveTaskConfig.ENV_HOT_THRESHOLD.getDefault())
-                .setMin(0.0).setMax(2.0)
-                .setTooltip(Component.literal("高于此值触发 env_too_hot (TLM 判热默认 1.0)"))
-                .setSaveConsumer(PassiveTaskConfig.ENV_HOT_THRESHOLD::set).build());
         env.addEntry(eb.startIntField(Component.literal("玩家门控半径"),
                         PassiveTaskConfig.ENV_PLAYER_GATE_RADIUS.get())
                 .setDefaultValue(PassiveTaskConfig.ENV_PLAYER_GATE_RADIUS.getDefault())
@@ -206,6 +206,24 @@ public final class ClothSettingsScreen {
                 .setMin(1).setMax(10)
                 .setTooltip(Component.literal("每次进入结构外围的提醒总数(含首次发现)"))
                 .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_REFRESH_MAX::set).build());
+        // v79.63.21 补缺口 (用户裁定: 感知域参数归本分类): 稀有群系通报 3 键此前**无任何 GUI 入口**
+        env.addEntry(eb.startBooleanToggle(Component.literal("稀有群系通报"),
+                        PassiveTaskConfig.ENV_RARE_BIOME_ENABLED.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_RARE_BIOME_ENABLED.getDefault())
+                .setTooltip(Component.literal("蘑菇岛/深暗之域/繁茂洞穴等稀有群系通报 (总开关)"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_RARE_BIOME_ENABLED::set).build());
+        env.addEntry(eb.startIntField(Component.literal("稀有群系检测间隔 (tick)"),
+                        PassiveTaskConfig.ENV_RARE_BIOME_INTERVAL.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_RARE_BIOME_INTERVAL.getDefault())
+                .setMin(1200).setMax(168000)
+                .setTooltip(Component.literal("默认 1200 = 1 分钟"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_RARE_BIOME_INTERVAL::set).build());
+        env.addEntry(eb.startIntField(Component.literal("稀有群系信号半径 (格)"),
+                        PassiveTaskConfig.ENV_RARE_BIOME_SIGNAL_RADIUS.get())
+                .setDefaultValue(PassiveTaskConfig.ENV_RARE_BIOME_SIGNAL_RADIUS.getDefault())
+                .setMin(1).setMax(64)
+                .setTooltip(Component.literal("玩家附近此范围内的主人女仆才接收稀有群系信号 (per-player)"))
+                .setSaveConsumer(PassiveTaskConfig.ENV_RARE_BIOME_SIGNAL_RADIUS::set).build());
 
         // ── 右键交互 (全局直列) ──
         ConfigCategory bi = root.getOrCreateCategory(Component.literal("右键交互"));
@@ -291,6 +309,39 @@ public final class ClothSettingsScreen {
                         ActiveTaskConfig.FAVOR_COST_L3.get())
                 .setDefaultValue(0.5).setMin(0.1).setMax(1.0)
                 .setSaveConsumer(ActiveTaskConfig.FAVOR_COST_L3::set).build());
+
+        // ── 防御塔设置 (v79.62.3, 用户裁定: Cloth = 全局默认, GUI = 每塔覆盖) ──
+        ConfigCategory tower = root.getOrCreateCategory(Component.literal("防御塔设置"));
+        tower.addEntry(eb.startDoubleField(Component.literal("默认伤害"),
+                        com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.DAMAGE.get())
+                .setDefaultValue(com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.DAMAGE.getDefault())
+                .setMin(0.5).setMax(100.0)
+                .setTooltip(Component.literal("防御塔全局默认伤害 (GUI 每塔可覆盖; 2.0 = 1 心)"))
+                .setSaveConsumer(com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.DAMAGE::set).build());
+        tower.addEntry(eb.startIntField(Component.literal("默认索敌半径 (格)"),
+                        com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.RADIUS.get())
+                .setDefaultValue(com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.RADIUS.getDefault())
+                .setMin(4).setMax(64)
+                .setTooltip(Component.literal("防御塔全局默认索敌半径 (GUI 每塔可覆盖)"))
+                .setSaveConsumer(com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.RADIUS::set).build());
+        tower.addEntry(eb.startIntField(Component.literal("射击节奏 (tick)"),
+                        com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.FIRE_INTERVAL.get())
+                .setDefaultValue(com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.FIRE_INTERVAL.getDefault())
+                .setMin(10).setMax(200)
+                .setTooltip(Component.literal("防御塔每轮射击间隔 (20 = 1 秒/发)"))
+                .setSaveConsumer(com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.FIRE_INTERVAL::set).build());
+
+        // ── 杂项 (v79.63.21 新建, 用户裁定) ──
+        // 归属判据: **真全局参数** (不属于任何单个任务的 per-task 屏) 归本分类;
+        // 任务自己的默认值 (dam_fill / void_excavation / bell_ring 等) 归「任务自定义 → 该任务」子屏 ✗ 不放这里。
+        ConfigCategory misc = root.getOrCreateCategory(Component.literal("杂项"));
+        misc.addEntry(eb.startIntField(Component.literal("发电皮带应力"),
+                        ActiveTaskConfig.POWER_BELT_STRESS.get())
+                .setDefaultValue(ActiveTaskConfig.POWER_BELT_STRESS.getDefault())
+                .setMin(-1).setMax(1000000)
+                .setTooltip(Component.literal("跑步发电皮带的自定义应力容量: -1 = 用原公式 (随蛋糕 1024/2048/4096); "
+                        + "≥0 = 固定此值 (转速仍随蛋糕 96/192/256 RPM)"))
+                .setSaveConsumer(ActiveTaskConfig.POWER_BELT_STRESS::set).build());
 
         return root.build();
     }

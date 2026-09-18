@@ -1,4 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.TaskRegistryManifest;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskMetaData;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
@@ -7,7 +8,6 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskTypeUid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskToggle;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 
@@ -29,15 +29,22 @@ import java.util.List;
  *
  * <p>v79.61x 被动脱管线 (用户批准): 被动不再共用单一 tick 通道 —
  * <ul>
- *   <li>GMPM 真管线 ({@link #GMPM_PIPELINES}: haqi FSM+底层覆盖 / self_rescue 时间关键) 仍由
- *       {@link #tickPassiveFor} 驱动 (haqi 运行中 self_rescue 停 tick — 底层覆盖)</li>
- *   <li>跨 tick 动作型 ({@link #STANDALONE}: temp_adapt/torch_light) 由
+ *   <li>GMPM 真管线 ({@code Drive.GMPM_PASSIVE}: haqi FSM+底层覆盖 / self_rescue 时间关键 /
+ *       explorer_map 纯信息气泡) 由 {@link #tickPassiveFor} 驱动 (haqi 运行中其余停 tick — 底层覆盖)</li>
+ *   <li>跨 tick 动作型 ({@code Drive.STANDALONE_PASSIVE}: torch_light / jiuhu_milk) 由
  *       {@link #tickStandalonePassives} 独立心跳驱动 — 每 tick 调用, 动作频率由管线内
- *       ThrottleUtil 节流自持 (100/200/300t), 不再共享 budget 轮转/位掩码缓存</li>
- *   <li>纯触发型 (structure_sense/festival) 无 tick — 经 PassiveDispatcher</li>
+ *       ThrottleUtil 节流自持, 坐下暂停; 不再共享 budget 轮转/位掩码缓存</li>
+ *   <li>纯触发型 ({@code Drive.TRIGGER_PASSIVE}: structure_sense/festival/rare_biome) 无 tick —
+ *       经 PassiveDispatcher</li>
  * </ul>
  * 删除: PASSIVE_TICK_BUDGET 配置 / PassiveRotation 轮转 / 位掩码缓存 (PASSIVE_ACTIVE_CACHE) /
  * clearMaidCaches (mask 缓存消失, 冷却表走 MaidUnloadRegistry 声明式清理)。
+ *
+ * <p><b>v79.63 Drive 单一真相源 + 异常护栏</b>: 驱动分派原靠本类两个手写 {@code String} 集合
+ * (漏名即静默死链 — 2026-09-11 实测 jiuhu_milk/explorer_map 两条死链), 现改
+ * {@link com.github.xiaozhaoz1.littlemaidmoreaction.task.TaskRegistryManifest.Drive} 声明 +
+ * {@link TaskRegistry#passivesByDrive} 分桶; 管线 tick 全部经
+ * {@link EngineGuard} 隔离 (第三方管线抛异常不再崩服)。
  */
 public final class GameTickPipelineManager {
 
@@ -51,12 +58,8 @@ public final class GameTickPipelineManager {
     /** 被动检查节流 (tick) — 运行中关开关清理遍历每 10t 一次 (摊薄 PD 读取) */
     public static final int PASSIVE_CHECK_INTERVAL = 10;
 
-    /** GMPM 真管线 (保留本通道) — haqi (FSM + 底层覆盖) / self_rescue (时间关键并行) */
-    private static final java.util.Set<String> GMPM_PIPELINES = java.util.Set.of("haqi", "self_rescue");
-
-    /** 跨 tick 动作型 (v79.61x 脱管线 — 独立心跳, 管线内节流自持) */
-    private static final java.util.Set<String> STANDALONE = java.util.Set.of(
-            "temp_adapt", "torch_light");
+    // v79.63: GMPM_PIPELINES / STANDALONE 两个手写 String 集合已删 —
+    // 驱动模式唯一真相源 = TaskRegistryManifest.TaskSpec.drive (引擎按 TaskHandler.drive() 分派)。
 
     private GameTickPipelineManager() {}
 
@@ -109,7 +112,7 @@ public final class GameTickPipelineManager {
 
         // ── 非活跃状态 ──
         // (CANCELLED 分支已删 — 2026-08-16 实证: TaskDispatcher.cancel 同帧 clearAll,
-        // FLOW_STATE 在 CLEAR_ALL_KEYS 内, 状态零残留不跨 tick, 原 cleanupMaid 兜底不可达)
+        // FLOW_STATE 在 CLEAR_ALL_KEYS 内, 状态零残留不跨 tick; 孤儿/异常状态由下方孤儿收容与 EngineGuard 兜底)
         if (!TaskKeys.STATE_IN_PROGRESS.equals(state)) {
             return;
         }
@@ -119,7 +122,23 @@ public final class GameTickPipelineManager {
         // 2026-08-11c 文档化: 看门狗+心跳均仅 isLongRunning 生效 — 非长任务 = 自终结语义
         // (设计约定: 任务自行 complete; 忘终结 = 永久运行无兜底 — GMPM 不干预)
         var h = TaskRegistry.get(task);
-        if (h != null && h.pipeline().isLongRunning()) {
+        // ── 孤儿任务收容 (v79.63, 评审 P1-4) ──
+        // 状态 in_progress 但任务类型已不在注册表: 典型来源 = 版本升级删掉整个任务
+        // (v79.63 删 smithing / v79.62 删 snow_shovel …) 而旧存档仍留着 in_progress。
+        // 原行为: 看门狗块 (h != null) 与驱动块 (h != null) 双双跳过 → **不日志、不清理、永留**,
+        // 表现为"女仆怪怪的但日志干净"。现自愈: 限流告警 + 状态归零 (clearAll)。
+        // 注: h.pipeline() == null (纯触发占位条目) 也算异常状态 — 主动流程不应指向被动条目
+        // (旧存档手改 / 类型复用); 与"未注册"同路径收容, 避免 L139 起对 null 解引用 (错题 #124 同族)
+        if (h == null || h.pipeline() == null) {
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
+                    .shouldFire(maid, "orphan_task_" + task, 600L)) {
+                LittleMaidMoreAction.LOGGER.warn("[LMA/TaskTickHandler] 孤儿任务 '{}' ({}) → 状态归零 maid={}",
+                        task, h == null ? "未注册" : "无管线条目", maid.getStringUUID());
+            }
+            TaskStateManager.clearAll(maid);
+            return;
+        }
+        if (h.pipeline().isLongRunning()) {
             long lastTick = FlowTaskData.getTick(maid);
             if (lastTick != 0) {
                 // v79.55: FLOW_TIMEOUT 键无写方恒默认 (错题 #181) — 删键后恒 DEFAULT_TIMEOUT
@@ -156,57 +175,86 @@ public final class GameTickPipelineManager {
             }
             // v79.58 裁定修订: 自救不暂停主动任务 — 并行执行 (被动标准语义),
             // 被埋瞬破与主动任务互不干预; 原暂停守卫 (方案 A) 已删
-            h.pipeline().tick(sl, maid);
+            // v79.63: 经 EngineGuard 隔离 — 管线抛异常不再崩服 (达阈值自动 fail + 气泡)
+            EngineGuard.tickActive(h.pipeline(), h.taskType(), sl, maid);
         }
     }
 
     /**
-     * 被动流程每 tick (v79.61x 脱管线版) — 只驱动 GMPM 真管线
-     * ({@link #GMPM_PIPELINES}: haqi/self_rescue); 跨 tick 型走
-     * {@link #tickStandalonePassives} 独立心跳; 纯触发型 (pipeline null) 占位跳过。
+     * 被动流程每 tick (v79.61x 脱管线版) — 只驱动 {@code Drive.GMPM_PASSIVE} 条目
+     * (haqi/self_rescue/explorer_map); {@code STANDALONE_PASSIVE} 走
+     * {@link #tickStandalonePassives} 独立心跳; {@code TRIGGER_PASSIVE} (pipeline null) 占位跳过。
      *
      * <p>保留: 运行中关开关 → cancelPassive 清理 (10t 节流遍历, 防旧状态复活 — v79.61x #6)。
-     * haqi 底层覆盖 (用户裁定): haqi 运行中 self_rescue 停 tick (恢复由 haqi 结束下轮自然继续)。
-     * 删除: PASSIVE_TICK_BUDGET 轮转 / 位掩码缓存 — 每 tick 全量判定 (遍历 7 条目 × PD 读,
-     * 与 passiveMask 重算同量级)。
+     * haqi 底层覆盖 (用户裁定): haqi 运行中其余被动停 tick (恢复由 haqi 结束下轮自然继续)。
+     * 删除: PASSIVE_TICK_BUDGET 轮转 / 位掩码缓存 — 每 tick 全量判定。
+     *
+     * <p>v79.63: 分派按 {@link TaskRegistryManifest.Drive} (原手写 String 集合已删),
+     * 开关判定统一走 {@code PassiveConfigUtil.isPassiveEnabled} (与提交门同源)。
      */
     public static void tickPassiveFor(ServerLevel sl, EntityMaid maid,
                                       List<TaskRegistry.TaskHandler> passives, long now) {
         // 运行中关开关 → cancelPassive 清理 (火把回背包/pipelineData 清/哈气 pin 恢复
         // — 原禁用只停 tick, in_progress 键+残留状态挂着, 重开开关后旧状态复活)。
+        // v79.63: 判据统一 (原只查全局 TaskToggle → 对 per-maid 开关型 haqi/jiuhu_milk 失效)
         if (now % PASSIVE_CHECK_INTERVAL == 0) {
             for (TaskRegistry.TaskHandler h : passives) {
                 String key = TaskKeys.passiveKey(h.taskType());
-                if (TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))
-                        && !TaskToggle.isEnabled(h.taskType())) {
+                boolean inProgress = TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key));
+                // 关开关 ⇒ 停 + 清理 (原有)
+                if (inProgress && !com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveConfigUtil
+                        .isPassiveEnabled(maid, h.taskType())) {
                     TaskDispatcher.cancelPassive(maid, h.taskType());
+                    continue;
+                }
+                // ★ v79.63.4 修「被动注册了却无人启动」(用户实测: 扔探险家地图给女仆无反应):
+                //   两个 tick 通道原先只 tick **已 in_progress** 的被动 ⇒ 没有自启动者的任务型被动
+                //   (explorer_map / jiuhu_milk) **永不运行**。现: 开关开 + 未运行 ⇒ 自动提交 (与上面"关开关即取消"对称)。
+                if (!inProgress && h.pipeline() != null
+                        && com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveConfigUtil
+                                .isPassiveEnabled(maid, h.taskType())) {
+                    TaskDispatcher.submitPassive(maid, h.taskType());
+                    LittleMaidMoreAction.LOGGER.debug("[LMA/Passive] 自动启动 {} (开关开, 原未运行)", h.taskType());
                 }
             }
         }
         for (TaskRegistry.TaskHandler h : passives) {
-            if (h.pipeline() == null) continue;                    // 纯触发型占位 — Dispatcher 通道
-            if (!GMPM_PIPELINES.contains(h.taskType())) continue;  // 跨 tick 型 — 独立心跳
+            if (h.pipeline() == null) continue;                          // TRIGGER_PASSIVE 占位 — Dispatcher 通道
+            if (h.drive() != TaskRegistryManifest.Drive.GMPM_PASSIVE) continue;  // 其余驱动 — 其他通道
             if (!running(maid, h)) continue;
-            // haqi 底层覆盖 — haqi 运行中 self_rescue 停 tick (用户裁定: 哈气启动不结束不做其他事)
+            // haqi 底层覆盖 — haqi 运行中其余被动停 tick (用户裁定: 哈气启动不结束不做其他事)
             if (!"haqi".equals(h.taskType())
                     && com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveDispatcher.haqiRunning(maid)) {
                 continue;
             }
-            h.pipeline().tick(sl, maid);
+            EngineGuard.tickPassive(h.pipeline(), h.taskType(), sl, maid);
         }
     }
 
     /**
-     * 跨 tick 动作型独立心跳 (v79.61x) — temp_adapt/torch_light 移出共享通道
-     * (v79.62: snow_shovel 已删 — TLM 原版清雪任务覆盖, 用户裁定)。
-     * 每 tick 调用 (动作频率由管线内 ThrottleUtil 节流自持 — temp 100/600t,
-     * torch 20/300t, 行为等价); haqi 底层覆盖统一检查 (PassiveDispatcher 同源判定)。
+     * 跨 tick 动作型独立心跳 (v79.61x) — 由 {@code Drive.STANDALONE_PASSIVE} 声明
+     * (torch_light / jiuhu_milk; v79.62 snow_shovel 删 / v79.62.5 temp_adapt 删)。
+     * 每 tick 调用 (动作频率由管线内 ThrottleUtil 节流自持);
+     * haqi 底层覆盖统一检查 (PassiveDispatcher 同源判定)。
      */
     public static void tickStandalonePassives(ServerLevel sl, EntityMaid maid,
                                               List<TaskRegistry.TaskHandler> passives) {
+        // ★ v79.63.4: 同 GMPM 通道 — 开关开 + 未运行 ⇒ 自动启动 (修"无启动者"死链)
+        if (sl.getGameTime() % PASSIVE_CHECK_INTERVAL == 0) {
+            for (TaskRegistry.TaskHandler h : passives) {
+                if (h.pipeline() == null || h.drive() != TaskRegistryManifest.Drive.STANDALONE_PASSIVE) continue;
+                String key = TaskKeys.passiveKey(h.taskType());
+                if (!TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))
+                        && com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveConfigUtil
+                                .isPassiveEnabled(maid, h.taskType())) {
+                    TaskDispatcher.submitPassive(maid, h.taskType());
+                    LittleMaidMoreAction.LOGGER.debug("[LMA/Passive] 自动启动 {} (standalone 通道)", h.taskType());
+                }
+            }
+        }
         for (TaskRegistry.TaskHandler h : passives) {
             if (h.pipeline() == null) continue;
-            if (!STANDALONE.contains(h.taskType())) continue;
+            if (h.drive() != TaskRegistryManifest.Drive.STANDALONE_PASSIVE) continue;
             if (!running(maid, h)) continue;
             // haqi 底层覆盖 — 哈气运行中跨 tick 型停 tick (统一入口)
             if (com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveDispatcher.haqiRunning(maid)) {
@@ -217,25 +265,16 @@ public final class GameTickPipelineManager {
             if (maid.isMaidInSittingPose()) {
                 continue;
             }
-            h.pipeline().tick(sl, maid);
+            EngineGuard.tickPassive(h.pipeline(), h.taskType(), sl, maid);
         }
     }
 
-    /** in_progress + 开关 (两通道共用判定) */
+    /** in_progress + 开关 (两通道共用判定) — v79.63: 开关判定统一走 PassiveConfigUtil
+     *  (原只查全局 TaskToggle, 对 per-maid 开关型被动 (haqi/jiuhu_milk) 判据错 — 关开关不清理) */
     private static boolean running(EntityMaid maid, TaskRegistry.TaskHandler h) {
         String key = TaskKeys.passiveKey(h.taskType());
         return TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData().getString(key))
-                && TaskToggle.isEnabled(h.taskType());
-    }
-
-    /** 先走 pipeline.onCleanup 闭合游标, 再 clearAll (原直调 clearAll 绕过 onCleanup) */
-    private static void cleanupMaid(EntityMaid maid) {
-        String task = FlowTaskData.getTask(maid);
-        if (task.isEmpty()) return;
-        var handler = TaskRegistry.get(task);
-        if (handler != null) {
-            handler.pipeline().onCleanup(maid);
-        }
-        TaskStateManager.clearAll(maid);
+                && com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveConfigUtil
+                        .isPassiveEnabled(maid, h.taskType());
     }
 }

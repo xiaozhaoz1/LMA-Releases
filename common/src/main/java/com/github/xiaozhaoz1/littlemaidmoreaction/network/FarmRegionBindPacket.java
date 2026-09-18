@@ -3,7 +3,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.network;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LmaNetwork;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.CropRegistry;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.FarmRegionStorage;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
@@ -84,6 +84,10 @@ public record FarmRegionBindPacket(String maidUuid, int minX, int minY, int minZ
     private static void handleBind(ServerPlayer player, FarmRegionBindPacket msg) {
         String uuid = msg.maidUuid();
         if (uuid == null || uuid.isBlank() || uuid.length() > 64) return;
+        // 按 uuid 找女仆 (包只带 uuid; 找不到 = 未加载/已收魂符)
+        if (!(player.level() instanceof net.minecraft.server.level.ServerLevel ownerLevel)) return;
+        var maid = FarmRegionStorage.findMaid(ownerLevel, uuid);
+        if (maid == null) return;
         ItemStack held = player.getMainHandItem();
         CompoundTag tag;
 //? if 1.20.1 {
@@ -93,7 +97,7 @@ public record FarmRegionBindPacket(String maidUuid, int minX, int minY, int minZ
                 net.minecraft.world.item.component.CustomData.EMPTY);
         tag = cd.copyTag();
 //?}
-        int nob = com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage.NO_BOX;
+        int nob = com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.FarmRegionStorage.NO_BOX;
         int sx = nob, sy = nob, sz = nob, hx = nob, hy = nob, hz = nob;
         if (tag.contains("farm_seed")) {
             BlockPos p = com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs.readBlockPos(tag, "farm_seed");
@@ -130,9 +134,13 @@ public record FarmRegionBindPacket(String maidUuid, int minX, int minY, int minZ
         FarmRegionStorage.FarmRegion r = FarmRegionStorage.of(
                 msg.minX(), msg.minY(), msg.minZ(), msg.maxX(), msg.maxY(), msg.maxZ(),
                 cropId, harvestMode, sx, sy, sz, hx, hy, hz);
-        FarmRegionStorage.addRegion(uuid, r);
-        FarmRegionStorage.save(LittleMaidMoreAction.CONFIG_DIR);
-        FarmRegionSyncPacket.sendToPlayer(player, uuid, FarmRegionStorage.getFor(uuid));
+        // v79.64 维度: 区域绑定到玩家当前世界 (绑定者眼前框选的区域)
+        r = new FarmRegionStorage.FarmRegion(r.minX(), r.minY(), r.minZ(), r.maxX(), r.maxY(), r.maxZ(),
+                r.cropId(), r.harvestMode(), r.seedX(), r.seedY(), r.seedZ(),
+                r.harvestX(), r.harvestY(), r.harvestZ(), r.name(),
+                player.level().dimension().location().toString());
+        FarmRegionStorage.addRegion(maid, r);
+        FarmRegionSyncPacket.sendToPlayer(player, uuid, FarmRegionStorage.getFor(maid));
         // 不清木棍标记 — 允许玩家标记一次箱子后连续绑定多个区域 (每个区域用当前木棍上的箱子)
 //? if !1.20.1 {
         held.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));

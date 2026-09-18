@@ -48,7 +48,7 @@ public abstract class WorkStationPipeline implements TaskPipeline {
 
         switch (executeOne(w, m, target)) {
             case SUCCESS -> countSuccess(m);
-            case FAILED -> MaidChatBubbleApi.showFail(m, taskType() + " 失败");
+            case FAILED -> MaidChatBubbleApi.showFail(m, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.station.failed", taskType()));
             case CONTINUE -> { /* 持续执行 */ }
         }
     }
@@ -66,11 +66,30 @@ public abstract class WorkStationPipeline implements TaskPipeline {
      */
     public static BlockPos gate(ServerLevel w, EntityMaid m, TaskPipeline p) {
         var mem = m.getBrain().getMemory(InitEntities.TARGET_POS.get());
-        if (mem.isEmpty()) return null;  // Brain 导航中/无目标 — 等重搜
+        // v79.63 修**工作站任务不走/不干活** (用户实机: 敲钟/烧炉女仆不移动; gametest 复现 TARGET_POS 恒 false):
+        //   Brain 的 searchForDestination 不可靠 (BFS 预筛选/半径/时序多因) ⇒ 这里**管线圈自搜兜底**。
+        //   先例 = VoidExcavationPipeline: "LMA 不自写寻路, 只给坐标, 移动靠 TLM" —
+        //   设 TARGET_POS (让本行为 tick 不提前返回) + WALK_TARGET (TLM MoveToTargetSink 读它走)。
+        if (mem.isEmpty()) {
+            if (m.level().getGameTime() % 20 == 0) {          // 1s 一次的节流扫描 (避免每 tick 全扫)
+                BlockPos found = searchWorkStation(w, m, p);
+                if (found != null) {
+                    m.getBrain().setMemory(InitEntities.TARGET_POS.get(),
+                            new net.minecraft.world.entity.ai.behavior.BlockPosTracker(found));
+                    net.minecraft.world.entity.ai.behavior.BehaviorUtils
+                            .setWalkAndLookTargetMemories(m, found, 1.0F, 0);
+                }
+            }
+            return null;   // 本 tick 只负责"发现 + 起走", 到位后由下面逻辑按节拍执行
+        }
         BlockPos target = mem.get().currentBlockPosition();
 
-        // 未到达 → 导航中 (心跳由 GMPM 20t 全局写, 不误杀)
-        if (target.distSqr(m.blockPosition()) >= VanillaConstants.ARRIVE_DIST_SQR) return null;
+        // 未到达 → 导航中: **每 tick 续写 WALK_TARGET** (TLM MoveToTargetSink 靠它推进; 先例同款)
+        if (target.distSqr(m.blockPosition()) >= VanillaConstants.ARRIVE_DIST_SQR) {
+            net.minecraft.world.entity.ai.behavior.BehaviorUtils
+                    .setWalkAndLookTargetMemories(m, target, 1.0F, 0);
+            return null;
+        }
 
         // 节拍
         if (w.getGameTime() % p.executeInterval() != 0) return null;
@@ -82,6 +101,30 @@ public abstract class WorkStationPipeline implements TaskPipeline {
             return null;
         }
         return target;
+    }
+
+    /**
+     * 管线圈**自搜工作站** (Brain 搜索不可靠时的兜底) — 有界扫描 + 尊重 home 模式半径。
+     *
+     * <p>设计对齐用户表述: "熔炉就是一条线的任务 — 先看有无产物, 再看燃料, 再看待烧物" ⇒
+     * 工作逻辑是清晰的线性相位机 (见 {@link #executeOne} 的实现), **缺的只是"先走到炉子前"**。
+     * 本方法补的就是那一步: 给坐标, 移动交给 TLM。
+     *
+     * @return 最近的匹配方块 (无则 null)
+     */
+    private static BlockPos searchWorkStation(ServerLevel w, EntityMaid m, TaskPipeline p) {
+        int r = (int) m.getRestrictRadius();
+        int range = (m.isHomeModeEnable() && r > 0) ? r : 12;   // home 模式才受 restrict 限制 (同 LmaFlowCoordinationBehavior 修复)
+        BlockPos c = m.blockPosition();
+        BlockPos best = null;
+        double bestSq = Double.MAX_VALUE;
+        for (BlockPos bp : BlockPos.betweenClosed(c.offset(-range, -4, -range), c.offset(range, 4, range))) {
+            if (!w.hasChunk(bp.getX() >> 4, bp.getZ() >> 4)) continue;   // 未加载区块不查 (避免卡顿, 同 shouldMoveTo)
+            if (!p.isTargetBlock(w, bp, w.getBlockState(bp), m)) continue;
+            double d = c.distSqr(bp);
+            if (d < bestSq) { bestSq = d; best = bp.immutable(); }
+        }
+        return best;
     }
 
     /**

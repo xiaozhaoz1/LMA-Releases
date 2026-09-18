@@ -12,7 +12,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class ItemListConfigMenu extends LmaTaskConfigContainer {
 
     public ItemListConfigMenu(int containerId, Inventory playerInv, int maidId) {
-        super(LmaMenus.ITEM_LIST_CONFIG_MENU, containerId, playerInv, maidId);
+        super(LmaMenus.ITEM_LIST_CONFIG_MENU.get(), containerId, playerInv, maidId);
     }
 
 }

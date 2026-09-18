@@ -6,6 +6,10 @@ def minecraftVersion = project.name
 def libs = catalogFor(project, minecraftVersion)
 
 repositories {
+    // v79.63: 本地 maven repo (与 forge 节点同款) — compat 运行期开关的坐标从这里解析;
+    // 关键: maven 坐标的 mod 依赖会被 ModDevGradle 重映射, 松散 files() 不会 → 第三方 mod 的
+    // SRG refmap 在 dev 下会 "Mixin apply failed ... @Shadow m_xxxxx_ was not located" (错题 #288)
+    maven { url = uri(rootProject.file('libs-maven').toURI()) }
     maven {
         name = "Modrinth"
         url = "https://api.modrinth.com/maven"
@@ -96,4 +100,28 @@ neoForge {
                     project.dependencies.create('cn.6tail:lunar:1.7.7'))
         }
     }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v79.63 compat 运行期开关 (neoforge) — **默认关**, 开关关时零副作用。
+// 实现在独立脚本里 (gradle/compat-runtime.gradle): 探测 mod 配置名 + 加运行期 mod jar。
+// 为什么独立 + 放在**文件末尾顶层**: 上一版把依赖块插进既有 dependencies{} 闭包内部 →
+// Groovy 解析错 (Unexpected input { @ line 21) 把构建改坏 (错题 #286 §3)。
+// 用法: ./gradlew -PcompatRuntime=true :neoforge:1.21.1:runGameTestServer
+// ─────────────────────────────────────────────────────────────────────────────
+ext.compatRuntimeJars = [
+        rootProject.file('libs/create-1.21.1-6.0.10.jar'),
+        rootProject.file('libs/ponder-neoforge-1.0.82+mc1.21.1.jar'),
+        rootProject.file('libs/flywheel-neoforge-1.21.1.jar'),
+        rootProject.file('libs/createbigcannons-5.11.7-mc.1.21.1-neoforge.jar'),
+        rootProject.file('libs/ritchiesprojectilelib-2.1.2+mc.1.21.1-neoforge.jar')
+]
+apply from: rootProject.file('gradle/compat-runtime.gradle')
+
+
+// v79.63: javadoc 读 UTF-8 源 — Windows 默认 GBK 会让中文注释报
+//   "编码 GBK 的不可映射字符" (100 条诊断/2 个文件), 导致 `build` 挂在 javadoc 任务。
+//   common/build.gradle 早有同款配置, 两个节点脚本此前漏了 (本次打包时发现)。
+tasks.withType(Javadoc).configureEach {
+    options.encoding = "UTF-8"
 }

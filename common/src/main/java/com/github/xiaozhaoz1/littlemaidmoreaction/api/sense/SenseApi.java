@@ -5,12 +5,12 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvEdgeDetector;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvRules;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvScanner;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StructureScanCache;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.StructureScanCache;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSenseBroadcaster;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSnapshot;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ScanFilters;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ScanJob;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ScanScheduler;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.scan.ScanJob;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.scan.ScanScheduler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.LivingEntity;
@@ -191,20 +191,15 @@ public final class SenseApi {
         return com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidStateReader.getHealthRatio(maid);
     }
 
-    // ── 纯逻辑 (零 MC 依赖, 无女仆也可用) ──
-
-    /** 温度档: COLD(<0.15) / OCEAN(<0.55) / MEDIUM(<0.95) / WARM */
-    public static String tempCategory(float baseTemp) {
-        return EnvRules.tempCategory(baseTemp);
-    }
+    // ── 纯逻辑 (零 MC 依赖, 无女仆也可用; v79.62.5 tempCategory 删 — 温度档经 TLM) ──
 
     /** 时间段: DAY(0-11999) / DUSK(12000-13799) / NIGHT(13800-22199) / DAWN(22200-23999) */
     public static String timeSegment(long dayTime) {
         return EnvRules.timeSegment(dayTime);
     }
 
-    /** 边沿检测纯核心 (外部扩展信号时可用) */
-    public static EnvEdgeDetector.EnvConfig envConfig(float coldThreshold, float hotThreshold, int darknessThreshold) {
-        return new EnvEdgeDetector.EnvConfig(coldThreshold, hotThreshold, darknessThreshold);
+    /** 边沿检测阈值 (v79.62.5: 温度阈值删 — 温度边沿检测删) */
+    public static EnvEdgeDetector.EnvConfig envConfig(int darknessThreshold) {
+        return new EnvEdgeDetector.EnvConfig(darknessThreshold);
     }
 }

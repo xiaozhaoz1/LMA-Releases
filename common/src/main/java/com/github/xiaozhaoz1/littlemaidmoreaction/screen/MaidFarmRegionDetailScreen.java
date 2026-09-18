@@ -1,8 +1,8 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.screen;
 
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.FarmRegionEditPacket;
-import com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage;
-import com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage.FarmRegion;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.FarmRegionStorage;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.FarmRegionStorage.FarmRegion;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

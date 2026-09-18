@@ -49,8 +49,8 @@ public final class LmaEnvSenseContext {
             if (w.thundering()) sb.append("雷暴");
             else if (w.raining()) sb.append("下雨(").append(w.precipitation()).append(")");
             else sb.append("晴");
-            sb.append(", 温度: ").append(String.format("%.2f", w.temperature()));
-            sb.append(" (").append(w.tempCategory()).append(")");
+            // v79.62.5 温度档改调 TLM (maid.getAtBiomeTemp) — LMA 不再自采集温度 (用户裁定)
+            sb.append(", 温度: ").append(maid.getAtBiomeTemp());
             sb.append(", 光照: ").append(w.lightAtMaid());
             sb.append(", 月相: ").append(w.moonPhase());
             return sb.toString();

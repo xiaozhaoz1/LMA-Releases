@@ -13,11 +13,12 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 class LmaTaskProgressDisplayTest {
 
     @Test
-    @DisplayName("任务类型 → 友好中文名 (映射表 15 项全覆盖 — TST-11 补 5 项)")
+    @DisplayName("任务类型 → 友好中文名 (映射表 14 项; v79.63 删孤儿 brewing — 见下方注释)")
     void friendlyName_knownTask_mapped() {
+        // v79.63: 删 "brewing" 断言 — LmaTaskTypeRegistry 注释已实证 (2026-08-11c) "LMA-MAIN 零注册 brewing,
+        // TLM 1.20.1 无 brewing 任务"; 为不存在任务保留映射 = 死链, 由 TaskRegistryDriftTest 防回归
         assertEquals("配方链合成", LmaTaskProgressDisplay.friendlyName("craft_chain"));
         assertEquals("熔炉烧炼", LmaTaskProgressDisplay.friendlyName("furnace"));
-        assertEquals("炼药", LmaTaskProgressDisplay.friendlyName("brewing"));
         assertEquals("敲钟", LmaTaskProgressDisplay.friendlyName("bell_ring"));
         assertEquals("唱片机", LmaTaskProgressDisplay.friendlyName("jukebox"));
         assertEquals("搬运", LmaTaskProgressDisplay.friendlyName("arm_transfer"));

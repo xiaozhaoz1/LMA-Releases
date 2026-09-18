@@ -12,7 +12,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class AiControlConfigMenu extends LmaTaskConfigContainer {
 
     public AiControlConfigMenu(int containerId, Inventory playerInv, int maidId) {
-        super(LmaMenus.AI_CONTROL_CONFIG_MENU, containerId, playerInv, maidId);
+        super(LmaMenus.AI_CONTROL_CONFIG_MENU.get(), containerId, playerInv, maidId);
     }
 
 }

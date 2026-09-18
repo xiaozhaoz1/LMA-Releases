@@ -23,4 +23,15 @@ public final class ThrottleMath {
         if (last == 0 || last > now) return 0;
         return Math.max(0, interval - (now - last));
     }
+
+    /**
+     * **同一气泡分级冷却** (用户裁定 2026-09-14): 第 1 次后 5 秒, 第 2 次后 10 秒, 第 3 次起 30 秒循环。
+     *
+     * @param repeat 已显示次数 (1 = 刚显示第 1 次) — &lt;1 按 1 处理, &gt;3 按 3 处理
+     * @return 下次允许显示前需等待的 tick (100 / 200 / 600)
+     */
+    public static long bubbleInterval(int repeat) {
+        if (repeat <= 1) return 100L;
+        return repeat == 2 ? 200L : 600L;
+    }
 }

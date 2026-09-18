@@ -18,6 +18,18 @@ projects:
 clean-generated:
   @rm -rf build versions/*/build common/versions fabric/versions forge/versions neoforge/versions
 
+# build-logs 清理 — 默认 dry-run 只打印将删清单与可回收空间 (v79.64, 用户 2026-09-16 裁定)
+clean-logs keep="6" min-mb="10":
+  @node scripts/clean-build-logs.mjs --keep {{keep}} --min-mb {{min-mb}}
+
+# 同上, 真删 (保留最近 N 个大日志, 不碰小文件与 *.summary.log)
+clean-logs-apply keep="6" min-mb="10":
+  @node scripts/clean-build-logs.mjs --keep {{keep}} --min-mb {{min-mb}} --apply
+
+# 摘要式跑测试/编译 — 300MB 级日志 → ~0.5MB, 证据行全保 (可加 --diag 保留噪音)
+log-run *args:
+  @bash scripts/log-run.sh {{args}}
+
 run first="" second="" *rest:
   @if [ -z "{{first}}" ]; then \
     echo "Usage: just run [version] [loader] <gradle args>"; \

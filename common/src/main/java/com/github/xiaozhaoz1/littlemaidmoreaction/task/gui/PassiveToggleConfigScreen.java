@@ -1,5 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.gui;
 
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskConfigurable;
+
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.RequestTaskConfigPacket;
 import net.minecraft.client.gui.GuiGraphics;
@@ -28,22 +30,24 @@ public class PassiveToggleConfigScreen extends LmaTaskConfigScreen<PassiveToggle
     }
 
     @Override
+    /** 布局 (规范 v79.63.8): 行0 开关 (满宽 rowW) */
     protected void initAdditionWidgets() {
+        int rowW = contentRight() - contentX();   // v79.63.22: 控件占满整行 ✓
+        int rowX = contentX();
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), taskType);
-        int cx = contentX();
-        int y = contentY();
-        toggleBtn = Button.builder(getToggleLabel(), btn -> {
-            CompoundTag cfg = getMenu().getConfig();
-            boolean cur = cfg.getBoolean("enabled");
-            cfg.putBoolean("enabled", !cur);
-            sendToggle("enabled");
-        }).pos(cx, y).size(100, 20).build();
+        toggleBtn = tipBtn(getToggleLabel(),
+                rowX, rowY(0) - 2, rowW, () -> {
+                    CompoundTag cfg = getMenu().getConfig();
+                    boolean cur = cfg.getBoolean(TaskConfigurable.KEY_ENABLED);
+                    cfg.putBoolean(TaskConfigurable.KEY_ENABLED, !cur);
+                    sendToggle(TaskConfigurable.KEY_ENABLED);
+                }, net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.passive.tip"));
         addRenderableWidget(toggleBtn);
     }
 
     private Component getToggleLabel() {
-        boolean on = getMenu().getConfig().getBoolean("enabled");
+        boolean on = getMenu().getConfig().getBoolean(TaskConfigurable.KEY_ENABLED);
         return Component.literal(on ? "§a✔ 启用" : "§c✘ 禁用");
     }
 

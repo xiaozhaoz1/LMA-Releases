@@ -15,7 +15,6 @@ import javax.annotation.Nullable;
  * <h3>信号 → 消费管线 → 配置面 (8 全量映射; v79.61x 死信号同族清理后; v79.62 snow_shovel 删)</h3>
  * <ul>
  *   <li>SNOWING/WEATHER_CLEAR → 天气检出保留 (LLM 对话/规则系统上下文, 用户裁定; 原 SnowShovelPipeline 消费已删)</li>
- *   <li>TEMP_COLD/HOT/NORMAL → TempAdaptPipeline → ENV_COLD/HOT_THRESHOLD</li>
  *   <li>DARKNESS → TorchLightPipeline → ENV_DARKNESS_THRESHOLD</li>
  *   <li>MAID_NEARBY → HaqiPipeline → HAQI_*</li>
  *   <li>FESTIVAL_ENTER → FestivalPassiveTask (纯触发型) → showTrigger 100t (无阈值)</li>
@@ -37,12 +36,6 @@ public final class Signals {
     public static final String ENV_SNOWING = "env:SNOWING";
     /** 天气转晴 */
     public static final String ENV_WEATHER_CLEAR = "env:WEATHER_CLEAR";
-    /** 进入寒冷区域 */
-    public static final String ENV_TEMP_COLD = "env:TEMP_COLD";
-    /** 进入炎热区域 */
-    public static final String ENV_TEMP_HOT = "env:TEMP_HOT";
-    /** 返回常温 */
-    public static final String ENV_TEMP_NORMAL = "env:TEMP_NORMAL";
     /** 进入黑暗 */
     public static final String ENV_DARKNESS = "env:DARKNESS";
     /** 附近有其他女仆 */

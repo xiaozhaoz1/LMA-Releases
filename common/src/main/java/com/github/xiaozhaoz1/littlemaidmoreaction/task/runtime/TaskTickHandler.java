@@ -54,7 +54,7 @@ public final class TaskTickHandler {
         if (event.phase != TickEvent.Phase.END) return;
 //?}
         // 扫描任务集中调度 (全维度共享预算, 每服务端 tick 一次)
-        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ScanScheduler
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.scan.ScanScheduler
                 .tick(event.getServer().getTickCount());
         for (ServerLevel sl : event.getServer().getAllLevels()) {
             long now = sl.getGameTime();
@@ -96,7 +96,7 @@ public final class TaskTickHandler {
             // 防重开维度/多世界残留旧维度 map; 懒清理兜底但维度级需显式收口)
             String dimKey = sl.dimension().location().toString();
             com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.WorldInfoCache.clearDimension(dimKey);
-            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.BlockPatternCache.clearDimension(dimKey);
+            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache.clearDimension(dimKey);
             for (var e : sl.getAllEntities()) {
                 if (e instanceof EntityMaid maid) {
                     com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.flushAllPl(maid);

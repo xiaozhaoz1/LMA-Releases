@@ -60,7 +60,10 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
     @Override protected boolean workStationGated() { return true; }
     @Override public int executeInterval() { return 30; }
     @Override public boolean isTargetBlock(ServerLevel w, BlockPos p, BlockState s, EntityMaid m) { return s.is(net.minecraft.world.level.block.Blocks.JUKEBOX); }
-    @Override public List<TaskStep> steps() { return List.of(new TaskStep("play", "播放唱片", StepType.INTERACT, List.of())); }
+    @Override public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            return List.of(new TaskStep("play", "播放唱片", StepType.INTERACT, List.of())); }
 
     /** 唱片黑白名单配置 GUI (per-maid) */
     @Override @javax.annotation.Nullable
@@ -209,9 +212,9 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
             if (chosen == null) {
                 // v79.61x S1-F4 (用户裁定): 目标碟不存在 → 节流气泡提醒, 保持 INSERTING 等补碟
                 // (原静默卡住; 匹配判据已与 validate 统一为 matchesTarget)
-                if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                         .shouldFire(maid, "jukebox_target_miss", 600)) {
-                    com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, "背包里没有目标唱片: " + target);
+                    com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.jukebox.no_disc", target));
                 }
                 return null;
             }
@@ -238,7 +241,7 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
             }
         }
         if (inserted) {
-            MaidChatBubbleApi.showInfo(maid, "正在播放: " + chosen.getHoverName().getString());
+            MaidChatBubbleApi.showInfo(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.jukebox.playing", chosen.getHoverName().getString()));
             int wait = ActiveTaskConfig.JUKEBOX_WAIT_TICKS.get();
             LittleMaidMoreAction.LOGGER.debug("[Jukebox] maid={} INSERTING→PLAYING (wait {} ticks={}min)",
                 maid.getId(), wait, wait / 20 / 60);
@@ -273,9 +276,9 @@ public final class JukeboxPipeline extends TaskStateMachine<JukeboxPipeline.Phas
         }
         // 全拒 (背包满, insertItem 剩余=原数量) — 碟滞留机内; 保持 EJECTING 每 tick 重试,
         // 600t 节流气泡提醒; 背包腾出空间后下一 tick 自然弹出 (自愈)
-        if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                 .shouldFire(maid, "jukebox_full", 600)) {
-            com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, "背包已满，无法取回唱片");
+            com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.jukebox.inv_full"));
         }
         return null;
     }

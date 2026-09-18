@@ -76,6 +76,9 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
 
     @Override
     public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            
         return List.of(
             new TaskStep("search",  "寻找火炮炮架", StepType.INTERACT, List.of()),
             new TaskStep("open",    "打开炮闩",     StepType.INTERACT, List.of()),
@@ -309,7 +312,7 @@ public final class CannonLoadPipeline extends TaskStateMachine<CannonLoadPipelin
         } else if (now - loadStart > LOAD_STALL_TIMEOUT) {
             // 2026-08-16 用户实测: 缺弹 → LOADING 200t 超时 → 气泡 → SEARCHING → 再 LOADING → 每 ~10s 弹
             // → 加 60s 气泡节流 (shouldFire 写戳) — 不刷屏仍周期提醒
-            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                     .shouldFire(maid, "cannon_no_ammo", 1200)) {
                 com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
                         .showFail(maid, "缺少弹药，无法继续装填");

@@ -25,6 +25,14 @@ public interface TaskConfigurable {
     // ── 配置 GUI 通用动作 (C→S TaskConfigActionPacket) ──
 
     /** 引擎预留动作 0-15; 任务自定义动作建议从 16 起 */
+        /**
+     * per-maid 开关键 ({@code pipelineConfig} 内) — 被动任务的"启用/禁用"由它承载,
+     * 缺省 false (默认关, 由子任务界面 {@code PassiveToggleConfigScreen} 显式开启)。
+     *
+     * <p>v79.63: 由裸字面量收敛为常量 (键名 = 跨层契约; 屏写入 / {@code PassiveConfigUtil} 读取必须同源)。
+     */
+    String KEY_ENABLED = "enabled";
+
     byte ACTION_TOGGLE = 0;    // payload: "key" — boolean 取反
     byte ACTION_SET_INT = 1;   // payload: "key" + "value" — int 赋值
     byte ACTION_REMOVE = 2;    // payload: "key" — 删除键
@@ -125,7 +133,13 @@ public interface TaskConfigurable {
      * 键名 "lma_cfg_&lt;taskType&gt;", 不会被 onCleanup() 清除 (直读 NBT, 低频访问).
      */
     default CompoundTag pipelineConfig(EntityMaid maid) {
-        return com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.cfg(maid, taskType());
+        // v79.63 修**配置改了不生效** (用户实机: 敲钟频率改了仍 1.5s 一敲):
+        //   原用 MaidData.cfg(...) = 只读版, 对**不存在的 key 返回临时空 tag (非引用)** ⇒
+        //   默认 handleConfigAction 的 putInt 写进临时 tag **不落盘** ⇒ 首次改配置必丢 ⇒
+        //   管线读不到 ⇒ 退回全局默认 (钟=30t)。MaidData.cfgOrCreate 的 javadoc 早已写明这个坑
+        //   (2026-08-16 修过绑定路径), 但**读写统一入口这里漏了**。
+        //   ⇒ 一律走 cfgOrCreate: 读也安全 (最多多一个空标签), 写保证落盘。
+        return com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.cfgOrCreate(maid, taskType());
     }
 
     default void clearPipelineConfig(EntityMaid maid) {
@@ -140,4 +154,31 @@ public interface TaskConfigurable {
     /** 附近容器收集过滤: null=关闭, Predicate=开启 */
     @Nullable
     default java.util.function.Predicate<net.minecraft.world.item.ItemStack> collectFilter(EntityMaid maid) { return null; }
+
+    // ── 开关归属 (v79.63 统一 — 「运行中关开关 → 清理」与「提交门」必须同源) ──
+
+    /**
+     * 本任务的启用开关归属 (默认 {@link SwitchScope#GLOBAL})。
+     *
+     * <p>被动任务的启用判定有两个来源, 曾经由 {@code TaskDispatcher.submitPassive} 里一处
+     * 硬编码 {@code if ("haqi"||"jiuhu_milk")} 决定 —— 而引擎侧的「运行中关开关 → cancelPassive」
+     * 与逐 tick 运行判定查的是**另一套** (全局 {@code TaskToggle}), 造成关开关不清理 / 排查
+     * 要同时看两个开关。现改为**任务自身声明**, 三处判定 (提交 / 运行 / 清理) 统一走
+     * {@code PassiveConfigUtil.isPassiveEnabled}。
+     *
+     * <p>覆写返回 {@link SwitchScope#PER_MAID} 的任务: 开关存 {@code pipelineConfig(maid)}
+     * 的 {@code "enabled"} 键 (子任务界面 {@code PassiveToggleConfigScreen} 编辑),
+     * **缺省 false = 默认关闭**; 不覆写的任务走全局 {@code TaskToggle} (黑名单语义, 缺省开启)。
+     */
+    default SwitchScope switchScope() {
+        return SwitchScope.GLOBAL;
+    }
+
+    /** 开关归属 — 见 {@link #switchScope()} */
+    enum SwitchScope {
+        /** 全局开关 ({@code config/littlemaidmoreaction/task_toggles.json}, TaskToggle, 缺省开启) */
+        GLOBAL,
+        /** 每女仆开关 ({@code lma_cfg_<type>.enabled}, 缺省关闭) */
+        PER_MAID
+    }
 }

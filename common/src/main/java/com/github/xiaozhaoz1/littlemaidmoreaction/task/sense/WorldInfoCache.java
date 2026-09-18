@@ -1,6 +1,5 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.sense;
 
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.MaidUnloadRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
@@ -37,16 +36,16 @@ public final class WorldInfoCache {
     /** 维度缓存: 维度 → entry (天气/时间, 每维度 1 条) */
     private static final Map<String, DimEntry> DIM = new HashMap<>();
 
-    static {
-        // 无 per-maid 状态 — 卸载清理无注册项; 维度清理走 clearDimension
-        MaidUnloadRegistry.register(maid -> { /* 占位: 静态共享缓存无 maidId 键 */ });
-    }
+    // v79.63 (命名评审 D-6): 原此处有一个 no-op 清理占位 (空 lambda 登记 MaidUnloadRegistry) — 已删。
+    // 规则澄清: **有 per-maid 状态才登记**; 本缓存是区块/维度键, 卸载清理无对象, 维度收口走
+    // clearDimension (ServerStopping)。(占位式登记会稀释"登记 = 有清理义务"的信号强度。)
 
     private WorldInfoCache() {}
 
     private record DimEntry(long tick, boolean day, boolean raining, boolean thundering,
                             int moonPhase, String dimension, long dayTime, String timeSegment) {}
-    private record ChunkEntry(long tick, int lightAtMaid, String tempCategory, float temperature,
+    // v79.62.5: tempCategory/temperature 字段删 — AI 上下文温度档改调 TLM maid.getAtBiomeTemp()
+    private record ChunkEntry(long tick, int lightAtMaid,
                               String precipitation, String biomeId, String structuresAt) {}
 
     /** 时间戳新鲜度判定 (逐字镜像 StructureScanCache.isFresh — 时钟回绕守卫) */
@@ -69,11 +68,9 @@ public final class WorldInfoCache {
             var biome = level.getBiome(center).value();
             c = new ChunkEntry(now,
                     com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.WorldStateReader.getLightLevel(level, center),
-                    EnvRules.tempCategory(biome.getBaseTemperature()),
-                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.WorldStateReader.getBiomeTemperature(level, center),
                     com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.WorldStateReader.getPrecipitation(level, center),
                     com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.WorldStateReader.getBiome(level, center),
-                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StructureScanCache.structuresAt(level, center));
+                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.StructureScanCache.structuresAt(level, center));
             dimChunk.put(chunkKey, c);
         }
 
@@ -91,7 +88,7 @@ public final class WorldInfoCache {
         }
 
         return new EnvSnapshot.WorldInfo(d.day(), d.raining(), d.thundering(), d.moonPhase(),
-                c.lightAtMaid(), d.dimension(), c.tempCategory(), c.temperature(),
+                c.lightAtMaid(), d.dimension(),
                 c.precipitation(), d.dayTime(), d.timeSegment(), c.biomeId(), c.structuresAt());
     }
 

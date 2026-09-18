@@ -11,7 +11,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class VoidExcavationConfigMenu extends LmaTaskConfigContainer {
 
     public VoidExcavationConfigMenu(int containerId, Inventory playerInv, int maidId) {
-        super(LmaMenus.VOID_EXCAVATION_CONFIG_MENU, containerId, playerInv, maidId);
+        super(LmaMenus.VOID_EXCAVATION_CONFIG_MENU.get(), containerId, playerInv, maidId);
     }
 
 }

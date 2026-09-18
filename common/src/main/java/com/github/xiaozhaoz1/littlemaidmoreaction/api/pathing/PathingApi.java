@@ -3,7 +3,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.VanillaConstants;
 import com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.DigThroughCoordinator;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.DigThroughCoordinator;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -13,6 +13,7 @@ import net.minecraft.world.entity.ai.memory.WalkTarget;
 import net.minecraft.world.level.block.state.BlockState;
 
 import javax.annotation.Nullable;
+import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -77,10 +78,30 @@ public final class PathingApi {
     /** 清除导航 — erase WALK_TARGET + 清导航看门狗记录 (LOOK_TARGET 由 TLM LookAtTargetSink 自清) */
     public static void clearNav(EntityMaid maid) {
         maid.getBrain().eraseMemory(MemoryModuleType.WALK_TARGET);
-        NAV_START.remove(maid.getId());
+        NAV_START.remove(maid.getUUID());
+        NAV_LAST_TARGET.remove(maid.getUUID());
         // v79.62.2 注意: 不清 NAV_ATTEMPT/NAV_CD — 超时路径先 clearNav 再记 attempt,
         // 若在此清 attempt → 2 次尝试永不达成 (attempt 永远从 1 开始). attempt/CD 由
         // navigate 自己管理 (FAILED/REACHED 时清).
+        // 实体离开世界请用 {@link #clearMaidState} (三表全清), 不要用本方法。
+    }
+
+    /**
+     * 女仆卸载清理 — 三张导航表**全清** (v79.63: 键统一 UUID + 补清 attempt/CD)。
+     *
+     * <p>与 {@link #clearNav} 的分工: clearNav = "清当前导航" (到达/切换目标/超时, 游戏内),
+     * **故意保留** NAV_ATTEMPT/NAV_CD (见其注释); 本方法 = "实体离开世界", 必须全清。
+     *
+     * <p>修的是两个缺陷 (错题 #272 同族): ① 三表旧用 {@code maid.getId()} (实体 ID 会话内可复用)
+     * — 与其他 per-maid 表键型不一致; ② 卸载只清 NAV_START → NAV_ATTEMPT/NAV_CD 永久残留,
+     * 新女仆若复用同一实体 ID 会继承旧尝试计数/冷却 (静默节流, 或直接 2 次机会用尽 → FAILED)。
+     */
+    public static void clearMaidState(EntityMaid maid) {
+        UUID uid = maid.getUUID();
+        NAV_START.remove(uid);
+        NAV_LAST_TARGET.remove(uid);
+        NAV_ATTEMPT.remove(uid);
+        NAV_CD.remove(uid);
     }
 
     /**
@@ -159,7 +180,9 @@ public final class PathingApi {
     // ── 完整寻路门面 (TLM 导航 + 垂直挖穿兜底) ──
 
     /** TLM 导航看门狗起始 tick (maidId → 目标切换时重置); 超时 → FAILED */
-    private static final ConcurrentMap<Integer, Long> NAV_START = new ConcurrentHashMap<>();
+    private static final ConcurrentMap<UUID, Long> NAV_START = new ConcurrentHashMap<>();
+    /** v79.63.23: 上次的**矿石目标** (看门狗计时/尝试计数只在换矿时重置 ✓) */
+    private static final ConcurrentMap<UUID, BlockPos> NAV_LAST_TARGET = new ConcurrentHashMap<>();
 
     /** 导航结果 — WALKING=TLM 导航中 / DIGGING=本 tick 挖了方块 (挖穿中) /
      *  REACHED=1 格邻域 (调用方开脉) / FAILED=放弃 (TLM 不可达/导航超时 — 调用方跳过目标) */
@@ -204,8 +227,8 @@ public final class PathingApi {
         BlockPos navGoal = target.above();
         if (reached(maid, navGoal, VanillaConstants.ONE_AWAY_DIST_SQR)) {
             clearNav(maid);
-            NAV_ATTEMPT.remove(maid.getId());   // v79.62.2 到达清尝试计数 (防残留影响下个目标)
-            NAV_CD.remove(maid.getId());
+            NAV_ATTEMPT.remove(maid.getUUID());   // v79.62.2 到达清尝试计数 (防残留影响下个目标)
+            NAV_CD.remove(maid.getUUID());
             alignToCenter(maid);
             return NavOutcome.REACHED;
         }
@@ -213,39 +236,46 @@ public final class PathingApi {
         // 看门狗超时 = 1 次尝试失败 → 5 秒 CD (100t, 期间不导航) → 再试;
         // 2 次尝试失败 → FAILED (调用方 failAndSkip 进跳过集 10 秒).
         long now = world.getGameTime();
-        int id = maid.getId();
+        UUID uid = maid.getUUID();
         BlockPos cur = navTarget(maid);
-        // 5 秒 CD: 上次超时后 100t 内不重设导航目标 (女仆原地等, 防每 tick 重导航)
-        long cdUntil = NAV_CD.getOrDefault(id, 0L);
-        if (cdUntil > now) {
-            return NavOutcome.WALKING;   // CD 中, 等
+        // ★ v79.63.25 (用户裁定): **删掉"超时后原地停 2 秒"** ✗
+        //   用户原话: "停 2 秒不就什么都不干了? 不应该是去尝试其他的 5 秒然后再回来试这个"
+        //   ⇒ 现改为: 超时 ⇒ 直接 FAILED ⇒ 调用方 failAndSkip ⇒ **进跳过集 (TTL 10 秒)** ✓
+        //   ⇒ 这 10 秒她**去挖别的矿** ✓ ⇒ TTL 到期后这块矿自动重新可选 ⇒ 再试 ✓✓
+        // ★ v79.63.23 修「看门狗永不触发」(用户日志实证: 同一块矿被反复 WALKING 20+ 次, 跳过集恒 false ✗):
+        //   原实现只在"**导航目标**变化"时设 NAV_START ⇒ 但 **TLM 自身行为 (跟随/其他) 每刻都在改 WALK_TARGET** ✗
+        //   ⇒ 我们每 20t 看一次都发现 cur ≠ navGoal ⇒ **每 20t 重置计时器** ⇒ 100t 超时永不达成 ✗✗
+        //   现改为: 计时器只跟"**矿石目标**"绑定 (target 变了才重置) ✓; 导航目标仍可随手重发 (便宜 ✓ 且不重置计时 ✓)
+        BlockPos lastTarget = NAV_LAST_TARGET.get(uid);
+        if (lastTarget == null || !lastTarget.equals(target)) {
+            NAV_ATTEMPT.remove(uid);   // 换矿 ⇒ 重新给 2 次机会 ✓
+            NAV_CD.remove(uid);
+            NAV_LAST_TARGET.put(uid, target);
+            NAV_START.put(uid, now);   // ← 唯一重置点: 换矿 ✓
         }
         if (cur == null || !cur.equals(navGoal)) {
-            NAV_ATTEMPT.remove(id);   // v79.62.2 目标切换清尝试计数 (新目标重新 2 次机会)
-            NAV_CD.remove(id);
-            navigateTo(maid, navGoal, 0.5F);
-            NAV_START.put(id, now);
+            navigateTo(maid, navGoal, 0.5F);   // 重发导航 (不碰 NAV_START ✓)
         }
-        if (now - NAV_START.getOrDefault(id, now) >= ActiveTaskConfig.CHAIN_NAV_TIMEOUT.get()) {
+        if (now - NAV_START.getOrDefault(uid, now) >= ActiveTaskConfig.CHAIN_NAV_TIMEOUT.get()) {
             clearNav(maid);
-            int attempt = NAV_ATTEMPT.merge(id, 1, Integer::sum);
-            if (attempt >= 2) {
-                // 2 次尝试失败 → FAILED → 调用方进跳过集 (SKIP_TTL 10 秒)
-                NAV_ATTEMPT.remove(id);
-                NAV_CD.remove(id);
-                return NavOutcome.FAILED;
+            // ★ v79.63.3 ② (用户实测「墙上矿走不过去也不向上挖」): 走路**失败一次**后,
+            //   若目标在**上方**且在挖穿深度内 ⇒ 改走"向上挖穿" (此时无视可达门 — 已经证明走不过去)
+            if (DigThroughCoordinator.digUpForce(world, maid, target)) {
+                return NavOutcome.DIGGING;
             }
-            // 第 1 次失败 → 5 秒 CD 后重试
-            NAV_CD.put(id, now + NAV_RETRY_CD_TICKS);
-            return NavOutcome.WALKING;
+            // ★ v79.63.25: **第一次超时就直接 FAILED** ⇒ 进跳过集 (10 秒 TTL) ⇒ 她先去挖别的 ✓
+            //   (跳过集 TTL 9 到期后自动重试 ✓; 连败 3 次升到 30 秒封顶 ✓ — 不再有"原地等 2 秒" ✗)
+            NAV_ATTEMPT.remove(uid);
+            NAV_CD.remove(uid);
+            return NavOutcome.FAILED;
         }
         return NavOutcome.WALKING;
     }
 
     /** v79.62.2 导航重试: 失败后 2 秒 CD (tick) — 用户裁定 (原 5 秒改 2 秒) */
     private static final int NAV_RETRY_CD_TICKS = 40;
-    /** per-maid 导航失败尝试次数 (超时算 1 次; ≥2 → FAILED 进跳过集) */
-    private static final ConcurrentMap<Integer, Integer> NAV_ATTEMPT = new ConcurrentHashMap<>();
-    /** per-maid 导航重试 CD 截止 tick (0=无 CD) */
-    private static final ConcurrentMap<Integer, Long> NAV_CD = new ConcurrentHashMap<>();
+    /** per-maid 导航失败尝试次数 (键 = maid UUID, 错题 #272 纪律; 超时算 1 次; ≥2 → FAILED 进跳过集) */
+    private static final ConcurrentMap<UUID, Integer> NAV_ATTEMPT = new ConcurrentHashMap<>();
+    /** per-maid 导航重试 CD 截止 tick (键 = maid UUID; 0=无 CD) */
+    private static final ConcurrentMap<UUID, Long> NAV_CD = new ConcurrentHashMap<>();
 }

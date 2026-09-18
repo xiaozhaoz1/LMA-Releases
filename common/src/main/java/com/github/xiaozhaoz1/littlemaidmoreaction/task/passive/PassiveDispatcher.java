@@ -28,30 +28,42 @@ public final class PassiveDispatcher {
 
     private PassiveDispatcher() {}
 
-    /** 纯触发型注册表 (taskType → 任务) */
+    /** 纯触发型注册表 (taskType → 任务) — 写侧 (仅 register 在锁内写, 保插入顺序) */
     private static final Map<String, PassiveTask> TASKS = new LinkedHashMap<>();
 
-    /** 冷却表 (maidId → taskType → 放行 tick) — 仅服务端写; 卸载清理闭环 */
-    private static final Map<Integer, Map<String, Long>> COOLDOWNS = new HashMap<>();
+    /** 注册锁 — v79.63 并发修复 (评审 P1-5): 外部 mod 可在任意时机注册, 而引擎每 tick 遍历 */
+    private static final Object REGISTER_LOCK = new Object();
+
+    /** 读侧不可变快照 — 注册后整体替换 (volatile 发布, 读方无锁无 CME) */
+    private static volatile Map<String, PassiveTask> SNAPSHOT = Map.of();
+
+    /** 冷却表 (女仆 UUID → taskType → 放行 tick) — 仅服务端写; 卸载清理闭环。
+     *  v79.63 键由实体 ID 改 UUID (见 {@code task.data.MaidKey}): ID 复用会让新女仆继承旧冷却。 */
+    private static final Map<java.util.UUID, Map<String, Long>> COOLDOWNS = new HashMap<>();
 
     static {
-        MaidUnloadRegistry.registerCache(COOLDOWNS, maid -> maid.getId());
+        MaidUnloadRegistry.registerCache(COOLDOWNS,
+                maid -> com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidKey.uuid(maid));
     }
 
-    /** 注册纯触发型被动 (防重 — 与 TaskRegistry 同款 fail-fast) */
+    /** 注册纯触发型被动 (防重 — 与 TaskRegistry 同款 fail-fast); 锁内写 + 快照重建 */
     public static void register(PassiveTask task) {
-        if (TASKS.containsKey(task.taskType())) {
-            throw new IllegalStateException("[LMA] 纯触发被动重复注册: " + task.taskType());
+        synchronized (REGISTER_LOCK) {
+            if (TASKS.containsKey(task.taskType())) {
+                throw new IllegalStateException("[LMA] 纯触发被动重复注册: " + task.taskType());
+            }
+            TASKS.put(task.taskType(), task);
+            // unmodifiableMap(new LinkedHashMap) — 保插入顺序 (Map.copyOf 不保证迭代顺序)
+            SNAPSHOT = java.util.Collections.unmodifiableMap(new LinkedHashMap<>(TASKS));
         }
-        TASKS.put(task.taskType(), task);
     }
 
     public static PassiveTask get(String taskType) {
-        return TASKS.get(taskType);
+        return SNAPSHOT.get(taskType);
     }
 
     public static Collection<PassiveTask> all() {
-        return TASKS.values();
+        return SNAPSHOT.values();
     }
 
     /**
@@ -74,7 +86,9 @@ public final class PassiveDispatcher {
         int cd = task.cooldown();
         if (cd > 0) {
             long now = level.getGameTime();
-            Map<String, Long> per = COOLDOWNS.computeIfAbsent(maid.getId(), k -> new HashMap<>());
+            Map<String, Long> per = COOLDOWNS.computeIfAbsent(
+                    com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidKey.uuid(maid),
+                    k -> new HashMap<>());
             Long last = per.get(taskType);
             if (last != null && now >= last && now - last < cd) return;
             per.put(taskType, now);

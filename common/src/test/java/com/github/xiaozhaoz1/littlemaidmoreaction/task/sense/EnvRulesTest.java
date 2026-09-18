@@ -6,22 +6,11 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * {@link EnvRules} 纯逻辑测试 (v79.3) — 温度档/时间段边界。
+ * {@link EnvRules} 纯逻辑测试 (v79.3) — 时间段边界。
+ *
+ * <p>v79.62.5: 温度档 (tempCategory/CAT_*) 已删 — 温度经 TLM {@code IMaid.getAtBiomeTemp} (用户裁定不复刻)。
  */
 class EnvRulesTest {
-
-    @Test
-    @DisplayName("温度四档边界 (0.15/0.55/0.95)")
-    void tempCategory_boundaries() {
-        assertEquals("COLD", EnvRules.tempCategory(0.1499f));
-        assertEquals("COLD", EnvRules.tempCategory(0.0f));
-        assertEquals("OCEAN", EnvRules.tempCategory(0.15f), "恰 0.15 → OCEAN (>= 语义)");
-        assertEquals("OCEAN", EnvRules.tempCategory(0.5499f));
-        assertEquals("MEDIUM", EnvRules.tempCategory(0.55f));
-        assertEquals("MEDIUM", EnvRules.tempCategory(0.9499f));
-        assertEquals("WARM", EnvRules.tempCategory(0.95f));
-        assertEquals("WARM", EnvRules.tempCategory(2.0f));
-    }
 
     @Test
     @DisplayName("时间段四段边界 (12000/13800/22200)")

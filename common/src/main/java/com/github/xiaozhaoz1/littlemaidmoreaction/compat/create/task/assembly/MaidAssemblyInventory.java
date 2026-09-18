@@ -57,13 +57,16 @@ public final class MaidAssemblyInventory extends ItemStackHandler {
         return inv;
     }
 
-    /** 服务端用: 共享实例, serverSide=true */
+    /** 服务端用: 共享实例, serverSide=true; 客户端 maid 可能 null (反查不到女仆优雅降级) */
     private MaidAssemblyInventory(EntityMaid maid, boolean serverSide) {
         super(TOTAL_SLOTS);
         this.maid = maid;
         this.serverSide = serverSide;
-        loadFromNBT();
-        LittleMaidMoreAction.LOGGER.info("[AssemblyInv] created serverSide={} maid={}", serverSide, maid.getStringUUID());
+        // v79.62.5 装配 GUI 打不开修复: 客户端 maid null (实体未加载/已死亡) → 跳过 loadFromNBT
+        // (内容由 vanilla 槽位同步覆盖 — container 槽位服务端驱动), 防 NPE 崩溃打不开屏
+        if (maid != null) loadFromNBT();
+        LittleMaidMoreAction.LOGGER.info("[AssemblyInv] created serverSide={} maid={}", serverSide,
+                maid != null ? maid.getStringUUID() : "null(no-entity)");
     }
 
     /** 客户端用: 独立实例, 不同步 NBT */

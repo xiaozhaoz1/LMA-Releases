@@ -9,7 +9,6 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskToggle;
 import net.minecraft.server.level.ServerLevel;
 
 /**
@@ -67,7 +66,7 @@ public final class TaskDispatcher {
         // 优先级策略 — 新任务严格更低 → 拒绝 (失败气泡节流); 等/高 → 抢占 (既有行为)
         if (!current.isEmpty() && !current.equals(taskType)) {
             if (!shouldPreempt(priorityOf(current), priorityOf(taskType))) {
-                MaidChatBubbleApi.showFail(maid, "已有更高优先级任务: " + current);
+                MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.dispatch.busy", current));
                 return false;
             }
             cancel(maid);
@@ -127,7 +126,7 @@ public final class TaskDispatcher {
         var h = getHandler(task);
         if (h != null) {
             // 统一失败气泡 (红色 ✘ + API 内置 600t 节流 — 补超时气泡缺失的节流, 错题: 同类刷屏 bug)
-            MaidChatBubbleApi.showFail(maid, task + " 超时");
+            MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.dispatch.timeout", task));
             h.pipeline().interrupt(maid);  // interrupt→onCleanup
         }
         FlowTaskData.setState(maid, TaskKeys.STATE_FAILED);
@@ -196,12 +195,11 @@ public final class TaskDispatcher {
     /** 提交被动任务 (与 lma_flow_task 不冲突) — 哈气运行中拒绝其他被动 (底层覆盖, 统一入口) */
     public static void submitPassive(EntityMaid maid, String taskType) {
         if (TaskRegistry.get(taskType) == null) return;
-        // v79.62.1 被动启用迁移: haqi/jiuhu_milk 由管线 per-maid 配置 (pipelineConfig "enabled",
-        // 子任务界面开关) 门控, 不再用全局 TaskToggle; 其他被动仍走 TaskToggle
-        if ("haqi".equals(taskType) || "jiuhu_milk".equals(taskType)) {
-            if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveConfigUtil
-                    .isEnabled(maid, taskType)) return;
-        } else if (!TaskToggle.isEnabled(taskType)) {
+        // v79.63 统一开关判定 (原硬编码 if "haqi"||"jiuhu_milk"): 提交门 / 运行判定 / 关开关清理
+        // 三处共用 PassiveConfigUtil.isPassiveEnabled — 开关归属由任务自己声明
+        // (TaskConfigurable.switchScope), 消灭"提交看 per-maid, 清理看全局"的双轨漂移
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.task.passive.PassiveConfigUtil
+                .isPassiveEnabled(maid, taskType)) {
             return;
         }
         // haqi 底层覆盖 — 哈气运行中其他被动不启动 (v79.61x 收敛: PassiveDispatcher.haqiRunning 统一判定)

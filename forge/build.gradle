@@ -89,3 +89,27 @@ legacyForge {
         }
     }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v79.63 compat 运行期开关 (forge) — **默认关**, 开关关时零副作用。
+// 实现在独立脚本里 (gradle/compat-runtime.gradle): 探测 mod 配置名 + 加运行期 mod jar。
+// 为什么独立 + 放在**文件末尾顶层**: 上一版把依赖块插进既有 dependencies{} 闭包内部 →
+// Groovy 解析错 (Unexpected input { @ line 21) 把构建改坏 (错题 #286 §3)。
+// 用法: ./gradlew -PcompatRuntime=true :forge:1.20.1:runGameTestServer
+// ─────────────────────────────────────────────────────────────────────────────
+ext.compatRuntimeJars = [
+        rootProject.file('libs/create-1.20.1-6.0.8.jar'),
+        rootProject.file('libs/Ponder-Forge-1.20.1-1.0.91.jar'),
+        rootProject.file('libs/flywheel-forge-1.20.1-1.0.5.jar'),
+        rootProject.file('libs/createbigcannons-5.11.4-mc.1.20.1-forge.jar'),
+        rootProject.file('libs/ritchiesprojectilelib-2.1.1+mc.1.20.1-forge.jar')
+]
+apply from: rootProject.file('gradle/compat-runtime.gradle')
+
+
+// v79.63: javadoc 读 UTF-8 源 — Windows 默认 GBK 会让中文注释报
+//   "编码 GBK 的不可映射字符" (100 条诊断/2 个文件), 导致 `build` 挂在 javadoc 任务。
+//   common/build.gradle 早有同款配置, 两个节点脚本此前漏了 (本次打包时发现)。
+tasks.withType(Javadoc).configureEach {
+    options.encoding = "UTF-8"
+}

@@ -4,14 +4,16 @@ import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskPipeline;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidKey;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskToggle;
+import com.github.xiaozhaoz1.littlemaidmoreaction.storage.FestivalTable;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanCache;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.EntityScanCache;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StructureScanCache;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.StructureScanCache;
 
 import javax.annotation.Nullable;
 import java.util.*;
@@ -54,7 +56,10 @@ public final class EnvSenseBroadcaster {
         return eligibleCount >= MIN_MAIDS_FOR_CACHE;
     }
 
-    private static final Map<Integer, EnvSnapshot> PREV_SNAPSHOTS = new HashMap<>();
+    /** per-maid 上轮快照 (键 = 女仆 UUID, v79.63 统一 — 见 {@link MaidKey})。
+     *  原为实体 ID 键: MC 实体 ID 会被复用, 一旦某条卸载路径漏触发, 新女仆会**继承旧快照**
+     *  → 边沿漏报/误报; 改 UUID 后漏清理只泄漏不串扰。 */
+    private static final Map<UUID, EnvSnapshot> PREV_SNAPSHOTS = new HashMap<>();
 
     private EnvSenseBroadcaster() {}
 
@@ -113,7 +118,7 @@ public final class EnvSenseBroadcaster {
                                 PassiveTaskConfig.ENV_MAX_HITS.get(), now, pass.deadlineNanos())
                         : EntityScanner.scanEntities(level, maid, radius, PassiveTaskConfig.ENV_MAX_HITS.get());
                 EnvSnapshot snap = new EnvSnapshot(now, entities, world);
-                EnvSnapshot prev = PREV_SNAPSHOTS.get(maid.getId());
+                EnvSnapshot prev = PREV_SNAPSHOTS.get(MaidKey.uuid(maid));
 
                 // 边沿检测
                 Set<EnvSignal> signals = detectSignals(prev, snap, level, maid, now);
@@ -128,7 +133,7 @@ public final class EnvSenseBroadcaster {
                 boolean haqiActive = TaskKeys.STATE_IN_PROGRESS.equals(maid.getPersistentData()
                         .getString(TaskKeys.passiveKey("haqi")));
                 if (!haqiActive) {
-                    PREV_SNAPSHOTS.put(maid.getId(), snap);
+                    PREV_SNAPSHOTS.put(MaidKey.uuid(maid), snap);
 
                     // 分发
                     if (!signals.isEmpty()) {
@@ -137,7 +142,7 @@ public final class EnvSenseBroadcaster {
                 }
             }
             // ── 结构信号 (v79.60 per-player 独立通道; v79.6x 预算 P: 2ms 墙钟预算跨玩家共享) ──
-            StructureSense.sweep(level);
+            // 玩家级 sweep 已移至门控外统一收口 (v79.63)
             long structureDeadline = System.nanoTime() + StructureScanCache.SCAN_BUDGET_NANOS;
             for (var player : level.players()) {
                 StructureSense.detect(level, player, structureDeadline);
@@ -145,6 +150,10 @@ public final class EnvSenseBroadcaster {
         }
         // 节日 stateless 状态广播 (现实日期口径, 与 env 扫描开关无关; 消费端当天首收去重)
         detectFestivalSignal(level);
+        // v79.63 玩家级缓存清理 — 统一在门控外收口 (玩家缓存与扫描开关无关, 关着也要清):
+        // 结构 per-player 三表 (原在 ENVSENSE 块内) + 稀有群系节流表 (原只写不清 = 慢泄漏)
+        StructureSense.sweep(level);
+        sweepPlayerCaches(level);
         // v79.62.1 稀有群系 stateless 广播 (当前在稀有群系即发; 消费端每群系去重)
         detectRareBiomeSignal(level);
         // 事件信号统一分发 — 不受 ENVSENSE_ENABLED 门控 (事件信号与扫描开关无关)
@@ -154,14 +163,21 @@ public final class EnvSenseBroadcaster {
     /** 获取女仆最新快照（AI Context / 调试用） */
     @Nullable
     public static EnvSnapshot getSnapshot(EntityMaid maid) {
-        return PREV_SNAPSHOTS.get(maid.getId());
+        return PREV_SNAPSHOTS.get(MaidKey.uuid(maid));
     }
 
-    /** 女仆卸载清理 (ScanScheduler.cancelFor — 任务句柄悬空烧预算, 必堵口; 结构缓存为 player 维度由 sweep 管) */
-    public static void onMaidUnload(int entityId) {
-        PREV_SNAPSHOTS.remove(entityId);
+    /**
+     * 女仆卸载清理 (ScanScheduler.cancelFor — 任务句柄悬空烧预算, 必堵口; 结构缓存为 player 维度由 sweep 管)。
+     *
+     * <p>v79.63: 形参从 {@code int entityId} 改为 {@link EntityMaid} — 本方法要同时清
+     * **UUID 键的自有缓存** (PREV_SNAPSHOTS) 与**实体 ID 键的下游缓存**
+     * (EntityScanCache.queryCache / ScanScheduler 任务句柄 — 那两处是 MC API 热路径例外, 见 {@link MaidKey})。
+     */
+    public static void onMaidUnload(EntityMaid maid) {
+        PREV_SNAPSHOTS.remove(MaidKey.uuid(maid));
+        int entityId = MaidKey.entityId(maid);
         EntityScanCache.GLOBAL.onEntityRemoved(entityId);   // v79.6x per-查询漂移缓存闭环
-        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.ScanScheduler.cancelFor(entityId);
+        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.scan.ScanScheduler.cancelFor(entityId);
     }
 
     // ── 边沿检测 ──
@@ -174,8 +190,6 @@ public final class EnvSenseBroadcaster {
                 prev != null ? prev.world() : null, snap.world(),
                 presenceOf(prev), presenceOf(snap),
                 new EnvEdgeDetector.EnvConfig(
-                        PassiveTaskConfig.ENV_COLD_THRESHOLD.get().floatValue(),
-                        PassiveTaskConfig.ENV_HOT_THRESHOLD.get().floatValue(),
                         PassiveTaskConfig.ENV_DARKNESS_THRESHOLD.get()));
     }
 
@@ -210,6 +224,23 @@ public final class EnvSenseBroadcaster {
      * 重复 emit 由消费端 (RareBiomePassiveTask) per-maid 每群系去重兜住.
      */
     private static final Map<UUID, Long> RARE_BIOME_LAST = new HashMap<>();
+
+    /**
+     * 玩家级缓存清理 (v79.63 架构评审 P1-2) — 摘除已离线玩家的 {@link #RARE_BIOME_LAST} 条目。
+     *
+     * <p>原实现只 get/put 从不 remove → 大服长期运行会为每个历史玩家 UUID 常驻一条 (慢泄漏)。
+     * 同族的 {@code StructureSense.sweep} 已有此清理, 本表当时漏了。
+     *
+     * <p>在线集取**全服 playerList** 而非 {@code level.players()} — 与 StructureSense.sweep 同因:
+     * 按单维度扫会把其他维度的在线玩家误清 (清理本身必须维度无关)。
+     */
+    public static void sweepPlayerCaches(ServerLevel level) {
+        Set<UUID> online = new HashSet<>();
+        for (var p : level.getServer().getPlayerList().getPlayers()) {
+            online.add(p.getUUID());
+        }
+        RARE_BIOME_LAST.keySet().removeIf(u -> !online.contains(u));
+    }
 
     private static void detectRareBiomeSignal(ServerLevel level) {
         if (!PassiveTaskConfig.ENV_RARE_BIOME_ENABLED.get()) return;
@@ -382,7 +413,7 @@ public final class EnvSenseBroadcaster {
         while ((p = PENDING.poll()) != null) {
             // 事件注入信号不依赖扫描快照 — 快照由 per-maid 门 (L64) 饿死时
             // 队列信号曾全被丢弃 (死链); 无快照也分发 (snap=null, 管线 onSignal 自行容错)
-            dispatchToPipelines(p.maid(), p.signalId(), PREV_SNAPSHOTS.get(p.maid().getId()), needsCache);
+            dispatchToPipelines(p.maid(), p.signalId(), PREV_SNAPSHOTS.get(MaidKey.uuid(p.maid())), needsCache);
         }
     }
 }

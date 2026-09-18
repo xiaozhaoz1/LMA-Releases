@@ -46,6 +46,9 @@ public final class CrankPipeline extends MoveToBlockStateMachine<CrankPipeline.S
 
     @Override
     public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            
         return List.of(new TaskStep("turn", "摇动曲柄", StepType.INTERACT, List.of()));
     }
 
@@ -66,7 +69,7 @@ public final class CrankPipeline extends MoveToBlockStateMachine<CrankPipeline.S
                         .stream().filter(p -> !isSkipped(maid, p, now)).findFirst().orElse(null);
                 if (target == null) {
                     // v79.61x: 无目标静默 → 600t 节流气泡
-                    if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+                    if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                             .shouldFire(maid, "crank_no_target", 600)) {
                         com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi
                                 .showFail(maid, "附近没有可用的曲柄");
@@ -104,7 +107,7 @@ public final class CrankPipeline extends MoveToBlockStateMachine<CrankPipeline.S
                 if (target == null) yield State.SEARCHING;
                 if (!arrived(maid, target)) yield State.NAVIGATING;
                 CrankService.crank(world, target);
-                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, 20);
+                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.MaidSwing.onInterval(maid, 20);
                 yield null;
             }
         };

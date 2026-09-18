@@ -2,7 +2,6 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla;
 import net.minecraft.core.Holder;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import com.github.xiaozhaoz1.littlemaidmoreaction.init.TlmVersion;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.ai.attributes.Attribute;
 import net.minecraft.world.entity.ai.attributes.AttributeInstance;
@@ -25,6 +24,10 @@ public final class MaidAttrRegistry {
     public record Entry(String key, String display, String category, String valueType) {}
 
     private static final Map<String, Entry> REGISTRY = new LinkedHashMap<>();
+    /** TLM 命名空间 — 本类内唯一来源 (v79.63 架构审计 A4: 原借用 init.TlmVersion.MOD_ID,
+     *  vanilla 层不得依赖 init; 且本类静态块内本就有同一字面量, 属重复来源) */
+    private static final String NS = "touhou_little_maid";
+
     /** key → Attribute 的懒加载缓存 */
 //? if 1.20.1 {
     private static final Map<String, Attribute> ATTR_CACHE = new LinkedHashMap<>();
@@ -33,7 +36,6 @@ public final class MaidAttrRegistry {
 //?}
 
     static {
-        final String NS = "touhou_little_maid";
         // TLM
         tlm("maid_use_item_speed",          "物品使用速度",    NS, "工作", "num");
         tlm("maid_crossbow_attack_speed",   "弩攻击速度",      NS, "战斗", "num");
@@ -116,9 +118,9 @@ public final class MaidAttrRegistry {
         Holder<Attribute> resolved = BuiltInRegistries.ATTRIBUTE.getHolder(
 //?}
 //? if 1.20.1 {
-                ResourceLocation.fromNamespaceAndPath(TlmVersion.MOD_ID, key));
+                ResourceLocation.fromNamespaceAndPath(NS, key));
 //?} else {
-                ResourceLocation.fromNamespaceAndPath(TlmVersion.MOD_ID, key)).orElse(null);
+                ResourceLocation.fromNamespaceAndPath(NS, key)).orElse(null);
 //?}
         ATTR_CACHE.put(key, resolved);
         return resolved;

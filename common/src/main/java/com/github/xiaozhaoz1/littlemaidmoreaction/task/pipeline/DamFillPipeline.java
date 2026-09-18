@@ -1,5 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline;
 
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
+
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs;
 import com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidChatBubbleApi;
@@ -11,7 +13,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineContext;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.PipelineResult;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskStateMachine;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.VoidExcavationService;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.VoidExcavationService;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -61,6 +63,8 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
     public enum Phase { BUILD_WALL, DRAIN }
 
     /** cfg 键 */
+    /** v79.63.15: 单女仆区域区块数 (pipelineConfig; 缺省读全局 DAM_FILL_DEFAULT_CHUNKS ✓) */
+    public static final String KEY_SIZE = "size";
     public static final String KEY_INPUT = "input";
     public static final String KEY_DRAIN_ENABLED = "drain_enabled";
 
@@ -114,6 +118,9 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
 
     @Override
     public List<TaskStep> steps() {
+    // ⚠ 改相位/状态时必须同步本步骤声明 — steps 是**用户可见的粗粒度语义**, 与内部状态枚举**不同层**;
+    //    二者无自动校验 (6 态→4 步这类多对一是正常的), 详见错题 #291。
+            
         return List.of(
                 new TaskStep("wall", "筑重力方块墙", StepType.INTERACT, List.of()),
                 new TaskStep("drain", "排空墙内水", StepType.INTERACT, List.of()));
@@ -127,7 +134,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
     @Override
     public PipelineResult validate(ServerLevel level, EntityMaid maid, PipelineContext ctx) {
         CompoundTag cfg = pipelineConfig(maid);
-        if (!cfg.contains("start") || !cfg.contains(KEY_INPUT)) {
+        if (!cfg.contains(TaskKeys.CFG_START) || !cfg.contains(KEY_INPUT)) {
             return PipelineResult.failed("未标记起点/输入箱 (木棍标记起点+输入箱)");
         }
         return PipelineResult.ok("");
@@ -196,8 +203,8 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
      * @return true = 外圈墙全部筑完 (→ 阶段 2 或完成)
      */
     private boolean tickBuildWall(ServerLevel world, EntityMaid maid, CompoundTag cfg, CompoundTag pd) {
-        BlockPos start = NbtCodecs.readBlockPos(cfg, "start");
-        int size = cfg.contains("size") ? cfg.getInt("size") : 1;
+        BlockPos start = NbtCodecs.readBlockPos(cfg, TaskKeys.CFG_START);
+        int size = cfg.contains(KEY_SIZE) ? cfg.getInt(KEY_SIZE) : com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.DAM_FILL_DEFAULT_CHUNKS.get();   // v79.63.15: 全局默认 (原写死 1 ✗)
         if (start == null) { TaskDispatcher.fail(maid, "无起点"); return false; }
         int scx = start.getX() >> 4, scz = start.getZ() >> 4;
         int minCX = scx - size / 2, maxCX = minCX + size - 1;
@@ -238,7 +245,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
             ItemStack block = takeGravityBlock(world, maid, cfg);
             if (block == null || block.isEmpty()) {
                 if (world.getGameTime() % 200 == 0) {
-                    MaidChatBubbleApi.showFail(maid, "输入箱没有沙子/砾石/铁砧了");
+                    MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.dam_fill.no_input"));
                 }
                 return false;
             }
@@ -264,7 +271,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
                 // 四面全完 → 填坝模式任务完成 (v79.62.2 独立模式, 不接排水)
                 pd.remove(PD_DIR); pd.remove(PD_COL); pd.remove(PD_COL_WAIT);
                 restoreHomeMode(maid, pd);
-                MaidChatBubbleApi.showComplete(maid, "墙筑好了!");
+                MaidChatBubbleApi.showComplete(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.dam_fill.wall_done"));
                 TaskDispatcher.complete(maid);
                 return true;
             }
@@ -327,7 +334,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
     private static ItemStack takeGravityBlock(ServerLevel world, EntityMaid maid, CompoundTag cfg) {
         BlockPos input = NbtCodecs.readBlockPos(cfg, KEY_INPUT);
         if (input == null) return ItemStack.EMPTY;
-        var handler = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.VoidExcavationContainerService
+        var handler = com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.VoidExcavationContainerService
                 .getHandler(world, input);
         if (handler == null) return ItemStack.EMPTY;
         for (int i = 0; i < handler.getSlots(); i++) {
@@ -346,8 +353,8 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
      * 游标/高度全 PD 内存.
      */
     private boolean tickDrain(ServerLevel world, EntityMaid maid, CompoundTag cfg, CompoundTag pd) {
-        BlockPos start = NbtCodecs.readBlockPos(cfg, "start");
-        int size = cfg.contains("size") ? cfg.getInt("size") : 1;
+        BlockPos start = NbtCodecs.readBlockPos(cfg, TaskKeys.CFG_START);
+        int size = cfg.contains(KEY_SIZE) ? cfg.getInt(KEY_SIZE) : com.github.xiaozhaoz1.littlemaidmoreaction.config.ActiveTaskConfig.DAM_FILL_DEFAULT_CHUNKS.get();   // v79.63.15: 全局默认 (原写死 1 ✗)
         if (start == null) { TaskDispatcher.fail(maid, "无起点"); return false; }
         int scx = start.getX() >> 4, scz = start.getZ() >> 4;
         int minCX = scx - size / 2, maxCX = minCX + size - 1;
@@ -363,7 +370,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
         // 主手必须有空桶 (排水舀水); 无桶 → 卡住提醒, 不排水
         if (!ensureBucket(world, maid, cfg)) {
             if (world.getGameTime() % 200 == 0) {
-                MaidChatBubbleApi.showFail(maid, "排水需要空桶 (给女仆一个桶)");
+                MaidChatBubbleApi.showFail(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.dam_fill.need_bucket"));
             }
             return false;
         }
@@ -374,7 +381,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
                 // 全部排完 → 完成
                 pd.remove(PD_ROW_X); pd.remove(PD_ROW_Z);
                 restoreHomeMode(maid, pd);
-                MaidChatBubbleApi.showComplete(maid, "填坝排水完成!");
+                MaidChatBubbleApi.showComplete(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.dam_fill.done"));
                 TaskDispatcher.complete(maid);
                 return true;
             }
@@ -420,24 +427,40 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
     /** 主手必须有空桶 (排水舀水; 桶舀水后仍空不变). 主手无桶 → 找背包/输入箱空桶; 都没有 → false. */
     private static boolean ensureBucket(ServerLevel world, EntityMaid maid, CompoundTag cfg) {
         if (maid.getMainHandItem().is(net.minecraft.world.item.Items.BUCKET)) return true;
+        // ★ v79.67.1 修「换桶把主手物品换没」(用户实测): 原两处分支都是 `setItemInHand(MAIN_HAND, 桶)`
+        //   **直接覆盖** ⇒ 原主手物品既没回背包也没落地 ⇒ **永久丢失** ✗
+        //   这是错题 #162「**丢物品族**」的**第三处** (前两处 ChainHarvestExecute / BlockUpCoordinator 已收敛到
+        //   `vanilla/output/item/HandSwap`; WorkEat / NearbyCollect 亦各自保全) ⇒ 本次一并收敛, 不再手写换手链 ✓
         var inv = maid.getAvailableInv(true);
         for (int i = 0; i < inv.getSlots(); i++) {
             ItemStack s = inv.getStackInSlot(i);
             if (s.is(net.minecraft.world.item.Items.BUCKET)) {
-                maid.setItemInHand(InteractionHand.MAIN_HAND, s.copy());
-                inv.extractItem(i, 1, false);
+                ItemStack bucket = inv.extractItem(i, 1, false);   // 只取 1 个 (桶可堆叠 16 — 保持原语义 ✓)
+                if (bucket.isEmpty()) continue;
+                ItemStack old = maid.getMainHandItem();
+                maid.setItemInHand(InteractionHand.MAIN_HAND, bucket);
+                if (!old.isEmpty()) {
+                    // 旧物保全三链的"背包 → 落地"段 (HandSwap 原语; 满则落地, 绝不消失) ✓
+                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.item.HandSwap.stashOrDrop(maid, old);
+                }
                 return true;
             }
         }
         BlockPos input = NbtCodecs.readBlockPos(cfg, KEY_INPUT);
         if (input != null) {
-            var handler = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.VoidExcavationContainerService
+            var handler = com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.VoidExcavationContainerService
                     .getHandler(world, input);
             if (handler != null) {
                 for (int i = 0; i < handler.getSlots(); i++) {
                     ItemStack s = handler.getStackInSlot(i);
                     if (s.is(net.minecraft.world.item.Items.BUCKET)) {
-                        maid.setItemInHand(InteractionHand.MAIN_HAND, handler.extractItem(i, 1, false));
+                        ItemStack taken = handler.extractItem(i, 1, false);
+                        if (taken.isEmpty()) continue;
+                        ItemStack old = maid.getMainHandItem();
+                        maid.setItemInHand(InteractionHand.MAIN_HAND, taken);
+                        if (!old.isEmpty()) {
+                            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.item.HandSwap.stashOrDrop(maid, old);   // 同上 (原此处亦直接覆盖 ✗)
+                        }
                         return true;
                     }
                 }

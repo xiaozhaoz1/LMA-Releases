@@ -52,11 +52,14 @@ public final class MaidAssemblyNetwork {
         }
     }
 
-    /** 客户端从buffer读取maid ID */
+    /** 客户端从buffer读取maid ID — v79.62.5 修复打不开: 反查不到女仆 (实体未加载/已死亡)
+     *  返回 null 优雅降级 (原抛异常 → 客户端 Menu 构造崩溃 → GUI 打不开; 锻造同场景返回 null) */
+    @javax.annotation.Nullable
     public static EntityMaid getMaidFromMenu(Inventory playerInv, FriendlyByteBuf data) {
         int maidId = data.readInt();
         if (playerInv.player.level().getEntity(maidId) instanceof EntityMaid maid)
             return maid;
-        throw new IllegalStateException("MaidAssemblyGUI: 女仆实体不存在 id=" + maidId);
+        LittleMaidMoreAction.LOGGER.warn("[MaidAssembly] 客户端反查女仆失败 id={} (降级空界面, 服务端同步覆盖)", maidId);
+        return null;
     }
 }

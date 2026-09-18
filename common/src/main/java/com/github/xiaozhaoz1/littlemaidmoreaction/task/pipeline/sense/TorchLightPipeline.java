@@ -136,7 +136,7 @@ public final class TorchLightPipeline implements PassiveSignalSkeleton, com.gith
         // v79.58 (用户裁定修订): 整个检查 100t 节流 (非每 tick — 亮度/副手状态)
         // v79.61x: 背包无灯 → 300t 重试降频 (no_light 标记)
         long interval = pipelineData(maid).getBoolean(KEY_NO_LIGHT) ? NO_LIGHT_INTERVAL : REPICK_INTERVAL;
-        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                 .shouldFire(maid, "torch_check", interval)) {
             return;
         }

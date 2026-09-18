@@ -36,6 +36,21 @@ public final class LmaBlockEntityTypes {
             DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, LittleMaidMoreAction.MOD_ID);
 //?}
 
+    /** v79.62.3: 防御塔方块实体 — 继承 TLM TileEntityGarageKit (渲染/NBT 复用) */
+//? if 1.20.1 {
+    public static final RegistryObject<BlockEntityType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlockEntity>> GARAGE_KIT_DEFENSE =
+            TYPES.register("garage_kit_defense",
+                    () -> BlockEntityType.Builder.of(
+                            com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlockEntity::new,
+                            LmaBlocks.GARAGE_KIT_DEFENSE.get()).build(null));
+//?} else {
+    public static final Supplier<BlockEntityType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlockEntity>> GARAGE_KIT_DEFENSE =
+            TYPES.register("garage_kit_defense",
+                    () -> BlockEntityType.Builder.of(
+                            com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlockEntity::new,
+                            LmaBlocks.GARAGE_KIT_DEFENSE.get()).build(null));
+//?}
+
     // Create 兼容方块实体 (双平台化) — 与 LmaBlocks.MAID_POWER_BELT 同步门控 (无 Create 时为 null)
 //? if 1.20.1 {
     public static final RegistryObject<BlockEntityType<MaidPowerBeltBlockEntity>> MAID_POWER_BELT =

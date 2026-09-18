@@ -20,7 +20,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSignal;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSnapshot;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.Signals;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.AnimExecute;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AnimExecute;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.movement.BrainHelper;
 import com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmOutput;
 import net.minecraft.core.BlockPos;
@@ -70,6 +70,13 @@ import java.util.Set;
  * 触发 (onSignal/HaqiTrigger) 与状态机 (MOVE/LOOK) 留管线。
  */
 public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurable {
+
+    /**
+     * v79.63: 开关归属声明 = 每女仆 (缺省关闭) — 三处判定 (提交/运行/关开关清理) 统一走
+     * {@code PassiveConfigUtil}。原由 {@code TaskDispatcher} 硬编码 {@code "haqi".equals(type)}
+     * 决定, 且运行/清理侧查的是全局 {@code TaskToggle} → 关开关不清理 (评审 P1-1)。
+     */
+    @Override public TaskConfigurable.SwitchScope switchScope() { return SwitchScope.PER_MAID; }
 
     /** pipelineData 键 (存于 lma_pl_haqi compound) */
     public static final String KEY_STATE = "state";
@@ -203,11 +210,15 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
 
         LivingEntity target = resolveTarget(world, data.getString(KEY_TARGET), targetType);
         if (target == null || !target.isAlive()) {
+            LittleMaidMoreAction.LOGGER.warn("[HAQI-DIAG] cancel target null/alive={} uuid={} maidPos={}",
+                    target == null ? "null" : target.isAlive(), data.getString(KEY_TARGET), maid.blockPosition());
             TaskDispatcher.cancelPassive(maid, taskType());
             return;
         }
         // 目标远离 → 放弃
         if (target.blockPosition().distSqr(maid.blockPosition()) > LOST_DIST_SQR) {
+            LittleMaidMoreAction.LOGGER.warn("[HAQI-DIAG] cancel LOST distSqr={} maidPos={} targetPos={}",
+                    target.blockPosition().distSqr(maid.blockPosition()), maid.blockPosition(), target.blockPosition());
             TaskDispatcher.cancelPassive(maid, taskType());
             return;
         }
@@ -215,9 +226,16 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
         switch (state) {
             case MOVE -> {
                 BlockPos targetPos = target.blockPosition();
+                // TEMP-DIAG: haqihit 首 tick 转换失败排查
+                if (data.getString(KEY_TARGET).isEmpty() || data.getInt(KEY_TIMER) < -1) {
+                    LittleMaidMoreAction.LOGGER.warn("[HAQI-DIAG] move branch target={} dist={}",
+                            data.getString(KEY_TARGET), maid.blockPosition().distSqr(targetPos));
+                }
                 if (maid.blockPosition().distSqr(targetPos) <= ARRIVE_DIST_SQR) {
                     // 到达 → 看她 + 音频 + 算总时长 (按目标类型分流)
+                    LittleMaidMoreAction.LOGGER.warn("[HAQI-DIAG] enterLook calling state before={}", data.getString(KEY_STATE));
                     enterLook(world, maid, data, targetType);
+                    LittleMaidMoreAction.LOGGER.warn("[HAQI-DIAG] enterLook done state={}", data.getString(KEY_STATE));
                 } else {
                     // v79.61x #4: MOVE 超时 — 目标持续跑动 (跟着主人跑) 走不到 2.5 格旁时
                     // 兜底放弃 (LOST_DIST 4 格只覆盖远离, 绕圈移动不触发) → 200t 放弃
@@ -339,7 +357,13 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
                 // 注册后不在实体索引实证 1.21: makeMockServerPlayerInLevel → getEntity(uuid) 为 null)
                 return world.getServer().getPlayerList().getPlayer(id);
             }
-            return e instanceof EntityMaid m ? m : null;
+            if (e instanceof EntityMaid m) return m;
+            // v79.62.5 兜底: 刚 addFreshEntity 的 maid uuid 索引未注册 (getEntity 返回 null 实测 —
+            // haqihit 首 tick resolveTarget 失败 cancel) — 全实体列表按 uuid 兜底 (仅 getEntity 失败才走, 正常零开销)
+            for (Entity ent : world.getEntities().getAll()) {
+                if (ent.getUUID().equals(id) && ent instanceof EntityMaid em) return em;
+            }
+            return null;
         } catch (IllegalArgumentException ex) {
             return null;
         }

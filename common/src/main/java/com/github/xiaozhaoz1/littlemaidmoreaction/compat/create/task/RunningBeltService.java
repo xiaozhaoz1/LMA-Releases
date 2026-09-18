@@ -90,16 +90,33 @@ public final class RunningBeltService {
     // ── Output: 方块转换 ──
 
     public static boolean convertToMaidPowerBelt(Level level, BlockPos clickedPos) {
+        // ★ v79.71 可观测性 (错题 #358): 本方法原**全静默** — 失败时调用方无从判断原因 (排查"魂符收放后
+        //   不再变发电"时被坑过)。失败按 `gameTime % 200` 节流 (本方法无 maid 参数 ⇒ 按 level 节流) ✓
         BlockPos controllerPos = findBeltController(level, clickedPos);
-        if (controllerPos == null) return false;
+        if (controllerPos == null) {
+            fail(level, "找不到皮带控制器 (脚下不是水平 Create 皮带链终点?)", clickedPos);
+            return false;
+        }
 
         List<BlockPos> beltChain = BeltBlock.getBeltChain(level, controllerPos);
-        if (beltChain.size() < 2) return false;
+        if (beltChain.size() < 2) {
+            fail(level, "皮带链长度 " + beltChain.size() + " < 2 (单格皮带不支持发电)", clickedPos);
+            return false;
+        }
         for (BlockPos beltPos : beltChain) {
-            if (!level.isLoaded(beltPos)) return false;
-            BlockState s = level.getBlockState(beltPos);
-            if (!isBelt(s) || s.getValue(BeltBlock.SLOPE) != BeltSlope.HORIZONTAL)
+            if (!level.isLoaded(beltPos)) {
+                fail(level, "皮带段未加载: " + beltPos, clickedPos);
                 return false;
+            }
+            BlockState s = level.getBlockState(beltPos);
+            if (!isBelt(s)) {
+                fail(level, "链上有非普通皮带方块: " + beltPos + " = " + s.getBlock(), clickedPos);
+                return false;
+            }
+            if (s.getValue(BeltBlock.SLOPE) != BeltSlope.HORIZONTAL) {
+                fail(level, "链上有非水平段: " + beltPos + " slope=" + s.getValue(BeltBlock.SLOPE), clickedPos);
+                return false;
+            }
         }
 
         BeltBlockEntity controllerBE = BeltHelper.getSegmentBE(level, controllerPos);
@@ -127,7 +144,16 @@ public final class RunningBeltService {
         }
 
         MaidPowerBeltBlock.initBelt(level, controllerPos);
+        com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.info(
+                "[RunningBelt] 已转换发电皮带: controller={} 段数={} (trigger={})", controllerPos, beltChain.size(), clickedPos);
         return true;
+    }
+
+    /** 转换失败日志 (节流: 同一 level 每 200t 最多一条 — 本方法无 maid 上下文 ⇒ 按 level 节流) ✓ */
+    private static void fail(Level level, String why, BlockPos clickedPos) {
+        if (level.getGameTime() % 200 != 0) return;
+        com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.warn(
+                "[RunningBelt] 转换发电皮带失败: {} (trigger={})", why, clickedPos);
     }
 
     public static boolean revertToRegularBelt(Level level, BlockPos clickedPos) {

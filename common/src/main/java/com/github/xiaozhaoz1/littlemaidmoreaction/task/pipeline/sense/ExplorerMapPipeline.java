@@ -22,10 +22,18 @@ import java.util.Set;
  *
  * <p>触发: 无信号, 纯 tick 检测 (背包扫描). isLongRunning=true (心跳豁免看门狗).
  * 防御点: 无地图/无装饰/读坐标失败均静默; 同地图只报一次 (PD 存地图 NBT hash).
+ *
+ * <p><b>驱动 (v79.63 修复)</b>: {@code Drive.GMPM_PASSIVE} (纯信息气泡 — 用户裁定**不受坐下限制**,
+ * 与 torch_light 那类"坐下暂停"的动作型被动相反)。此前本任务未进任何驱动集合 = **生产从不 tick**
+ * (测试直调掩盖, 2026-09-11 架构评审 P0-1)。同理补 {@link #SCAN_INTERVAL} 前置节流 —
+ * 原实现每 tick 扫全背包.
  */
 public final class ExplorerMapPipeline implements TaskPipeline, TaskConfigurable {
 
     private static final String KEY_ANNOUNCED = "explorer_announced";
+    /** 背包扫描节流 (tick, 5 秒) — 地图是持久物品, 迟早会发现; 无需逐 tick 扫 (v79.63) */
+    private static final long SCAN_INTERVAL = 100L;
+    private static final String THROTTLE_KEY = "explorer_map_scan";
 
     @Override public String taskType() { return "explorer_map"; }
     @Override public boolean isLongRunning() { return true; }
@@ -37,6 +45,11 @@ public final class ExplorerMapPipeline implements TaskPipeline, TaskConfigurable
 
     @Override
     public void tick(ServerLevel world, EntityMaid maid) {
+        // v79.63 前置节流 — 原每 tick 全背包扫描 (被动须自持节流)
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
+                .shouldFire(maid, THROTTLE_KEY, SCAN_INTERVAL)) {
+            return;
+        }
         var inv = maid.getAvailableInv(true);
         for (int i = 0; i < inv.getSlots(); i++) {
             ItemStack s = inv.getStackInSlot(i);
@@ -48,8 +61,16 @@ public final class ExplorerMapPipeline implements TaskPipeline, TaskConfigurable
             if (hash.equals(announced)) continue;
             // 读宝藏坐标
             BlockPos pos = readTreasurePos(world, s);
-            if (pos == null) continue;
-            MaidChatBubbleApi.showInfo(maid, "宝藏坐标: " + pos.getX() + ", " + pos.getZ());
+            if (pos == null) {
+                // v79.63.5 (用户裁定): 无宝藏标记 (空白图/玩家自制图) ⇒ 给一句提示, 不再静默 ✗
+                //   同样计入 announced (同图只提示一次, 与"同地图只报一次"同语义) ✓
+                MaidChatBubbleApi.showInfo(maid, net.minecraft.network.chat.Component.translatable(
+                        "bubble.littlemaidmoreaction.no_treasure"));
+                pd.putString(KEY_ANNOUNCED, hash);
+                return;
+            }
+            MaidChatBubbleApi.showInfo(maid, net.minecraft.network.chat.Component.translatable(
+                    "bubble.littlemaidmoreaction.treasure_pos", pos.getX(), pos.getZ()));
             pd.putString(KEY_ANNOUNCED, hash);
             return;
         }
@@ -65,36 +86,45 @@ public final class ExplorerMapPipeline implements TaskPipeline, TaskConfigurable
 //?}
     }
 
-    /** 读探险家结构坐标 — 遍历地图装饰, 找 MANSION/MONUMENT (双版本枚举差异 stonecutter) */
+    /**
+     * v79.62.5 读藏宝图目标坐标 (用户实测: 沉船图没反应 — 原读 MapItemSavedData 装饰, 但藏宝图目标
+     * 存在 ITEM NBT (1.20.1 addTargetDecoration) / MAP_DECORATIONS 组件 (1.21.1), 存的是世界坐标 x/z,
+     * 且地图未展开时 saved data 无该装饰). 兼容所有 vanilla 藏宝图类型: RED_X(沉船/埋藏宝藏) /
+     * MANSION(林地府邸) / MONUMENT(海底神殿) — 玩家标记(PLAYER/BANNER/FRAME)不会用这些类型, 不误报.
+     */
     @javax.annotation.Nullable
     private static BlockPos readTreasurePos(ServerLevel level, ItemStack map) {
-        MapItemSavedData data = net.minecraft.world.item.MapItem.getSavedData(map, level);
-        if (data == null) return null;
-        for (MapDecoration deco : data.getDecorations()) {
-            boolean isExplorer = false;
 //? if 1.20.1 {
-            isExplorer = deco.getType() == MapDecoration.Type.MANSION
-                    || deco.getType() == MapDecoration.Type.MONUMENT;
-//?} else {
-            var t = deco.type().value();
-            isExplorer = t == net.minecraft.world.level.saveddata.maps.MapDecorationTypes.WOODLAND_MANSION.value()
-                    || t == net.minecraft.world.level.saveddata.maps.MapDecorationTypes.OCEAN_MONUMENT.value();
-//?}
-            if (isExplorer) {
-                // v79.62.1 修复坐标换算: 原版 addDecoration 世界→装饰 = (world-center)/(1<<scale) * 2
-                // 反向: world = center + (deco / 2.0) * (1 << scale)  (探险家地图 scale=2 → 1<<2=4)
-                int scaleFactor = 1 << data.scale;
-//? if 1.20.1 {
-                int x = data.centerX + (int) (deco.getX() / 2.0 * scaleFactor);
-                int z = data.centerZ + (int) (deco.getY() / 2.0 * scaleFactor);
-//?} else {
-                int x = data.centerX + (int) (deco.x() / 2.0 * scaleFactor);
-                int z = data.centerZ + (int) (deco.y() / 2.0 * scaleFactor);
-//?}
-                return new BlockPos(x, 0, z);
+        // 1.20.1: item NBT Decorations ListTag — addTargetDecoration 写: type(byte) / id / x(double,世界) / z(double,世界)
+        CompoundTag tag = map.getTag();
+        if (tag != null && tag.contains("Decorations", 9)) {
+            net.minecraft.nbt.ListTag list = tag.getList("Decorations", 10);
+            for (int i = 0; i < list.size(); i++) {
+                CompoundTag d = list.getCompound(i);
+                MapDecoration.Type t = MapDecoration.Type.byIcon(d.getByte("type"));
+                if (t == MapDecoration.Type.RED_X
+                        || t == MapDecoration.Type.MANSION
+                        || t == MapDecoration.Type.MONUMENT) {
+                    return new BlockPos((int) d.getDouble("x"), 0, (int) d.getDouble("z"));
+                }
             }
         }
         return null;
+//?} else {
+        // 1.21.1: DataComponents.MAP_DECORATIONS — Entry(type Holder, x 世界, z 世界, rot)
+        var decos = map.get(net.minecraft.core.component.DataComponents.MAP_DECORATIONS);
+        if (decos != null) {
+            for (var entry : decos.decorations().values()) {
+                var t = entry.type().value();
+                if (t == net.minecraft.world.level.saveddata.maps.MapDecorationTypes.RED_X.value()
+                        || t == net.minecraft.world.level.saveddata.maps.MapDecorationTypes.WOODLAND_MANSION.value()
+                        || t == net.minecraft.world.level.saveddata.maps.MapDecorationTypes.OCEAN_MONUMENT.value()) {
+                    return new BlockPos((int) entry.x(), 0, (int) entry.z());
+                }
+            }
+        }
+        return null;
+//?}
     }
 
     @Override

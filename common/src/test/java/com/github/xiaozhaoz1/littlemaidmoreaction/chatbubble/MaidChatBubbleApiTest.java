@@ -41,12 +41,12 @@ class MaidChatBubbleApiTest {
     }
 
     @Test
-    @DisplayName("不同间隔: 触发节流 100t (5秒) / 失败节流 600t (30秒)")
+    @DisplayName("不同间隔: 触发节流 200t (10秒) / 失败节流 600t (30秒)")
     void shouldThrottle_differentIntervals() {
         assertTrue(MaidChatBubbleApi.shouldThrottle(10, 100, MaidChatBubbleApi.TRIGGER_THROTTLE_TICKS),
                 "触发节流窗口内 → 节流");
-        assertFalse(MaidChatBubbleApi.shouldThrottle(10, 110, MaidChatBubbleApi.TRIGGER_THROTTLE_TICKS),
-                "触发节流到期 → 放行");
+        assertFalse(MaidChatBubbleApi.shouldThrottle(10, 210, MaidChatBubbleApi.TRIGGER_THROTTLE_TICKS),
+                "触发节流到期 (210-10>=200) → 放行");
         assertTrue(MaidChatBubbleApi.shouldThrottle(10, 600, MaidChatBubbleApi.FAIL_THROTTLE_TICKS),
                 "失败节流窗口内 → 节流");
         assertFalse(MaidChatBubbleApi.shouldThrottle(10, 610, MaidChatBubbleApi.FAIL_THROTTLE_TICKS));

@@ -52,7 +52,7 @@ public final class BrushPipeline implements TaskPipeline {
         if (gt % BRUSH_INTERVAL != 0) return;
         if (world.getBlockEntity(suspicious) instanceof BrushableBlockEntity be) {
             // v79.62.1 刷扫摆手动画 — 每 10t 刷一次同步挥臂 (原缺摆动, 刷扫无动作感)
-            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.MaidSwing.onInterval(maid, BRUSH_INTERVAL);
+            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.MaidSwing.onInterval(maid, BRUSH_INTERVAL);
             LmaFakePlayer fp = new LmaFakePlayer(world, maid, suspicious);
             try {
                 boolean done = be.brush(gt, fp, Direction.UP);

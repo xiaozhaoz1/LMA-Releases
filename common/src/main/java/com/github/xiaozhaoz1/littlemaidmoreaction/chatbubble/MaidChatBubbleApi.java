@@ -44,8 +44,8 @@ public final class MaidChatBubbleApi {
     /** 失败气泡节流 (tick, 30秒) — 沿用 TaskDispatcher.FAIL_BUBBLE_INTERVAL */
     public static final int FAIL_THROTTLE_TICKS = 600;
 
-    /** 触发气泡节流 (tick, 5秒) — 镜像 MaidEmojiApi.EMOJI_THROTTLE_TICKS 防刷屏 */
-    public static final int TRIGGER_THROTTLE_TICKS = 100;
+    /** 触发气泡节流 (tick, 10秒) — 用户裁定 v79.62.5: 100→200t 防刷屏 (镜像 MaidEmojiApi.EMOJI_THROTTLE_TICKS) */
+    public static final int TRIGGER_THROTTLE_TICKS = 200;
     /** 气泡全局公共 CD (tick, 5秒) — 2026-08-16 用户裁定: 同女仆任意气泡间至少隔 5s, 同时只有 1 格气泡 */
     public static final int BUBBLE_GLOBAL_CD_TICKS = 100;
 
@@ -80,9 +80,48 @@ public final class MaidChatBubbleApi {
         showInfo(maid, Component.literal(msg), duration);
     }
 
+    // ── 同一气泡分级冷却 (用户裁定 2026-09-14: 5s → 10s → 30s 循环) ──
+    /** 键 = uuid|气泡文本 → { 上次显示 tick, 已显示次数 } */
+    private static final java.util.Map<String, long[]> BUBBLE_REPEAT = new java.util.concurrent.ConcurrentHashMap<>();
+
+    static {
+        // 实体卸载 ⇒ 清该女仆所有气泡冷却记录 (与项目声明式清理一致, 防跨 session 残留)
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.MaidUnloadRegistry.register(maid -> {
+            String prefix = maid.getUUID() + "|";
+            BUBBLE_REPEAT.keySet().removeIf(k -> k.startsWith(prefix));
+        });
+    }
+
+    /**
+     * **同一气泡(同文本)是否允许显示** — 第 1 次后 5s / 第 2 次后 10s / 第 3 次起 30s 循环。
+     *
+     * <p>被冷却挡住时**不推进计数** (计数只在真正显示时前进), 保证节奏稳定; 文本含动态数字时
+     * 视为不同气泡 (各自独立冷却) — 动态进度类消息本就该逐条可见 ✓
+     */
+    private static boolean allowRepeat(EntityMaid maid, String text, long now) {
+        String key = maid.getUUID() + "|" + text;
+        long[] st = BUBBLE_REPEAT.get(key);
+        if (st == null) {
+            BUBBLE_REPEAT.put(key, new long[]{now, 1});
+            return true;
+        }
+        long need = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleMath
+                .bubbleInterval((int) st[1]);
+        if (now - st[0] < need) return false;
+        st[0] = now;
+        st[1] = Math.min(3, st[1] + 1);   // 封顶 3 ⇒ 之后每 30s 循环 ✓
+        return true;
+    }
+
     /** 普通信息气泡 (Component, 自定义持续时间) — 公共 CD 3s (2026-08-16 用户裁定:
      *  同女仆任意气泡间至少隔 3s, 同时只有 1 格气泡; 与 showFail 30s/showTrigger 5s 独立叠加) */
     public static void showInfo(EntityMaid maid, Component msg, int duration) {
+        // v79.63.5 (用户裁定): 同一气泡分级冷却先行 — 5s → 10s → 30s 循环; 被挡时直接返回,
+        //   不消耗下面的全局 3s 公共 CD (否则一个高频气泡会把所有气泡都压住 ✗)
+        if (maid.level() instanceof ServerLevel sl
+                && !allowRepeat(maid, msg.getString(), sl.getGameTime())) {
+            return;
+        }
         if (throttled(maid, com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.BUBBLE_GLOBAL_TICK,
                 BUBBLE_GLOBAL_CD_TICKS)) {
             return;
@@ -173,6 +212,19 @@ public final class MaidChatBubbleApi {
     private static void add(EntityMaid maid, IChatBubbleData bubble) {
         if (maid.level() instanceof ServerLevel) {
             maid.getChatBubbleManager().addChatBubble(bubble);
+        }
+    }
+
+    // ── Component 重载 (v79.63.7 i18n 清扫): 客户端按语言翻译, 前缀/节流与 String 版完全一致 ──
+    /** 任务完成气泡 (Component) — 绿色 §a✔ 前缀 */
+    public static void showComplete(EntityMaid maid, Component msg) {
+        showInfo(maid, Component.literal("§a✔ ").append(msg));
+    }
+
+    /** 任务失败气泡 (Component) — 红色 §c✘ 前缀, 30 秒节流 */
+    public static void showFail(EntityMaid maid, Component msg) {
+        if (!throttled(maid, KEY_LAST_FAIL_TICK, FAIL_THROTTLE_TICKS)) {
+            showInfo(maid, Component.literal("§c✘ ").append(msg));
         }
     }
 }

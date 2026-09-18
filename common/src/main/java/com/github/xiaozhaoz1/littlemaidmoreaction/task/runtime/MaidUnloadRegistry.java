@@ -15,30 +15,41 @@ import java.util.function.Consumer;
  * 幂等 remove, 双调用无重复副作用)。
  *
  * <p>注册 (static 块): ChainHarvestExecute / PathingApi / GameTickPipelineManager /
- * MaidData PL 缓存 / EnvSenseBroadcaster / AutoCropHandler / TlmTaskMonitor /
+ * MaidData PL 缓存 / EnvSenseBroadcaster / TlmTaskMonitor /
  */
 public final class MaidUnloadRegistry {
 
-    private static final List<Consumer<EntityMaid>> HANDLERS = new ArrayList<>();
+    /**
+     * 清理回调表 — {@link java.util.concurrent.CopyOnWriteArrayList}。
+     * v79.63 并发收口 (评审 P1-5 同族): 原 ArrayList 的 register 与 runAll 遍历可并发 —
+     * 各模块在自己的静态初始化里登记 (EngineGuard / PassiveDispatcher / FarmExecute / 各管线),
+     * 类初始化时机由首次使用触发 (可能落在不同线程); 遍历中登记 = CME。
+     * 写极少读较多 → CopyOnWrite 正合适 (登记后只遍历)。
+     */
+    private static final List<Consumer<EntityMaid>> HANDLERS =
+            new java.util.concurrent.CopyOnWriteArrayList<>();
 
     private MaidUnloadRegistry() {}
 
     static {
-        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute.clearMaidState(maid));
-        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.PathingApi.clearNav(maid));
+        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.ChainHarvestExecute.clearMaidState(maid));
+        // v79.63: 改用 clearMaidState (三表全清) — clearNav 故意保留 attempt/CD (超时重试语义),
+        // 卸载只清 NAV_START 会让 NAV_ATTEMPT/NAV_CD 永久残留 (错题 #272 同族: 键复用静默串扰)
+        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.PathingApi.clearMaidState(maid));
         // 错题 P-5: DangerGuard STATES (UUID key) 原只有模式切换/FAILED 两清理点,
         // 堵护中卸载 → 永久残留 — 补卸载登记 (红线 #8 协议)
-        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.DangerGuardCoordinator.clear(maid));
+        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.DangerGuardCoordinator.clear(maid));
         // v79.58: SelfRescueState 自救上下文 (per-maid 内存态, 卸载清理)
-        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.SelfRescueState.onMaidUnload(maid));
-        // v79.61x: UnstuckCoordinator 卡住检测窗口 (per-maid 内存态, 卸载清理)
-        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.UnstuckCoordinator.onMaidUnload(maid));
+        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.SelfRescueState.onMaidUnload(maid));
+        // v79.62.5: UnstuckCoordinator 已删除 (用户裁定 — 卡住靠 TLM 导航自行传送, 无状态需清理)
         // v79.61x: GMPM 被动 mask 缓存已删 (脱管线) — 冷却表经 registerCache 声明式清理
         register(com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData::flushAllPl);
         // 环境感知/白名单/监控/假人 (原 Extension.ServerEvents 手写 4 处)
-        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSenseBroadcaster.onMaidUnload(maid.getId()));
-        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.AutoCropHandler.onMaidUnload(maid.getUUID()));
-        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.adapter.TlmTaskMonitor.onMaidLeave(maid.getId()));
+        // v79.63 键类型统一 (见 task.data.MaidKey): 前两条改传实体 (内部用 UUID 键);
+        // 仍保留实体 ID 形参的仅 FakePlayerManager (MC API 热路径例外: 需 level.getEntity(id) 回投;
+        // AutoCropHandler 已删 — 原为第 4 个例外, 另 PathingApi.NAV_* 已改为 UUID 键)
+        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.EnvSenseBroadcaster.onMaidUnload(maid));
+        register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.adapter.TlmTaskMonitor.onMaidLeave(maid));
         register(maid -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.fakeplayer.FakePlayerManager.onMaidUnload(maid.getId()));
         // 便携装配背包 CACHE — 已改声明式 registerCache (MaidAssemblyInventory 静态初始化自登记, 批 3c)
     }

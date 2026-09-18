@@ -27,7 +27,7 @@ public final class MaidEmojiApi {
             return;
         }
         // 统一节流工具 (原手写时间戳 + 防溢出)
-        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.maid.ThrottleUtil
+        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
                 .shouldFire(maid, "emoji", EMOJI_THROTTLE_TICKS)) {
             return;
         }

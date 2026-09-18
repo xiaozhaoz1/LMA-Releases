@@ -92,10 +92,6 @@ public final class LittleMaidMoreAction {
     public static final RegistryObject<MenuType<CraftChainConfigMenu>> CRAFT_CHAIN_CONFIG_MENU =
         MENU_TYPES.register("craft_chain_config",
             () -> IForgeMenuType.create((id, inv, buf) -> new CraftChainConfigMenu(id, inv, buf.readInt())));
-    /** v79.62.1: 锻造容器菜单 (原版锻造台样式, 无模板) */
-    public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingMenu>> SMITHING_MENU =
-        MENU_TYPES.register("smithing",
-            () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingMenu(id, inv, buf)));
     /** 敲钟单女仆间隔配置菜单 */
     public static final RegistryObject<MenuType<BellRingConfigMenu>> BELL_RING_CONFIG_MENU =
         MENU_TYPES.register("bell_ring_config",
@@ -108,6 +104,10 @@ public final class LittleMaidMoreAction {
     public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu>> VOID_EXCAVATION_CONFIG_MENU =
         MENU_TYPES.register("void_excavation_config",
             () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu(id, inv, buf.readInt())));
+    /** v79.62.3: 防御塔 GUI (弹药槽 + 范围/伤害/模式; buf = BlockPos) */
+    public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu>> DEFENSE_TOWER_MENU =
+        MENU_TYPES.register("defense_tower",
+            () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu(id, inv, buf)));
     /** AI 操控配置菜单 (LLM 模型/声线名称) */
     public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigMenu>> AI_CONTROL_CONFIG_MENU =
         MENU_TYPES.register("ai_control_config",
@@ -127,6 +127,10 @@ public final class LittleMaidMoreAction {
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON,
                 com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.WildKitsuneMilkConfig.KITSUNE_SPEC,
                 MOD_ID + "/kitsune_milk.toml");
+        // v79.62.3: 防御塔配置段
+        ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON,
+                com.github.xiaozhaoz1.littlemaidmoreaction.config.DefenseTowerConfig.SPEC,
+                MOD_ID + "/defense_tower.toml");
 
         LmaRegistrar.init();
         LmaRegistrar.initServer();
@@ -136,6 +140,10 @@ public final class LittleMaidMoreAction {
         LmaRegistrar.registerBlockEntityTypes(modBus);
         // 女仆饰品物品
         LmaRegistrar.registerItems(modBus);
+        // v79.62.3: 配方序列化器 (自定义防御塔合成 — 保留手办 NBT)
+        LmaRegistrar.registerRecipeSerializers(modBus);
+        // v79.62.3: 防御塔容器能力 (漏斗供弹; 1.20.1 no-op — BE getCapability 覆写)
+        com.github.xiaozhaoz1.littlemaidmoreaction.init.LmaCapabilities.register(modBus);
         // 酒狐奶物品 (v79.6x)
         com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.register(modBus);
         // LMA 创造栏标签页 (2026-08-16 — 用户裁定「创造栏没 LMA 栏」)
@@ -169,22 +177,29 @@ public final class LittleMaidMoreAction {
         });
 
         MinecraftForge.EVENT_BUS.register(this);
+        // v79.63 (用户裁定): 玩家破坏方块 → 清附近跳过记录 (女仆跟着下矿, 地形变化比 TTL 快)
+        MinecraftForge.EVENT_BUS.addListener((net.minecraftforge.event.level.BlockEvent.BreakEvent e) -> {
+            if (e.getPlayer() != null && !e.getLevel().isClientSide()) {
+                com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.ChainHarvestExecute
+                        .invalidateSkipsNear(e.getPos(), 8);
+            }
+        });
     }
 
     /** 注册网络包序列化器 */
     private void commonSetup(final FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             // LmaMenus 注入 (修 v75 迁移遗留 — forge 侧此前从未赋值, 配置屏 MenuType null)
-            LmaMenus.BLOCK_INTERACT_CONFIG_MENU = BLOCK_INTERACT_CONFIG_MENU.get();
-            LmaMenus.ITEM_LIST_CONFIG_MENU = ITEM_LIST_CONFIG_MENU.get();
-            LmaMenus.CRAFT_CHAIN_CONFIG_MENU = CRAFT_CHAIN_CONFIG_MENU.get();
-            LmaMenus.BELL_RING_CONFIG_MENU = BELL_RING_CONFIG_MENU.get();
-            LmaMenus.AI_CONTROL_CONFIG_MENU = AI_CONTROL_CONFIG_MENU.get();
-            LmaMenus.PASSIVE_TOGGLE_CONFIG_MENU = PASSIVE_TOGGLE_CONFIG_MENU.get();
-            LmaMenus.MAID_ASSEMBLY_MENU = MAID_ASSEMBLY_MENU.get();   // v75.1: 便携装配
-            LmaMenus.SMITHING_MENU = SMITHING_MENU.get();             // v79.62.1: 锻造容器
-            LmaMenus.VOID_EXCAVATION_CONFIG_MENU = VOID_EXCAVATION_CONFIG_MENU.get();
-            LmaMenus.DAM_FILL_CONFIG_MENU = DAM_FILL_CONFIG_MENU.get();   // v79.62.2 dam_fill   // v79.62: 挖空置域
+            LmaMenus.BLOCK_INTERACT_CONFIG_MENU = BLOCK_INTERACT_CONFIG_MENU;   // 存 supplier (值在使用点解析)
+            LmaMenus.ITEM_LIST_CONFIG_MENU = ITEM_LIST_CONFIG_MENU;   // 存 supplier (值在使用点解析)
+            LmaMenus.CRAFT_CHAIN_CONFIG_MENU = CRAFT_CHAIN_CONFIG_MENU;   // 存 supplier (值在使用点解析)
+            LmaMenus.BELL_RING_CONFIG_MENU = BELL_RING_CONFIG_MENU;   // 存 supplier (值在使用点解析)
+            LmaMenus.AI_CONTROL_CONFIG_MENU = AI_CONTROL_CONFIG_MENU;   // 存 supplier (值在使用点解析)
+            LmaMenus.PASSIVE_TOGGLE_CONFIG_MENU = PASSIVE_TOGGLE_CONFIG_MENU;   // 存 supplier (值在使用点解析)
+            LmaMenus.MAID_ASSEMBLY_MENU = MAID_ASSEMBLY_MENU;   // 存 supplier (值在使用点解析)   // v75.1: 便携装配
+            LmaMenus.VOID_EXCAVATION_CONFIG_MENU = VOID_EXCAVATION_CONFIG_MENU;   // 存 supplier (值在使用点解析)
+            LmaMenus.DAM_FILL_CONFIG_MENU = DAM_FILL_CONFIG_MENU;   // 存 supplier (值在使用点解析)   // v79.62.2 dam_fill   // v79.62: 挖空置域
+            LmaMenus.DEFENSE_TOWER_MENU = DEFENSE_TOWER_MENU;   // 存 supplier (值在使用点解析)       // v79.62.3: 防御塔
             // 网络包注册 — 清单驱动 (批次 A: PacketRegistry.DEFS 单一事实源 + ForgePacketRegistrar 循环消费)
             ForgePacketRegistrar.registerAll(NETWORK);
 
@@ -197,11 +212,10 @@ public final class LittleMaidMoreAction {
     @SubscribeEvent
     public void onServerStarting(ServerStartingEvent event) {
         com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationDurationManager.loadServerDurations();
-        // v79.62 种菜区域配置 — 服务端启动从 config/littlemaidmoreaction/farm_regions.json 加载
-        com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage
-                .load(LittleMaidMoreAction.CONFIG_DIR);
+        // v79.64: 种菜区域改存女仆 NBT (lma_cfg_farm.regions), 启动不再读全局文件 —
+        //   老 config/littlemaidmoreaction/farm_regions.json 由 TaskTickHandler 首个 tick 一次性导入 (导入后改名 .imported)
         // v79.62.1 清空挖空认领池 (运行时状态, 重启后空 — 用户裁定, 防旧认领残留)
-        com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.VoidExcavationPipeline.resetPool();
+        com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.VoidExcavationPool.resetPool();
         LOGGER.info("[LMA] 服务端动画数据加载完成");
     }
 //?}

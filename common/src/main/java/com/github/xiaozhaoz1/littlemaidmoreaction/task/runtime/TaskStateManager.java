@@ -34,7 +34,7 @@ public final class TaskStateManager {
         FlowTaskData.setTick(maid, now);
     }
 
-    /** 清除所有流程任务状态 — TaskDispatcher 主路径 + TaskTickHandler.cleanupMaid 兜底 */
+    /** 清除所有流程任务状态 — TaskDispatcher 主路径 + GMPM 孤儿收容 / EngineGuard 降级兜底 */
     public static void clearAll(EntityMaid maid) {
         FlowTaskData.clearAll(maid);
     }

@@ -295,7 +295,7 @@ public final class StructureSense {
 
         BlockPos center = player.blockPosition();
         // v79.6x 预算方案 P ②③: 区块级共享缓存 + 摊薄螺旋 + 墙钟预算 (vanilla/input/world 工具 API)
-        Map<String, StructBox> found = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StructureScanCache.GLOBAL
+        Map<String, StructBox> found = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.StructureScanCache.GLOBAL
                 .scanAround(level, center, PassiveTaskConfig.ENV_STRUCTURE_RADIUS.get(), now, deadlineNanos);
         // v79.6x 诊断日志 (结构气泡无痕排查) — 每玩家每 60s 一条
         com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.debug(
@@ -400,7 +400,7 @@ public final class StructureSense {
         SignalKind kind = kindOf(kindSuffix);
         if (kind == null) return "未知信号: " + kindSuffix + " (可用 discover/refresh/enter/leave)";
         BlockPos center = player.blockPosition();
-        Map<String, StructBox> found = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StructureScanCache.GLOBAL
+        Map<String, StructBox> found = com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.StructureScanCache.GLOBAL
                 .scanAround(level, center, PassiveTaskConfig.ENV_STRUCTURE_RADIUS.get(),
                         level.getGameTime(), System.nanoTime() + 20_000_000L);
         PLAYER_TEXT.put(player.getUUID(), buildTexts(center, found,

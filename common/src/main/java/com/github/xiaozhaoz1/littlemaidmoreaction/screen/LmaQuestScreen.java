@@ -34,8 +34,12 @@ import java.util.*;
  */
 public final class LmaQuestScreen extends Screen implements ClientAdvancements.Listener {
 
-    private static final int LEFT_W = 140;        // 左栏章节宽度
-    private static final int RIGHT_W = 200;       // 右栏详情宽度
+    private static final org.slf4j.Logger LOGGER =
+            org.slf4j.LoggerFactory.getLogger("LMA/QuestScreen");
+
+    private static final int LEFT_W = 150;        // 左栏章节展开宽度
+    private static final int LEFT_W_COLLAPSED = 28; // 左栏收起宽度 (只留箭头)
+    private static final int RIGHT_W = 220;       // 右栏详情宽度
     private static final int TOP_H = 28;          // 顶部标题高度
     private static final int NODE_SIZE = 26;      // 节点尺寸 (对齐原版)
 
@@ -48,7 +52,10 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
     @Nullable private QuestNode selectedChapter;  // 当前章节 (根)
     @Nullable private QuestNode hovered;           // 悬停节点
     @Nullable private QuestNode selected;          // 选中节点 (详情)
-    private double scrollX, scrollY;
+    private double scrollX, scrollY;               // 画布平移
+    private int scrollChapter = 0;                 // 左栏章节滚动偏移
+    private boolean leftCollapsed = false;         // 左栏是否收起 (点箭头)
+    private boolean detailOpen = false;            // 右侧详情是否展开 (点任务才开)
     private boolean dragging;
     private int dragLastX, dragLastY;
 
@@ -59,6 +66,16 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
 
     @Override
     protected void init() {
+        // ★ v79.63.13 (用户反馈「成就树没有返回按钮」): 底部居中 80×20 返回键 ✓
+        //   坐标: x = (width-80)/2 · y = height-26 · 尺寸 80×20 (Esc 关闭仍然可用 ✓)
+        //   用原版键 gui.back (中文"返回"/英文 "Back" ✓ 无需新语言键) + tooltip ✓
+        this.addRenderableWidget(net.minecraft.client.gui.components.Button.builder(
+                        net.minecraft.network.chat.Component.translatable("gui.back"),
+                        b -> this.onClose())
+                .pos((this.width - 80) / 2, this.height - 26).size(80, 20)
+                .tooltip(net.minecraft.client.gui.components.Tooltip.create(
+                        net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.quest.back.tip")))
+                .build());
         ClientPacketListener conn = Minecraft.getInstance().getConnection();
         if (conn != null) conn.getAdvancements().setListener(this);
         reloadTree();
@@ -74,7 +91,10 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
     private void reloadTree() {
         roots.clear(); byId.clear(); layout.clear();
         ClientPacketListener conn = Minecraft.getInstance().getConnection();
-        if (conn == null) return;
+        if (conn == null) {
+            LOGGER.warn("[LMA/Quest] 连接为空, 无法读成就树");
+            return;
+        }
         List<QuestNode> loaded = new ArrayList<>();
 //? if 1.20.1 {
         // 1.20.1: getAllAdvancements() -> Collection<Advancement> (全部, 含子 — 只遍历根则子永远缺失)
@@ -108,6 +128,13 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
         this.roots.addAll(rootsList);
         this.byId.putAll(byId);
         indexNodes(rootsList);
+        LOGGER.info("[LMA/Quest] 成就树: 全部节点={} 根(章节)={}",
+                this.byId.size(), this.roots.size());
+        if (this.roots.isEmpty()) {
+            LOGGER.warn("[LMA/Quest] 无章节! 原始节点={}, conn={}",
+                    loaded.size(), conn.getAdvancements() != null
+                            ? conn.getAdvancements().getClass().getSimpleName() : "null");
+        }
     }
 
     /** 1.21.1: AdvancementNode → QuestNode */
@@ -181,25 +208,46 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
 //?} else {
         renderBackground(g, mx, my, pt);
 //?}
-        int canvasX = LEFT_W;
-        int canvasY = TOP_H;
-        int canvasW = this.width - LEFT_W - RIGHT_W;
-        int canvasH = this.height - TOP_H;
-
-        // 左栏章节列表
-        g.fill(0, 0, LEFT_W, this.height, 0xAA141414);
-        g.drawCenteredString(font, Component.literal("章节"), LEFT_W / 2, 8, 0xFFD700);
-        int ry = TOP_H + 4;
-        for (QuestNode ch : roots) {
-            boolean sel = ch == selectedChapter;
-            if (sel) g.fill(4, ry, LEFT_W - 4, ry + 18, 0x553355AA);
-            String title = ch.titleKey() != null ? net.minecraft.client.resources.language.I18n.get(ch.titleKey()) : ch.id();
-            g.drawString(font, Component.literal((sel ? "▶ " : "  ") + title).withStyle(s -> s.withColor(sel ? 0x55FF55 : 0xCCCCCC)),
-                    8, ry + 4, 0xFFFFFF);
-            ry += 20;
+        // 懒加载: 若成就树为空 (网络同步晚到), 每帧重试
+        if (roots.isEmpty() && Minecraft.getInstance().getConnection() != null) {
+            reloadTree();
+            if (selectedChapter == null && !roots.isEmpty()) selectedChapter = roots.get(0);
+            layoutChapter();
         }
 
-        // 中间画布
+        // 动态布局: 左栏收起 + 详情收起时画布全宽
+        int leftW = leftCollapsed ? LEFT_W_COLLAPSED : LEFT_W;
+        int rightW = detailOpen ? RIGHT_W : 0;
+        int canvasX = leftW;
+        int canvasY = TOP_H;
+        int canvasW = this.width - leftW - rightW;
+        int canvasH = this.height - TOP_H;
+
+        // ── 左栏章节 (可收起 + 可滚动) ──
+        g.fill(0, 0, leftW, this.height, 0xAA141414);
+        if (leftCollapsed) {
+            // 收起态: 只留展开箭头 ▶
+            g.drawCenteredString(font, Component.literal("▶").withStyle(s -> s.withColor(0xFFD700)),
+                    leftW / 2, this.height / 2, 0xFFFFFF);
+        } else {
+            g.drawCenteredString(font, Component.literal("章节"), leftW / 2, 8, 0xFFD700);
+            // 收起箭头 ◀ (点它收起)
+            g.drawString(font, Component.literal("◀").withStyle(s -> s.withColor(0xFFFFFF)),
+                    leftW - 16, 8, 0xFFFFFF);
+            int ry = TOP_H + 4 - scrollChapter * 20;
+            g.enableScissor(2, TOP_H, leftW - 2, this.height - 4);
+            for (QuestNode ch : roots) {
+                boolean sel = ch == selectedChapter;
+                if (sel) g.fill(4, ry, leftW - 4, ry + 18, 0x553355AA);
+                String title = ch.titleKey() != null ? net.minecraft.client.resources.language.I18n.get(ch.titleKey()) : ch.id();
+                g.drawString(font, Component.literal((sel ? "▶ " : "  ") + title).withStyle(s -> s.withColor(sel ? 0x55FF55 : 0xCCCCCC)),
+                        8, ry + 4, 0xFFFFFF);
+                ry += 20;
+            }
+            g.disableScissor();
+        }
+
+        // ── 中间画布 (滚轮平移) ──
         g.fill(canvasX, canvasY, canvasX + canvasW, canvasY + canvasH, 0xAA000000);
         g.enableScissor(canvasX, canvasY, canvasX + canvasW, canvasY + canvasH);
         int ox = canvasX + (int) scrollX;
@@ -210,10 +258,13 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
         if (selectedChapter != null) drawNode(g, selectedChapter, ox, oy, mx, my);
         g.disableScissor();
 
-        // 右栏详情
-        int dx = this.width - RIGHT_W;
-        g.fill(dx, 0, this.width, this.height, 0xAA141414);
-        if (selected != null) {
+        // ── 右栏详情 (点任务才开, 可收回) ──
+        if (detailOpen && selected != null) {
+            int dx = this.width - RIGHT_W;
+            g.fill(dx, 0, this.width, this.height, 0xAA141414);
+            // 收回箭头 ✕
+            g.drawString(font, Component.literal("✕").withStyle(s -> s.withColor(0xFFFFFF)),
+                    dx + RIGHT_W - 16, 8, 0xFFFFFF);
             g.drawCenteredString(font, Component.literal("任务详情").withStyle(s -> s.withColor(0xFFD700)), dx + RIGHT_W / 2, 8, 0xFFFFFF);
             String title = selected.titleKey() != null ? net.minecraft.client.resources.language.I18n.get(selected.titleKey()) : selected.id();
             g.drawString(font, Component.literal(title).withStyle(s -> s.withColor(0x55FF55)), dx + 8, 28, 0xFFFFFF);
@@ -263,7 +314,6 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
             if (!stack.isEmpty()) {
                 g.renderFakeItem(stack, x + 5, y + 5);
             } else {
-                // 图标解析失败 — 画个色块占位 (至少可见)
                 g.fill(x + 4, y + 4, x + NODE_SIZE - 4, y + NODE_SIZE - 4, 0x553355AA);
             }
         } else {
@@ -304,27 +354,48 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
 
     @Override
     public boolean mouseClicked(double mx, double my, int btn) {
-        // 左栏章节选择
-        if (mx < LEFT_W && my > TOP_H) {
-            int idx = (int) ((my - TOP_H - 4) / 20);
+        // 当前左栏宽 (收起/展开)
+        int leftW = leftCollapsed ? LEFT_W_COLLAPSED : LEFT_W;
+        // 左栏收起箭头 (展开态点 ◀ → 收起)
+        if (mx < leftW && my < TOP_H && !leftCollapsed) {
+            leftCollapsed = true;
+            return true;
+        }
+        // 左栏展开箭头 (收起态点 ▶ → 展开) — 收起态只响应这个, 不响应章节点击
+        if (mx < LEFT_W_COLLAPSED && leftCollapsed) {
+            leftCollapsed = false;
+            return true;
+        }
+        // 左栏章节选择 — 仅展开态 (收起态不换章节)
+        if (!leftCollapsed && mx < leftW && my > TOP_H) {
+            int idx = (int) ((my - TOP_H - 4) / 20) + scrollChapter;
             if (idx >= 0 && idx < roots.size()) {
                 selectedChapter = roots.get(idx);
                 selected = null; scrollX = scrollY = 0; layoutChapter();
                 return true;
             }
         }
-        // 节点选中
-        if (mx >= LEFT_W && mx <= this.width - RIGHT_W) {
+        // 右栏收回箭头 (详情 ✕)
+        if (detailOpen && mx >= this.width - RIGHT_W && my < TOP_H) {
+            detailOpen = false; selected = null;
+            return true;
+        }
+        // 节点选中 (画布内, 动态区域)
+        int rightW = detailOpen ? RIGHT_W : 0;
+        if (mx >= leftW && mx <= this.width - rightW) {
             hovered = null;
-            QuestTreeLayout.Pos pos = layout.get(selectedChapter != null ? selectedChapter.id() : "");
-            // 递归找悬停节点
             if (selectedChapter != null) {
-                QuestNode hit = findNodeAt(selectedChapter, (int)mx - LEFT_W - (int)scrollX, (int)my - TOP_H - (int)scrollY);
-                if (hit != null) { selected = hit; return true; }
+                QuestNode hit = findNodeAt(selectedChapter, (int)mx - leftW - (int)scrollX, (int)my - TOP_H - (int)scrollY);
+                if (hit != null) {
+                    selected = hit; detailOpen = true;   // 点任务 → 开详情
+                    return true;
+                }
             }
         }
-        // 拖拽起点
-        dragging = true; dragLastX = (int) mx; dragLastY = (int) my;
+        // 拖拽起点 (只在画布内)
+        if (mx >= leftW && mx <= this.width - rightW && my >= TOP_H) {
+            dragging = true; dragLastX = (int) mx; dragLastY = (int) my;
+        }
         return super.mouseClicked(mx, my, btn);
     }
 
@@ -339,6 +410,36 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
             if (hit != null) return hit;
         }
         return null;
+    }
+
+    @Override
+//? if 1.20.1 {
+    public boolean mouseScrolled(double mx, double my, double yDelta) {
+        return handleScroll(mx, my, yDelta);
+    }
+//?} else {
+    public boolean mouseScrolled(double mx, double my, double xDelta, double yDelta) {
+        return handleScroll(mx, my, xDelta + yDelta);
+    }
+//?}
+
+    /** 滚轮分流: 左栏=章节滚动 / 画布=平移 (无缩放) */
+    private boolean handleScroll(double mx, double my, double delta) {
+        int leftW = leftCollapsed ? LEFT_W_COLLAPSED : LEFT_W;
+        int rightW = detailOpen ? RIGHT_W : 0;
+        // 左栏: 章节滚动 (仅展开态)
+        if (!leftCollapsed && mx < leftW && my > TOP_H) {
+            scrollChapter = (int) Math.max(0, Math.min(
+                    Math.max(0, roots.size() - (this.height - TOP_H) / 20),
+                    scrollChapter - (int) delta));
+            return true;
+        }
+        // 画布: 平移 (滚轮垂直/水平)
+        if (mx >= leftW && mx <= this.width - rightW && my >= TOP_H) {
+            scrollY += delta * 8;
+            return true;
+        }
+        return false;
     }
 
     @Override
@@ -377,13 +478,17 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
 
 //? if 1.20.1 {
     @Override
-    public void onAddAdvancementRoot(net.minecraft.advancements.Advancement a) {}
+    public void onAddAdvancementRoot(net.minecraft.advancements.Advancement a) {
+        if (roots.isEmpty()) { reloadTree(); if (selectedChapter == null && !roots.isEmpty()) selectedChapter = roots.get(0); layoutChapter(); }
+    }
 
     @Override
     public void onRemoveAdvancementRoot(net.minecraft.advancements.Advancement a) {}
 
     @Override
-    public void onAddAdvancementTask(net.minecraft.advancements.Advancement a) {}
+    public void onAddAdvancementTask(net.minecraft.advancements.Advancement a) {
+        if (roots.isEmpty()) { reloadTree(); if (selectedChapter == null && !roots.isEmpty()) selectedChapter = roots.get(0); layoutChapter(); }
+    }
 
     @Override
     public void onRemoveAdvancementTask(net.minecraft.advancements.Advancement a) {}
@@ -402,13 +507,17 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
     }
 //?} else {
     @Override
-    public void onAddAdvancementRoot(AdvancementNode node) {}
+    public void onAddAdvancementRoot(AdvancementNode node) {
+        if (roots.isEmpty()) { reloadTree(); if (selectedChapter == null && !roots.isEmpty()) selectedChapter = roots.get(0); layoutChapter(); }
+    }
 
     @Override
     public void onRemoveAdvancementRoot(AdvancementNode node) {}
 
     @Override
-    public void onAddAdvancementTask(AdvancementNode node) {}
+    public void onAddAdvancementTask(AdvancementNode node) {
+        if (roots.isEmpty()) { reloadTree(); if (selectedChapter == null && !roots.isEmpty()) selectedChapter = roots.get(0); layoutChapter(); }
+    }
 
     @Override
     public void onRemoveAdvancementTask(AdvancementNode node) {}

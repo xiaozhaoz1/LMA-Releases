@@ -22,6 +22,10 @@ public final class NbtCodecs {
         if (!tag.contains(key)) return null;
         CompoundTag sub = tag.getCompound(key);
 //? if 1.20.1 {
+        // ★ v79.64.2: 坏数据必须 null — 原直接 NbtUtils.readBlockPos(sub) 对空/损坏复合标签
+        //   会返回 (0,0,0) 而非 null, 与 1.21 分支语义**不一致** ⇒ 调用方"读不出就报错"的判据在
+        //   1.20.1 失效, 会静默绑到 0,0,0 (同类"静默错坐标"隐患) ✗ (NbtCodecsTest 抓到)
+        if (!sub.contains("X") || !sub.contains("Y") || !sub.contains("Z")) return null;
         return NbtUtils.readBlockPos(sub);
 //?} else {
         return sub.contains("pos") ? BlockPos.of(sub.getLong("pos")) : null;

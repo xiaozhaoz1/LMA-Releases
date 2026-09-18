@@ -1,7 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search;
 
-import com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage.FarmRegion;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.BlockPatternCache;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.RegionBox;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.CropRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -16,6 +16,9 @@ import java.util.List;
 /**
  * 作物区域扫描原语 (v79.62) — 走 {@link BlockPatternCache} 区块缓存 (CROP/FARMLAND),
  * 区域 AABB 过滤 + 细筛防脏读. 纯读 (vanilla 层).
+ *
+ * <p>v79.63 (架构审计 A4): 参数由 {@code storage.FarmRegionStorage.FarmRegion} 改 {@link RegionBox} —
+ * 本类只需"盒子"数据形状, 不再反向依赖 storage; 区域记录 → 盒子的转换由调用方 (task 层) 负责。
  *
  * <p><b>双面</b>:
  * <ul>
@@ -32,7 +35,7 @@ public final class CropQuery {
      * 区域内全部成熟可收作物 (含骨粉可催熟 fallback 方块), 按距中心升序.
      * 粗扫描走 CROP 缓存, 细筛 region.contains.
      */
-    public static List<BlockPos> scanMature(ServerLevel level, BlockPos center, FarmRegion region,
+    public static List<BlockPos> scanMature(ServerLevel level, BlockPos center, RegionBox region,
                                             BlockPos origin) {
         BlockPos c = regionCenter(region);
         int r = regionRadius(region);
@@ -60,18 +63,16 @@ public final class CropQuery {
         return out;
     }
 
-    /** Y 轴扩展 ±1 的 contains (与 getRegionAABB 一致) */
-    private static boolean containsExtended(FarmRegion region, BlockPos p) {
-        return p.getX() >= region.minX() && p.getX() <= region.maxX()
-                && p.getY() >= region.minY() - 1 && p.getY() <= region.maxY() + 1
-                && p.getZ() >= region.minZ() && p.getZ() <= region.maxZ();
+    /** Y 轴扩展 ±1 的 contains — 判定实现下沉 RegionBox (纯函数可单测, 口径与 getRegionAABB 一致) */
+    private static boolean containsExtended(RegionBox region, BlockPos p) {
+        return region.containsYExtended(p.getX(), p.getY(), p.getZ());
     }
 
     /**
      * 区域内可播种指定种子的耕地 (上方可为方块), 按距原点升序.
      * 粗扫描 FARMLAND 缓存 + 细筛 canPlantOn + 上方可替换.
      */
-    public static List<BlockPos> scanPlantable(ServerLevel level, FarmRegion region, BlockPos origin,
+    public static List<BlockPos> scanPlantable(ServerLevel level, RegionBox region, BlockPos origin,
                                                ItemStack seed) {
         if (seed.isEmpty()) return List.of();
         List<BlockPos> out = new ArrayList<>();
@@ -99,25 +100,15 @@ public final class CropQuery {
         return out;
     }
 
-    /** 区域内是否还有成熟作物 (快速有无判定 — 无则区域种完/收完) */
-    public static boolean hasMature(ServerLevel level, FarmRegion region, BlockPos origin) {
-        BlockPos c = regionCenter(region);
-        int r = regionRadius(region);
-        for (BlockPos p : BlockPatternCache.scanBlocks(level, c, r, BlockPatternCache.PatternType.CROP)) {
-            if (containsExtended(region, p)) return true;
-        }
-        return false;
-    }
-
     // ── 区域几何 (归一化已由 FarmRegionStorage.of 保证; 中心/半径按区块扫描) ──
 
-    public static BlockPos regionCenter(FarmRegion region) {
+    public static BlockPos regionCenter(RegionBox region) {
         return new BlockPos((region.minX() + region.maxX()) / 2,
                 (region.minY() + region.maxY()) / 2,
                 (region.minZ() + region.maxZ()) / 2);
     }
 
-    public static int regionRadius(FarmRegion region) {
+    public static int regionRadius(RegionBox region) {
         // v79.62.1 修复多区块区域只扫一个区块: 半径按最大边长一半 + 16 余量,
         // 保证 chunkRadius = radius>>4 覆盖区域所有区块 (跨多区块农田/作物)
         int dx = region.maxX() - region.minX();

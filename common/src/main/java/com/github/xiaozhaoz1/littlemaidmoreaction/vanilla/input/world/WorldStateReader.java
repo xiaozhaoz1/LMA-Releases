@@ -24,11 +24,6 @@ public final class WorldStateReader {
         var biome = w.getBiome(pos); return biome != null ? biome.unwrapKey().map(k -> k.location().toString()).orElse("unknown") : "unknown";
     }
 
-    /** 生物群系基础温度 (0.0~2.0 区间典型) — v79.6x 自 EnvScanner 迁入 (B4) */
-    public static float getBiomeTemperature(Level w, BlockPos pos) {
-        return w.getBiome(pos).value().getBaseTemperature();
-    }
-
     /** 生物群系降水类型名 (RAIN/SNOW/NONE) — v79.6x 自 EnvScanner 迁入 (B4) */
     public static String getPrecipitation(Level w, BlockPos pos) {
         return w.getBiome(pos).value().getPrecipitationAt(pos).name();

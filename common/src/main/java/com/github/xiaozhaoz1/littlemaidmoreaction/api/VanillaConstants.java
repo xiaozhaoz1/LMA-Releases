@@ -28,12 +28,12 @@ public final class VanillaConstants {
                                                           // 门已分家 MINE_DIG_DIST_SQR — v79.58)
     public static final double ONE_AWAY_DIST_SQR = 3.0;   // 1 格邻域 (3x3x3 相邻格) — 寻路到达判定
                                                           // (用户: "至少要走到矿旁边" — 回归早期行为)
-    public static final double MINE_DIG_DIST_SQR = 16.0;  // 4 格球 — 挖矿可破块门 (v79.58 用户裁定
+    public static final double MINE_DIG_DIST_SQR = 16.0;  // 4 格 — **只用于开脉选择/裁剪** ✓ (v79.63.24 用户裁定: 破块不再判距离 ✓)  // 4 格球 — 挖矿可破块门 (v79.58 用户裁定
                                                           // "可挖掘距离调成 4, 完全覆盖" — TLM
                                                           // destroyBlock 无距离限制实测 (EntityMaid
                                                           // destroyBlock 直破), 3 格边界抖动白蓄力;
                                                           // 仅挖矿用, 不连带 WorkStation 等)
-    public static final double DIG_DIRECT_DIST_SQR = 16.0; // 4 格球 — 扫描目标直接开脉 (v79.58 跟随
+    public static final double DIG_DIRECT_DIST_SQR = 16.0; // 4 格 — 内直接开脉 ✓ (同上) // 4 格球 — 扫描目标直接开脉 (v79.58 跟随
                                                            // 破块门 — 4 格内直接挖, 不走寻路)
 
 }

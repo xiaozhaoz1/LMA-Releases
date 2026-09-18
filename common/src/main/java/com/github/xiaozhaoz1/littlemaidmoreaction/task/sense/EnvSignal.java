@@ -4,7 +4,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.task.sense;
  * 环境感知信号枚举 (v63, v79.47 补 8; v79.58 删 MONSTER 2; v79.61x 死信号同族清理
  * — 删 DARKNESS_CLEAR + RAINING/THUNDER_START/DIMENSION_CHANGE/TIME_SEGMENT/BIOME_CHANGE/
  * STRUCTURE_ENTER/LEAVE/FRIENDLY_NEARBY/FRIENDLY_CLEAR/MAID_CLEAR 共 11 个零消费信号,
- * 剩 8 个全部有消费方) — 边沿触发的环境事件。
+ * v79.62.5: 删温度 3 (TEMP_COLD/HOT/NORMAL — 温度边沿检测删, TLM 覆盖) — 剩 6 个有消费方) — 边沿触发的环境事件。
  *
  * <p>广播器每 200 tick 对比 prev/now 快照，生成命中信号。
  * 被动任务 Pipeline 在 {@code validate()} 中声明需要的信号，
@@ -17,14 +17,6 @@ public enum EnvSignal {
     SNOWING,
     /** 天气转晴 (雨→晴边沿) */
     WEATHER_CLEAR,
-
-    // ── 温度 (TempAdaptPipeline) ──
-    /** 进入寒冷区域（温度 < cold_threshold 默认0.15） */
-    TEMP_COLD,
-    /** 进入炎热区域（温度 > hot_threshold 默认1.0） */
-    TEMP_HOT,
-    /** 返回常温 */
-    TEMP_NORMAL,
 
     /** 进入黑暗（光照 < darkness_threshold 默认7） — TorchLightPipeline */
     DARKNESS,

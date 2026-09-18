@@ -3,7 +3,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.PathingApi;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.ChainHarvestExecute;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.ChainHarvestExecute;
 //? if 1.20.1 {
 import net.minecraftforge.event.entity.EntityLeaveLevelEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;

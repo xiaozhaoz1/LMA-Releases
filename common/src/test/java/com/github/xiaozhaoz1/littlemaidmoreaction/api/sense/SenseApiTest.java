@@ -12,10 +12,8 @@ import static org.junit.jupiter.api.Assertions.*;
 class SenseApiTest {
 
     @Test
-    @DisplayName("tempCategory/timeSegment 委托 EnvRules (边界)")
+    @DisplayName("timeSegment 委托 EnvRules (边界)")
     void pureLogic_delegatesToEnvRules() {
-        assertEquals("COLD", SenseApi.tempCategory(0.0f));
-        assertEquals("WARM", SenseApi.tempCategory(1.0f));
         assertEquals("DAY", SenseApi.timeSegment(0));
         assertEquals("NIGHT", SenseApi.timeSegment(15000));
         assertEquals("DAWN", SenseApi.timeSegment(23000));
@@ -37,11 +35,9 @@ class SenseApiTest {
     }
 
     @Test
-    @DisplayName("envConfig 构造透传")
+    @DisplayName("envConfig 构造透传 (v79.62.5 温度阈值删, 仅黑暗阈值)")
     void envConfig_passthrough() {
-        var cfg = SenseApi.envConfig(0.15f, 1.0f, 7);
-        assertEquals(0.15f, cfg.coldThreshold());
-        assertEquals(1.0f, cfg.hotThreshold());
+        var cfg = SenseApi.envConfig(7);
         assertEquals(7, cfg.darknessThreshold());
     }
 }

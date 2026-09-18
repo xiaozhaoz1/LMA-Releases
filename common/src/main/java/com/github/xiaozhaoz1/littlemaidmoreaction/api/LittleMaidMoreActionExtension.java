@@ -19,7 +19,6 @@ import java.util.List;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaMagicCastingProvider;
 import com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskTypeRegistry;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.AutoCropHandler;
 import com.github.xiaozhaoz1.littlemaidmoreaction.resource.DynamicAnimationResources;
 import com.github.xiaozhaoz1.littlemaidmoreaction.storage.StartupLoader;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.api.TaskRegistry;
@@ -112,9 +111,9 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
         if (com.github.xiaozhaoz1.littlemaidmoreaction.compat.CompatToggle.isModuleEnabled("create")
                 && net.neoforged.fml.ModList.get().isLoaded("create")) {
 //?}
-//? if 1.20.1 {
+            // v79.62.3: 双平台注册 (1.20.1/1.21.1 一致) — 之前 stonecutter 把 neoforge 剥掉,
+            // 日志却假装「已注册」; create 1.21.1 已兼容 (21.1.247 ≥ 228), 放开分支
             manager.add(com.github.xiaozhaoz1.littlemaidmoreaction.compat.create.task.assembly.MaidAssemblyTask.get());
-//?}
             LittleMaidMoreAction.LOGGER.info("[LMA] MaidAssemblyTask 已注册");
         }
     }
@@ -125,7 +124,8 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
      */
     @Override
     public void registerSpecialCropHandler(SpecialCropManager manager) {
-        // v79.62: 不再注册 AutoCropHandler — 新 farm 区域制种菜 (CropRegistry + FarmExecute)
+        // v79.62: 该钩子退役 — 新 farm 区域制种菜 (CropRegistry + FarmExecute);
+        // v79.63: 原 AutoCropHandler 实现类已删除 (死代码: 钩子退役后零调用)
         LittleMaidMoreAction.LOGGER.info("[LMA] TLM 耕种白名单钩子已退役 (改用 LMA farm 区域制种菜)");
     }
 
@@ -163,6 +163,28 @@ public final class LittleMaidMoreActionExtension implements ILittleMaid {
     public void bindMaidBauble(com.github.tartaricacid.touhoulittlemaid.item.bauble.BaubleManager manager) {
         com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkBaubleRegistry.bind(manager);
         LittleMaidMoreAction.LOGGER.info("[LMA] 酒狐奶饰品已注册 (tamed_milk_bucket / wild_dogmilk)");
+        // v79.72: Token (可食 · 佩戴给生命恢复 I) ✓
+        com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenBaubleRegistry.bind(manager);
+        LittleMaidMoreAction.LOGGER.info("[LMA] Token 饰品已注册 (token)");
+    }
+
+    /**
+     * 手持 Token 对准女仆时的 **HUD 提示** — v79.74 补 ✓
+     *
+     * <p>用户实测: "喂金苹果有提示, 喂 Token 没提示" ✓ ⇒ 金苹果那条提示的真实来源就在这里
+     * ({@code MaidTipsOverlay#addTips(langKey, Item...)} ✓ — TLM 把金苹果/指南针/牛奶桶等都注册在同一处 ✓);
+     * TLM 官方文档 §二「添加文本提示」亦明说走 {@code ILittleMaid#addMaidTips} ✓
+     * ⇒ **不是聊天框** ✗ 也**不是女仆气泡** ✗ (用户裁定: 喂个 token 不必弹聊天框 ✓)。
+     */
+//? if 1.20.1 {
+    @Override
+    @net.minecraftforge.api.distmarker.OnlyIn(net.minecraftforge.api.distmarker.Dist.CLIENT)
+//?} else {
+    @Override
+//?}
+    public void addMaidTips(com.github.tartaricacid.touhoulittlemaid.client.overlay.MaidTipsOverlay maidTipsOverlay) {
+        maidTipsOverlay.addTips("overlay.littlemaidmoreaction.token.tips",
+                com.github.xiaozhaoz1.littlemaidmoreaction.init.LmaItems.TOKEN.get());
     }
 
     // ── 预留扩展钩子 (待实现) ──

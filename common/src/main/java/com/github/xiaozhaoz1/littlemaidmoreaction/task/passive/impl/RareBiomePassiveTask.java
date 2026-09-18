@@ -70,7 +70,7 @@ public final class RareBiomePassiveTask implements PassiveTask {
         // 主人聊天 (不只气泡)
         var owner = maid.getOwner();
         if (owner instanceof net.minecraft.server.level.ServerPlayer sp) {
-            sp.sendSystemMessage(Component.literal("§b[女仆] ")
+            sp.sendSystemMessage(Component.translatable("msg.littlemaidmoreaction.maid_prefix")
                     .append(Component.translatable("lma.rare_biome.found", name)));
         }
         // 记录去重

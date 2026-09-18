@@ -41,16 +41,6 @@ public final class PassiveTaskConfig {
     public static final ModConfigSpec.IntValue ENV_MAX_HITS;
 //?}
     // ── 环境感知阈值 (默认对齐 TLM) ──
-//? if 1.20.1 {
-    public static final ForgeConfigSpec.DoubleValue ENV_COLD_THRESHOLD;
-//?} else {
-    public static final ModConfigSpec.DoubleValue ENV_COLD_THRESHOLD;
-//?}
-//? if 1.20.1 {
-    public static final ForgeConfigSpec.DoubleValue ENV_HOT_THRESHOLD;
-//?} else {
-    public static final ModConfigSpec.DoubleValue ENV_HOT_THRESHOLD;
-//?}
     // ── 环境感知扩展 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.IntValue ENV_PLAYER_GATE_RADIUS;
@@ -259,12 +249,6 @@ public final class PassiveTaskConfig {
         ENV_MAX_HITS = b
                 .comment("每感知器命中结果上限")
                 .defineInRange("max_hits_per_sensor", 32, 1, 256);
-        ENV_COLD_THRESHOLD = b
-                .comment("太冷判定阈值 (女仆位置温度低于此值触发 env_too_cold, TLM COLD 档默认 0.15)")
-                .defineInRange("cold_threshold", 0.15, -1.0, 2.0);
-        ENV_HOT_THRESHOLD = b
-                .comment("太热判定阈值 (女仆位置温度高于此值触发 env_too_hot, TLM 判热默认 1.0)")
-                .defineInRange("hot_threshold", 1.0, 0.0, 2.0);
         ENV_PLAYER_GATE_RADIUS = b
                 .comment("玩家门控半径: 仅此范围内的女仆参与环境感知, 0=不门控 (v37.2)")
                 .defineInRange("player_gate_radius", 20, 0, 256);
@@ -387,8 +371,6 @@ public final class PassiveTaskConfig {
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_SCAN_INTERVAL);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_DEFAULT_RADIUS);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_MAX_HITS);
-        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_COLD_THRESHOLD);
-        MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_HOT_THRESHOLD);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_PLAYER_GATE_RADIUS);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_DARKNESS_THRESHOLD);
         MoreActionConfig.reg(PASSIVE_VALUES, "passive", ENV_STRUCTURE_ENABLED);

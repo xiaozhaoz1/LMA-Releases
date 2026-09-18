@@ -35,55 +35,58 @@ public class AiControlConfigScreen extends LmaTaskConfigScreen<AiControlConfigMe
 
     // ── initAdditionWidgets: 请求配置 + 文本框 + 保存按钮 (TLM 标准钩子; renderBg 基类默认委托) ──
 
+    /** 布局 (规范 v79.63.8): 行0 模型名 · 行1 声线 · 行2 保存/恢复 · 行3 变假人 (各 26t 间距, 控件 20 高) */
     @Override
     protected void initAdditionWidgets() {
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), getTaskType());
 
-        int cx = contentX();
-        int y = contentY();
+        int labelX = contentX();
+        int rowW = contentRight() - contentX();   // v79.63.22 (用户): 控件占满整行 ✓
+        int rowX = contentX();
 
-        providerBox = new EditBox(font, cx, y, 120, 18, Component.literal("LLM 模型名称"));
+        providerBox = tipBox(rowX, rowY(0) - 2, rowW,
+                Component.translatable("screen.littlemaidmoreaction.ai.provider"),
+                Component.translatable("screen.littlemaidmoreaction.ai.provider.tip"));
         providerBox.setMaxLength(64);
         providerBox.setValue(getMenu().getConfig().getString(AiControlPipeline.KEY_PROVIDER));
         addRenderableWidget(providerBox);
-        y += 22;
 
-        voiceBox = new EditBox(font, cx, y, 120, 18, Component.literal("声线名称"));
+        voiceBox = tipBox(rowX, rowY(1) - 2, rowW,
+                Component.translatable("screen.littlemaidmoreaction.ai.voice"),
+                Component.translatable("screen.littlemaidmoreaction.ai.voice.tip"));
         voiceBox.setMaxLength(64);
         voiceBox.setValue(getMenu().getConfig().getString(AiControlPipeline.KEY_VOICE));
         addRenderableWidget(voiceBox);
-        y += 26;
 
-        addRenderableWidget(Button.builder(Component.literal("保存设置"), b -> save())
-                .pos(cx, y).size(80, 20).build());
-        addRenderableWidget(Button.builder(Component.literal("恢复全局默认"), b -> resetToGlobal())
-                .pos(cx + 84, y).size(90, 20).build());
-        y += 24;
+        int half = rowW / 2;
+        addRenderableWidget(tipBtn(Component.translatable("screen.littlemaidmoreaction.ai.save"),
+                rowX, rowY(2) - 2, half - 4, this::save,
+                Component.translatable("screen.littlemaidmoreaction.ai.save.tip")));
+        addRenderableWidget(tipBtn(Component.translatable("screen.littlemaidmoreaction.ai.reset"),
+                rowX + half, rowY(2) - 2, rowW - half, this::resetToGlobal,
+                Component.translatable("screen.littlemaidmoreaction.ai.reset.tip")));
 
-        // 变成假人 — 任务运行中点击 → 生成假人 + 自动设模型/同步状态 + 女仆收石板
-        addRenderableWidget(Button.builder(Component.literal("变成假人 (AI 操控)"), b -> transformToFake())
-                .pos(cx, y).size(120, 20).build());
+        addRenderableWidget(tipBtn(Component.translatable("screen.littlemaidmoreaction.ai.transform"),
+                rowX, rowY(3) - 2, rowW, this::transformToFake,
+                Component.translatable("screen.littlemaidmoreaction.ai.transform.tip")));
     }
 
-    // ── renderAddition: 当前生效值 (per-maid 或全局回退) ──
-
+    /** 当前值以标签位显示 (左列, 行0/行1) */
     @Override
     protected void renderAddition(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
         CompoundTag cfg = getMenu().getConfig();
-        int cx = contentX();
-        int y = topPos + 136;   // 下移避开按钮区 (编辑框 34/56, 按钮 80/104)
-        String p = cfg.getString(AiControlPipeline.KEY_PROVIDER);
-        if (p.isEmpty()) p = ActiveTaskConfig.AI_LLM_PROVIDER.get();
-        String v = cfg.getString(AiControlPipeline.KEY_VOICE);
-        if (v.isEmpty()) v = ActiveTaskConfig.AI_VOICE.get();
-        g.drawString(font, Component.literal("模型: " + (p.isEmpty() ? "(未设置)" : p)), cx, y, 0xFFFFFF);
-        y += 14;
-        g.drawString(font, Component.literal("声线: " + (v.isEmpty() ? "(未设置)" : v)), cx, y, 0xFFFFFF);
-        y += 14;
-        g.drawString(font, Component.literal("名称 = Numen 面板 (G键) 创建的模型/声线条目名, 空 = 全局默认"), cx, y, 0xAAAAAA);
-        y += 16;
-        g.drawString(font, Component.literal("变成假人: 女仆收石板, 假人自动继承模型/血量"), cx, y, 0xFFD700);
+        String pv = cfg.getString(AiControlPipeline.KEY_PROVIDER);
+        if (pv.isEmpty()) pv = ActiveTaskConfig.AI_LLM_PROVIDER.get();
+        String vv = cfg.getString(AiControlPipeline.KEY_VOICE);
+        if (vv.isEmpty()) vv = ActiveTaskConfig.AI_VOICE.get();
+        boolean perMaid = cfg.contains(AiControlPipeline.KEY_PROVIDER) || cfg.contains(AiControlPipeline.KEY_VOICE);
+        drawLabel(g, Component.translatable("screen.littlemaidmoreaction.ai.provider_label",
+                pv.isEmpty() ? "—" : pv, Component.translatable(perMaid
+                        ? "screen.littlemaidmoreaction.scope.per_maid"
+                        : "screen.littlemaidmoreaction.scope.global")), 0);
+        drawLabel(g, Component.translatable("screen.littlemaidmoreaction.ai.voice_label",
+                vv.isEmpty() ? "—" : vv), 1);
     }
 
     // ── 业务 ──

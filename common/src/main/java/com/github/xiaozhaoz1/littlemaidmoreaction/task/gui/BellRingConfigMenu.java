@@ -12,7 +12,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class BellRingConfigMenu extends LmaTaskConfigContainer {
 
     public BellRingConfigMenu(int containerId, Inventory playerInv, int maidId) {
-        super(LmaMenus.BELL_RING_CONFIG_MENU, containerId, playerInv, maidId);
+        super(LmaMenus.BELL_RING_CONFIG_MENU.get(), containerId, playerInv, maidId);
     }
 
 }

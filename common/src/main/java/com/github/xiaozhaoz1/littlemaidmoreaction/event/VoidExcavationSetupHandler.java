@@ -4,6 +4,7 @@ import com.github.tartaricacid.touhoulittlemaid.api.event.InteractMaidEvent;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskDispatcher;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -61,7 +62,7 @@ public final class VoidExcavationSetupHandler {
         CustomData cd = held.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
         CompoundTag tag = cd.copyTag();
 //?}
-        NbtCodecs.writeBlockPos(tag, KEY_START, pos);
+        NbtCodecs.writeBlockPos(tag, TaskKeys.MARK1, pos);   // v79.63: 统一通用标记槽 (原写私有 void_start ⇒ 与 block_interact 抢键)
 //? if !1.20.1 {
         held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 //?}
@@ -90,9 +91,9 @@ public final class VoidExcavationSetupHandler {
             event.setCanceled(true);
             return;
         }
+        // v79.63 (用户裁定): 非本任务**静默让位** — 只有匹配任务的 handler 发言
+        //   (原先在此发"切到挖空置域/填坝排水"属于越权提示, 用户明确反感)
         if (!"void_excavation".equals(maidTask)) {
-            player.sendSystemMessage(Component.literal("§e女仆当前任务: "
-                    + (maidTask == null ? "idle" : maidTask) + " — 切到「挖空置域」或「填坝排水」任务再右键写入"));
             return;
         }
 //? if 1.20.1 {
@@ -101,13 +102,15 @@ public final class VoidExcavationSetupHandler {
         CustomData cd = held.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
         CompoundTag tag = cd.copyTag();
 //?}
-        if (!tag.contains(KEY_START)) {
-            player.sendSystemMessage(Component.literal("§c请先用木棍右键一个方块标记起点"));
+        if (!tag.contains(TaskKeys.MARK1) && !tag.contains(KEY_START)) {
+            player.sendSystemMessage(Component.translatable("msg.littlemaidmoreaction.void.need_start"));
             return;
         }
-        BlockPos start = NbtCodecs.readBlockPos(tag, KEY_START);
+        BlockPos start = tag.contains(TaskKeys.MARK1)   // v79.63: 通用槽优先, 旧 void_start 兼容读
+                ? NbtCodecs.readBlockPos(tag, TaskKeys.MARK1)
+                : NbtCodecs.readBlockPos(tag, KEY_START);
         if (start == null) {
-            player.sendSystemMessage(Component.literal("§c起点无效，请重新标记"));
+            player.sendSystemMessage(Component.translatable("msg.littlemaidmoreaction.void.bad_start"));
             return;
         }
         // 写女仆持久进度 cfg (v79.62.1: 挖空超长任务 — 进度存 lma_cfg 持久 NBT,
@@ -164,13 +167,15 @@ public final class VoidExcavationSetupHandler {
         CustomData cd = held.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY);
         CompoundTag tag = cd.copyTag();
 //?}
-        if (!tag.contains(KEY_START)) {
-            player.sendSystemMessage(Component.literal("§c请先用木棍右键一个方块标记起点"));
+        if (!tag.contains(TaskKeys.MARK1) && !tag.contains(KEY_START)) {
+            player.sendSystemMessage(Component.translatable("msg.littlemaidmoreaction.void.need_start"));
             return;
         }
-        BlockPos start = NbtCodecs.readBlockPos(tag, KEY_START);
+        BlockPos start = tag.contains(TaskKeys.MARK1)   // v79.63: 通用槽优先, 旧 void_start 兼容读
+                ? NbtCodecs.readBlockPos(tag, TaskKeys.MARK1)
+                : NbtCodecs.readBlockPos(tag, KEY_START);
         if (start == null) {
-            player.sendSystemMessage(Component.literal("§c起点无效，请重新标记"));
+            player.sendSystemMessage(Component.translatable("msg.littlemaidmoreaction.void.bad_start"));
             return;
         }
         CompoundTag cfg = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.MaidData.cfgOrCreate(maid, "dam_fill");

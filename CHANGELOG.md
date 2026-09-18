@@ -5,24 +5,655 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.9.63 (2026-08-31) — 填坝排水 dam_fill 新任务 + 挖空置域大修 + 温度感知触发语义
+## 0.9.74 (2026-09-18) — Token 定稿 (透明贴图 + 创造栏可见)
 
-- **新任务 dam_fill 填坝排水 (两模式独立)**: 填坝=只筑墙 (四方向, 重力方块自落填充, 检测列堆顶到 topY) / 排水=只排水 (按排从墙边往里, 液体→空气+粒子+舀水声); cfg 只存标记配置, 游标全 PD 内存; 任务期间 HOME + 水下呼吸
-- **挖空置域修复**: 液体提前空气化+相邻扫描+清缓存 / 脚下 >2 格深矿扫描排除 / 矿必须裸露才挖 (6 邻面至少 1 面空气) / 导航 navGoal=target.above + 5s 尝试→2s CD→2 次→跳过集 10s / 递归 idleScan 卡死修复 / ChunkWorkArea 3 点 restrict 防拉回 / 挖产物遍历全槽入包 / 认领后自动传送
-- **温度感知**: 触发即写 5 分钟 CD + tick CD 未冷却 cancelPassive + 到火/水旁立即 CD+结束 (删 30 秒停留)
-- **导航重试**: 5 秒尝试 → 2 秒 CD → 2 次失败进跳过集 10 秒 (SKIP_TTL 60→200)
-- 版本 0.9.62 → 0.9.63 (双平台)
-- 验证: 双编译 --no-build-cache ✅ + 单测 474 用例 0 失败 ✅ + gametest 48/48 ✅
+> 0.9.73 是本功能的首版打包, **未对外发布**; 本版为定稿 (取代 0.9.73)。
+
+### Fixed / Changed (相对 0.9.73)
+- **贴图换透明版**: 原用 `token.jpg` (JPG **白底** ✗ ⇒ 游戏里是白方块) ⇒ 改用 `token.png` (源 2048²
+  `Format32bppArgb` ✓) 转 128×128, 转换用 `CompositingMode=SourceCopy` (直拷像素, 避免半透明边缘被底混色 ✗)
+  ⇒ 实测产物四角/边缘 `alpha=0` ✓ 中心 `alpha=255` ✓ jar 内 `colorType=6 (RGBA)` ✓
+- **创造栏可见**: `LmaCreativeTab.displayItems` 是**显式列物品**的 ⇒ 原先创造栏**翻不到 Token** ✗ (只能 /give)
+  ⇒ 已加入双平台分支 ✓ (反编译 jar 内 `LmaCreativeTab` 含 `TOKEN` ✓)
+### Testing (基建, 不影响玩法)
+- gametest flaky **家族**放宽等待窗口 (语义不变): `lmaVoidExcavationMultiMaid` 200→500t (timeout 400→900) ·
+  `lmaChainOreNeighbourChunk` 600→1800t (timeout 1300→2600) ⇒ 改后实测: 两项**双平台转绿** ✓
+  (neo 全绿; forge 这轮暴露同族另两个 — 已记入基线行"flaky 家族 + 长期正解=轮询到截止" ✓)
+### 验证
+双编译 ✓ · 单测 **88 类 557 用例 0 失败** ✓ (部署前门禁) · jar 内 `version = "0.9.74"` + 透明 PNG + 配方 +
+Token 三件套齐 ✓ · 部署 `.bak-0918a` ✓ · 交付副本 `D:\claudecode\release-0.9.74\` ✓
+## 0.9.73 (2026-09-18) — 新功能: Token (可食用 · 女仆饰品)
+
+### Added
+- **Token** — 用户需求: 可食用 + 可当女仆饰品 ✓
+  - **食用 (三路径同一套结算 ✓)**: +2 饱食度 · **回 5 点血** · **30s「缓慢恢复 I」** ✓
+    (① 玩家吃 ② 右键喂女仆 = `TokenFeedHandler`/`InteractMaidEvent` ③ 女仆吃自己背包的 = `finishUsingItem`)
+  - **佩戴**: `TokenBauble.onTick` 每 40t 补 60t 的「生命恢复 I」⇒ 不断档 ✓; **摘下即清** ✓
+  - **可堆叠 64 + 可作饰品**(TLM `BaubleItemHandler` 只判"是否注册过的饰品", `getSlotLimit` 无覆写 ⇒ 上限=物品堆叠数 ✓
+    已 fact-forcing 实证) ⇒ 16 个的合成产出成立 ✓
+  - **配方**: 8 个**青金石**围一圈(中间空) ⇒ **16 个** ✓ 双平台照既有 cake 配方格式
+    (1.20.1 `recipes/` 复数 + `result.item/count` + `show_notification`; 1.21.1 `recipe/` 单数 + `result.count/id` ✓)
+  - **素材**: `token.jpg` (2048²) ⇒ 128×128 PNG 进包 ✓
+### Added (测试)
+- **gametest `lmaTokenEffects`**: ① 结算(补血到 15 / 饱食 +2 / 恢复 I 600t) ② 佩戴 60t 仍持有(且时长为饰品自身短刷新 ≤60t)
+  ③ 摘下 70t 后消失 ✓ 双平台通过 ✓
+- **单测 `TokenSpecGuardTest`** (3 例): 效果数值常量 / 配方(形状 8 格环 + 空中心 + 青金石 + 产出 16 + 双平台目录与 result 格式) / 资源三件套 ✓
+### 验证
+双编译 ✓ · 单测 **88 类 557 用例 0 失败** ✓ · gametest **117 例**(forge/neo 均仅既有 flaky 红:
+`lmachainoreneighbourchunk` / `lmavoidexcavationmultimaid`) ✓ · jar 内 recipe/png/model/handler 齐 ✓ · 部署 `.bak-0917x` ✓
+## 0.9.72 (2026-09-18) — 修「应力配置改了但读数不变」: 写 BE 字段 ≠ 生效, 必须 dirty 动能网络
+
+### Fixed
+- **皮带发电应力配置不生效 (第二层根因)**: 用户把「杂项 → 皮带发电应力」改成 100000, 日志显示字段已是
+  `stress=100000.0` ✓ 但 Create 护目镜仍显示 **1024** (改配置**之前**算出的旧容量) ✗
+  根因: `MaidPowerBeltBlockEntity.setGeneratedOutput` 只写 `generatedSpeed/generatedCapacity` 两个字段,
+  **没有 dirty 动能网络** ⇒ Create 的应力容量是**网络级缓存**, 不重算就永远用旧值 ✗
+  (fact-forcing 实证: javap 本地 `create-1.20.1-6.0.8.jar` ⇒ `KineticBlockEntity` 有
+  `public boolean networkDirty`, 另有 `updateSpeed` 只管转速路径 ✓)
+  ⇒ 修法: 值真的变化时 `networkDirty = true` ✓ (调用方每 tick 调, 幂等闸门在方法开头 ✓)
+- **日志刷屏**: `[MaidPowerBeltBlock] direct …` 原本每 sprint tick 都打 (实测 **5842 行** ✗) ⇒ 移入 BE 的
+  "值真的变了"分支并改名 `[MaidPowerBelt] 输出变更: rpm=… capacity/每RPM=… ⇒ 总应力=…` ✓ (刷屏 → 个位数)
+
+### 说明 (与 0.9.71 的关系 — 两层根因)
+- 第一层 (0.9.71 已修): 魂符收放后 FSM 卡在旧分支 ⇒ 她进不了 running ⇒ 应力路径根本不跑 ✓
+- 第二层 (本版): 即便跑起来了, **写 BE 字段也不会被 Create 采纳** ⇒ 必须显式 dirty 网络 ✓
+  ⚠ 0.9.71 的 changelog/错题 #358 里"修好后下一次 sprint 即生效"的说法**不完整** ✗ ⇒ 已在 #358 内更正,
+  并新增 **#359** 记录该教训 ✓
+
+### 验证 (0.9.72)
+双编译 ✓ · 单测 **87 类 554 用例 0 失败 0 错误** ✓ · gametest **forge 116/116 全绿** ✓ · neo 仅既有 flaky
+`lmavoidexcavationmultimaid` 红 (与本改动无关) · jar 内 `version = "0.9.72"` ✓ · 部署 `.bak-0917o` + md5 双端一致 ✓
+
+
+### 补充修复 (同版 0.9.72, 未升号 — 用户裁定: 没修好不上号)
+- **「配置 100000 仍读到 1024」的真根因 (第三层)**: **两个 writer 打架** ✗ —
+  ① direct 路径 (女仆 sprint ⇒ `setDirectOutput(rpm, customStress)`) 写 100000 ✓
+  ② **表面速度链路** (`MaidPowerBeltBlockEntity.applyDetectedSurfaceMovement` → `setGeneratedOutput`) 每个检测
+  周期用**采样值**覆盖它 ✗ ⇒ 护目镜读到 1024 (采样/老公式值) ✓
+  ⇒ 修法: direct 输出**权威化** — 记录 `lastDirectOutputTick`, 表面链路在 **40t 窗口内 yield**
+  (女仆 sprint 期间 direct 每 tick 刷新 ⇒ 持续权威 ✓; 停 sprint 后窗口过期 ⇒ 采样链路自然接管 ✓)
+- **日志降噪**: `[MaidPowerBelt] 输出变更` 改按**总应力**判定 (rpm/换算容量随蛋糕数抖动时不刷屏 ✓
+  实测曾 600~5842 行 ✗)
+
+### 补充修复 2 (同版 0.9.72) — 「Cloth 设置屏没挂保存回调」(含全量配置写入审计: 5 Spec × 全部落盘入口 ⇒ 仅此屏漏挂, 其余健全 ✓; 并已对齐多人同步 `ConfigSyncPacket.send()` ✓)⇒ 改了的设置重启就回默认
+
+- **现象**: 用户把「杂项 → 发电皮带应力」改成 100000 ⇒ 当次会话日志里确实读到 100000 ✓, 但**每次进游戏又变回 -1** ✗
+  ⇒ 应力永远 1024 ✓ (前三条修复 — FSM 分派键 / networkDirty / 双 writer — 都真实存在且已修 ✓, 但都
+  **不是**用户看到 1024 的原因 ✗)
+- **根因**: `ClothSettingsScreen.create(...)` 只给每个条目挂了 `setSaveConsumer(值::set)`(只写**内存 spec** ✗),
+  **没有** `.setSavingRunnable(MoreActionConfig::saveAll)` ✗ ⇒ 没人调 `ACTIVE_SPEC.save()` ⇒ TOML 里
+  **从没有这个键** ✓ (实证: `config/littlemaidmoreaction-common.toml` 只有 `[debug]` ✗)
+  **对照物**: 同类屏 `TaskSettingsScreen.java:303` **有** `setSavingRunnable` ✓ ⇒ 只有本屏漏 ✗
+- **修法**: builder 链上补 `.setSavingRunnable(MoreActionConfig::saveAll)` ✓ (= 该屏**所有**设置恢复可落盘 ✓)
+- **验证**: 双编译 ✓ · 单测 87 类 554 用例 0 失败 ✓ · jar 内 `ClothSettingsScreen` 已含保存回调 (反编译 ✓) ·
+  同版 0.9.72 重新打包部署 (旧的轮换成 `.bak-0917q`) + md5 双端一致 ✓
+## 0.9.71 (2026-09-18) — 修「魂符收放后传送带不再变发电」+ 转换路径可观测性
+
+### Fixed
+- **魂符收放后无法再转成发电皮带** (用户实测): `converted` 是跑步带 FSM 的**分派键**, 而
+  `RunningBeltPipeline.onMaidUnload` 只清 `target` **不清 `converted`** ✗ (且清理语句放在 `anchor == null`
+  **早退之后** ⇒ 无锚点时连清理都跳过 ✗) ⇒ 女仆被魂符放回后永远进 `tickRunning`, 回不到
+  "站上去 → 转换"的 `tickSearching` 分支 ✗
+  ⇒ 修法: ① `onMaidUnload` **第一条语句**清 `converted` ✓ ② `tick()` 里 `converted=true` 时**校验绑定**
+  (锚点已非发电皮带/无锚点 ⇒ 清两键 + 冷却归零 ⇒ 立即回 searching 重新转换) ✓
+- **「应力改了没变」是连带, 不是配置没绑对**: Cloth 「杂项」↔ `ActiveTaskConfig.POWER_BELT_STRESS` ↔
+  方块侧 `MaidPowerBeltBlock` 每 tick **活读** = 同一个 spec 值 ✓; 但她既然回不到 running/sprint,
+  `setDirectOutput` 永不调用 ⇒ 2048 无从体现 ✓ (修好转 换后下一次 sprint 即生效 ✓)
+
+### Added (可观测性 — 本次排查被"全静默"坑了)
+- `RunningBeltService.convertToMaidPowerBelt`: 5 类失败原因**节流日志** (`gameTime % 200`) + 成功一行 ✓
+
+### Added (回归)
+- gametest `lmaRunningBeltRebindAfterUnload`: 卸载回调后 **`converted` 必须被清** ✓ (修前必红) —
+  按用户裁定**降级为只验 PD 状态契约** (gametest 环境 Create 皮带/BE 不可构造, 报 `IBE`/`BeltBlock`),
+  **真实"再站上去能再转换"链路待实机验证** ✓
+
+### 验证 (0.9.71)
+双编译 ✓ · 单测 **87 类 554 用例 0 失败 0 错误** ✓ · gametest **forge 116/116 全绿** ✓ ·
+neo 116 例仅 `lmavoidexcavationmultimaid` 红 = **既有 flaky** (与本改动无关: 同提交 forge 全绿) ✓ ·
+jar 内 `version = "0.9.71"` + 动画仅 haqi/maimeng ✓ · 部署 `.bak-0917n` + md5 双端一致 ✓
+
+## 0.9.70 (2026-09-18) — 修外部玩家崩溃「畸形动画关键帧」+ 动画预设精简为 2 个 + 空置域 home 还原
+
+### Fixed
+- **外部玩家 GeckoLib 加载崩溃** (`GeckoLibException: …/animations/dodge.animation.json` +
+  `Invalid keyframe data - multiple starting keyframes?`): 该文件 `animation.flash1` 的 **13 个骨骼通道全部**
+  键序为 `'1'` → `'-0.03'` → `0.3…1.97` (**首键不在时间轴开头且非单调**) ⇒ GeckoLib 4 解析 **MAP 形式**
+  按**文件键序**建关键帧表 ⇒ 判非法 ✗ (同文件 `flash2` 正常; 全仓 60 动画/1100+ 通道仅此 13 处; 与旧检出
+  逐字节相同 = 历史遗留, TLM/GeckoLib 校验收紧后才爆)
+- **空置域任务结束 home 不还原**: `VoidExcavationPipeline.tick` 的"记录 wasHome + 强制 home"块**每 tick 都跑**,
+  第 2 tick 起把第 1 tick 记的 `false` **覆盖成 `true`** ⇒ `onCleanup` 的 `!wasHome` 判定失败 ⇒ home 永不关 ✗
+  ⇒ 改为「**只记一次**」(与 `DamFillPipeline.ensureHomeMode` 同款) ✓
+
+### Changed (用户裁定: 动画只留 哈气 haqi + 卖萌 maimeng)
+- **删除 6 个废弃预设**: `execution` / `dodge` / `taunt` / `parry` / `man` / `ysm_slashblade`
+  (无代码消费者; jar 体积 **-1.6 MB**) — 兜底自检表 `AnimationDurationManager.FALLBACK_ANIMATIONS` 同步改为只校验 `haqi`/`maimeng` ✓
+- **老玩家 config 目录自动清理** (`AnimationPresetNames.syncConfigDir`): 该目录是 LMA 专属 ⇒ `load()`/`reload()`
+  都对照 **JAR 内实际文件**，**删除所有不在 JAR 里的 `*.animation.json`** (只补缺失的复制逻辑删不掉旧文件,
+  而 `scanAnimations` 扫的是目录 ⇒ 畸形文件会继续崩 ✗) ✓
+
+### Added (守护)
+- `AnimationPresetGuardTest` (4 例): ① 随包动画**关键帧必须升序** ② 随包清单 == resources 实际文件
+  ③ config 目录对照 JAR 清理 (只删动画文件/保留在用/幂等) ④ 自检表键都在随包动画里 ✓
+  (探针实测: 把畸形 `dodge.animation.json` 临时放回 ⇒ **BUILD FAILED** ✓)
+
+### 验证 (0.9.70)
+双编译 ✓ · 单测 **87 类 554 用例 0 失败 0 错误 0 跳过** ✓ · gametest **forge 115/115 · neoforge 115/115** ✓ ·
+逐节点 clean+jar ✓ · jar 内 `version = "0.9.70"` + 动画仅 `haqi`/`maimeng` ✓ · 部署 `.bak-0917m` + md5 双端一致 ✓
+
+### ⚠ 已知未修 (根因已查明, 见错题 #357)
+「空置域已关闭仍被拉回」(跑步机强制 home 时女仆被 TLM `restrictTo(workPos)` 传送回坑): 根因 = `adaptToChunk`
+改的 `SchedulePos` 三点**会落盘**, 而卸载路径只释放区块认领**不还原**; 本版曾尝试"原点持久化 + 结束/卸载/重进
+还原", 但引入 neo 回归 (`lmavoidexcavationmultimaid` dug=0/4) ⇒ **整体回滚** (代码已恢复原行为, 死代码待清) ✗
+
+## 0.9.69 (2026-09-17) — 丢物品族**全仓审计** + 3 处"退还余量"硬化 (规则升格 README 契约)
+
+> 用户裁定: "看下其他代码有没有同样错误" ⇒ 8 类丢物模式全仓扫描 (393 main 文件) ⇒ 收掉 3 处低风险硬化点。
+
+### Audited (结论: 真实缺陷仅 dam_fill 一处, 已于 0.9.68 修)
+扫描面: 覆盖写手 16 · 库存槽覆盖 20 · `insertItem` 返回值 45 · `extractItem` 返回值 37 · `removeItem` 3 ·
+`copy()`+`shrink/setCount/grow` 7 · `setCount(0)` 1 · `shrink(` 16。
+- **覆盖写手** 全部有保全 (Assembly save/restore · NearbyCollect 塞不进则不换手 · WorkEat 旧物先入包 ·
+  TorchLight 灯先回包才清副手 · BlockUp `HandSwap` 三链 · LmaPlayerSimulator 回写前旧物入包/落地 · HandSwap 原语本身) ✓
+- **槽覆盖** 装配机器槽全部"写前判空 / 余量交调用方 / 产物 `deposit` 背包→无线→落地"; 配方匹配用的临时 handler 非玩家物品 ✓
+- **返回值丢弃** 4 处故意消耗 (射箭/弹碟/放软块/装配耗材); "赋值后从未使用"机械扫 **0 命中** ✓
+- **copy+改** 7 处全是"先验证存入成功, 再扣源栈"的正确写法 ✓
+
+### Fixed (硬化 3 处"退还余量未接" — 不可复现, 防 mod 容器拒收)
+- `VoidExcavationContainerService` (工具溢出退还输入箱) → 余量 `ItemSpawner.spawnForPickup` 落地待拾 ✓
+- `ContainerOutput.depositItemStack` (退还女仆背包槽) → 余量 `HandSwap.stashOrDrop` (背包 → 落地) ✓
+- `ContainerOutput.withdrawItemStack` (退还源容器) → 余量 `ItemSpawner.spawnForPickup` ✓
+
+### 文档 (规则升格为契约)
+- `vanilla/output/README.md` **陷阱 B** 补: "**'退还类' insert 同样要接余量**" —— 退还目标是刚被 extract 的同一槽
+  (正常必有空间 ⇒ 不可复现), 但 mod 容器有 insert 筛选时会拒收 ⇒ 余量必须落地 ✓
+- 错题集 **#354** 追加「族审计结果」小节 (扫描面 + 逐类判定 + 3 处硬化 + 无自动化覆盖的诚实标注) ✓
+
+### 验证 (0.9.69)
+双编译 ✓ · 单测 **86 类 550 用例 0 失败 0 跳过** ✓ · gametest **forge 114/114 · neoforge 114/114 全绿** ✓ ·
+逐节点 clean+jar ✓ · jar 内 `version = "0.9.69"` + 反编译确认兜底代码在位 ✓ · 部署 `.bak-0917l` + md5 双端一致 ✓
+
+## 0.9.68 (2026-09-17) — 修「排水换桶把主手物品弄没」: 换手改走 HandSwap 保全链 (错题 #162 丢物品族第三处)
+
+> 用户报告: 排水 (dam_fill) 时把空桶换到手上, 主手的东西**直接消失** ✗
+
+### Fixed
+- **`DamFillPipeline.ensureBucket`** (两分支: 背包取桶 / 输入箱取桶): 原为
+  `maid.setItemInHand(MAIN_HAND, 桶)` **直接覆盖** ⇒ 原主手物品(工具/其它)**既没回背包也没落地** ⇒ 永久丢失 ✗
+  ⇒ 现统一为"取 1 桶 → 置主手 → 旧物交 `HandSwap.stashOrDrop` (背包 → 满则落地)" ✓
+  (项目早有 `vanilla/output/item/HandSwap` 原语, javadoc 明写"整槽提取 + 旧物保全三链", 来源收敛正是 #162 的
+  两处复制链 — **dam_fill 是第三处且未收敛**; WorkEat/NearbyCollect/Assembly/BlockUp 均已保全 ✓)
+
+### Added (测试)
+- **gametest `lmaDamFillBucketKeepsMainHand`** (批 `z_void`): 主手放铁镐 + **背包**放 1 空桶 ⇒ 排水首 tick 换桶;
+  断言 **主手=空桶 且 铁镐未丢** (背包或落地) ✓ (修前实测: 超时未达成 ⇒ 必红 ✓)
+- ⚠ **顺带查明为什么这 bug 一直没被测出**: 现有 `lmaDamFill` 用 `getAvailableInv(true).insertItem(0, 桶)`,
+  而 TLM `getAvailableInv(handsFirst)` = **`[手槽, 背包]`** ⇒ **slot 0 是手槽** ⇒ 桶直接进了手,
+  `ensureBucket` 首行即早退 ⇒ **从未覆盖"背包 → 手"换手路径** ✗ (新用例改用 `getAvailableBackpackInv()`)
+
+### 文档
+- `vanilla/output/README.md` 陷阱 C (回滚语义) + `task/pipeline/README.md` `dam_fill` 行: 明确"**覆盖式写手必须带旧物去向**" ✓
+
+### 验证 (0.9.68)
+双编译 ✓ · 单测 **86 类 550 用例 0 失败 0 跳过** ✓ · gametest **forge 114/114 · neoforge 114/114** ✓
+(新用例双平台达成 20t; forge 另 1 例 `lmafarmplant` 为既有 flaky) · 逐节点 clean+jar ✓ ·
+jar 内 `version = "0.9.68"` ✓ · 部署 `.bak-0917k` + md5 双端一致 ✓
+
+## 0.9.67 (2026-09-17) — 修「空置域一直提示**未设起始点**」: 无效 `min_y` ⇒ 误判挖完 + 误删 start (已部署双平台)
+
+> 用户报告 (1.20.1): 女仆无法进行挖空置域, 一直提示未设起始点。
+
+### 诊断 (1.20.1 日志 + 代码控制流, 链完全闭合)
+1. 旧 GUI 保存 bug 曾把 `min_y` 存成 **0**, 而标记层 `start.y = -60` (该坏值**仍在女仆 NBT 里**;
+   新保存已在 0.9.64.4 修 ✓);
+2. `while (y > minY)` 即 `-60 > 0` = **false** ⇒ 挖掘循环**一次不进**;
+3. 循环后的 `if (y <= minY)` = `-60 <= 0` = **true** ⇒ 首 tick 就 `poolMark(区块, 2)` = **把区块标记为"已挖完"**;
+4. 下 tick 认领池发现"区域全部区块已完成" ⇒ `poolClaim` 返回 null ⇒ 管线判"**全部挖完**" ⇒
+   **`cfg.remove("start")`** + 气泡"完成" + cancel;
+5. `start` 被删 ⇒ 之后每次启动 `validate` 都失败 ⇒ **"未标记起始点"反复出现** (日志里每 4 秒一轮 = 反复重标) ✓
+
+### Fixed
+- **管线自愈** (`VoidExcavationPipeline`): `min_y >= start.y` ⇒ 无可挖层 ⇒ **移除该无效键** + WARN,
+  回落"自动检测基岩层" ⇒ 女仆可正常开挖, 且**不再误删 `start`** ✓
+- **屏端拒存** (`VoidExcavationConfigScreen`): 保存最低高度时若 `min_y >= 标记层` ⇒ 直接拒绝 + 提示
+  (`screen.littlemaidmoreaction.void.min_y.invalid`, zh+en) ✓ — 从源头杜绝无效值 ✓
+
+### Added (测试)
+- **gametest `lmaVoidMinYInvalidSelfHeal`** (批 `z_void`): 置 `min_y == start.y` (同一判定分支) ⇒ 断言
+  ① `min_y` 键被移除 (自愈) ② `start` **未**被误删 ③ 游标首格**实际开挖** ✓
+  (修前: 首 tick 判完成 + 删 start ⇒ 三条断言全红 ✓)
+
+### 文档
+- `task/service/harvest/README.md` 增「`min_y` 必须低于标记层」小节 (含控制流推导 + 两道防线 + 回归用例);
+  `task/gui/README.md` 表格 `min_y` 单元格补同款约束 ✓
+
+### 验证 (0.9.67)
+双编译 ✓ · 单测 **85 类 549 用例 0 失败** ✓ · gametest **forge 113/113 + neoforge 113/113 全绿** ✓
+(实测日志: `[VOID] min_y=-59 不低于标记层 start.y=-59 ⇒ 无可挖层, 已自愈为自动检测基岩层` ✓) ·
+逐节点 clean+jar ✓ · jar 内 `version = "0.9.67"` ✓ · 部署 `.bak-0917j` + md5 双端一致 ✓
+
+## 0.9.66 (2026-09-17) — 空置域「**第一层检查**」: 传送前先挖净落点 2 格 (防卡方块窒息掉血) (已部署双平台)
+
+> 用户报告: "女仆挖空置域的第一层可能挖不到 (因为是实心的), 传送过去会被卡方块里掉血" ⇒ 裁定:
+> **第一层先把它上面的方块挖掉, 再挖第一层的方块** — 挖掉两块后女仆即可安全传送站位 ✓
+
+### Fixed (产品)
+- **传送落点未净空 ⇒ 头埋方块窒息** (`VoidExcavationPipeline`): 女仆站姿 = 脚在落点格 + 头在其上 1 格。
+  逐层下挖时**后续层头位**已在上一层挖空 ⇒ 安全; 但**第一层 (标记层) 头位是未开挖地表** ⇒
+  两条传送路径都会把女仆**传进实心方块** ⇒ 窒息持续掉血 ✗ (解释"只有第一层中招" ✓)。
+  **修法**: 新增 `ensureLandingClear(...)` — 传送前把落点挖成 **2 格净空**, 顺序按用户裁定
+  **头位 (y+1) → 本体 (y)** ✓; 走既有 `tryDig` 通道 (工具/耐久/销毁名单/背包一致 ✓) + 同一挖掘节拍
+  (不额外加速 ✓); 基岩/屏障清不掉则跳过 (不阻塞进度 ✓); 区块未加载则交回原门控 ✓。
+  **两条路径都加**: ① 关导航的"传区块中间" ② 导航超时的"传 `target.above()`" ✓
+- 落点净空后女仆传送进去即可**站在自己挖出的 2 格空间**里, 不再窒息 ✓
+
+### Added (测试)
+- **gametest `lmaVoidFirstLayerLandingClear`** (独占 `z_void` 批): 落点本体+头位都摆实心石 (模拟第一层),
+  女仆站**水平 5 格外** (`near` = 水平 ≤4 格 ⇒ 必走传送分支 ✓) ⇒ 断言头位与本体先后挖净 **且血量全程不掉** ✓
+  (修前: 直接传进实心石 ⇒ 头埋方块 ⇒ 血量断言必红 ✓) + 每 100t 打诊断 (失败可定因)
+
+### 文档
+- `task/pipeline/README.md` 空置域行 + `task/service/harvest/README.md` 增「**传送前第一层检查**」小节
+  (含"为什么只有第一层中招"的几何解释 + 回归用例位置) ✓
+
+### 验证 (0.9.66)
+双编译 ✓ · 单测 **85 类 549 用例 0 失败** ✓ · gametest **forge 112/112 + neoforge 112/112 全绿** ✓
+(实测日志: `[VOID-LAND] 第一层检查: 挖净传送落点 88,-58,200 (头位)` → `88,-59,200 (本体)`, 女仆在 93,-57,200 未受伤 ✓) ·
+逐节点 clean+jar ✓ · jar 内 `version = "0.9.66"` ✓ · 部署 `.bak-0917i` + md5 双端一致 ✓
+
+## 0.9.65 (2026-09-17) — **正式版** (含 0.9.64.1~0.9.64.4 全部内容): neo 箭塔伤害补齐 + 空置域 Y 保存变 0 + 绑定/崩服修复 + flaky 治本
+
+> **版本说明**: 本会话先以 `0.9.64.1` ~ `0.9.64.4` 四次补丁部署 (每次都已上双平台); 用户裁定**统一为 `0.9.65` 正式版**
+> ⇒ 本节即"0.9.65 实际包含的全部内容", 其下 `0.9.64.1` ~ `0.9.64.3` 各节保留为当时的中间部署记录 (内容已并入本版) ✓
+
+> 用户裁定: "补齐, 还有修bug" — ① 补齐 1.21.1 箭塔伤害配置; ② 修"TLM 任务栏界面设置空置域 Y 轴 → 保存后变 0"。
+
+### Fixed
+- **neo 箭塔忽略伤害配置** (产品): `DefenseTowerFire.fireArrow` 的 1.21.1 分支**整块缺失**伤害口径
+  (含 `setBaseDamage`) ⇒ neo 上单塔 GUI 覆盖与全局 `defense_tower.damage` **都无效**
+  (v79.63.11 那次修只进了 1.20.1 分支) ✗ ⇒ 现补齐: `单塔覆盖 > 全局默认 > vanilla`,
+  且**默认 2.0 = 原版箭基础伤害 ⇒ 未改配置者行为不变** ✓
+- **空置域屏「保存高度」存成 0** (产品): `VoidExcavationConfigScreen` **绕过基类助手**手写 payload —
+  用 `putString("value", val)` 配 `ACTION_SET_INT`, 而服务端是 `cfg.putInt(key, payload.getInt("value"))`
+  ⇒ 对 StringTag 取 int **得 0** ✗ (min_y=0 = 挖到世界底部, 覆盖"自动检测基岩层"; 屏上回读也变 0) ⇒
+  改走 `sendSetInt` ✓; 同屏另两处手写 (销毁名单 / 导航开关) 一并改用基类助手 `sendSetList` / `sendToggle` ✓,
+  空的 min_y 继续用 `sendRemove` (回落到自动检测) ✓
+
+### Added
+- **`DefenseTowerLogic.effectiveArrowDamage(override, global, vanilla)`** — 伤害决策**纯函数**,
+  1.20.1 / 1.21.1 两分支**共享同一实现** (本次 neo 漏配的根因就是"两处内联重复实现必漂移" ✗) ✓
+- **单测**: `DefenseTowerLogicTest` 增"伤害优先级"用例 (含"默认配置 ⇒ 2.0 行为不变"回归锚点) ✓
+- **守护测试 `GuiActionPayloadGuardTest`**: 机械拦住"配置屏内直接引用通用动作常量"
+  (必须经 `sendSetInt/sendSetList/sendSetString/sendToggle/sendRemove`) ⇒ 旧代码那行会被当场拦下 ✓
+- **README**: `task/gui/README.md` 增「payload 字段类型契约」表 (含本次实测后果); `defense/README.md` 记伤害口径 + 双平台差异备案 ✓
+
+### 附: 其余配置项已一并核对
+空置域屏 4 个写动作全部核对 (销毁名单/导航开关/保存高度/清空高度) ✓; 全部屏 30 处动作调用逐条审计,
+除本屏外均**已走基类助手** ✓; 两个自定义动作 (`craft_chain` 的 `ACTION_SET_TARGET` = String↔String、
+`ai_control` 的 `ACTION_TRANSFORM` = 空 payload↔不读) 均**类型对称** ✓
+
+### 验证 (0.9.64.4 部署时实测 — 该版本内容已并入 0.9.65, 见本节顶部「版本说明」)
+双编译 ✓ · 单测 **85 类 549 用例 0 失败** ✓ · gametest **forge 111/111 + neoforge 111/111 全绿** ✓ ·
+逐节点 clean+jar ✓ · jar 内 `version = "0.9.64.4"` ✓ · 部署 `.bak-0917g` + md5 双端一致 ✓
+
+## 0.9.64.3 (2026-09-17) — 右键绑定**全量审计**: 另修 2 处手工 BlockPos 解析 (统一 NbtCodecs) (已部署双平台)
+
+> 用户要求: "检查下右键绑定的是否都正确" ⇒ 对全部绑定入口做**机械对账** (73 处读写配对逐一核)。
+
+### 审计结果
+| 位置 | 结论 |
+|---|---|
+| `BlockInteractSetupHandler` | 0.9.64.2 已修 ✓ |
+| **`ArmTransferSetupHandler.readPos`** | **本批修** — 手工双平台解析 (`NbtUtils` / `getCompound(key).getLong("pos")`), 而写侧 (`FarmContainerBindPacket`) 用 `NbtCodecs` ⇒ 各写一套 = 错题 #348 同款隐患 (重复实现必漂移; 1.20.1 分支还缺"坏数据→null", 会静默得 `(0,0,0)`) ⇒ 统一 `NbtCodecs` ✓ |
+| **`BlockInteractConfigScreen.getPosText`** | **本批修** — 同款手工解析 ⇒ 统一 `NbtCodecs`; 坏数据/未绑定显示走 translatable (`screen.littlemaidmoreaction.bi.unbound`, zh+en), 不再显示 `0, 0, 0` ✓ |
+| `MaidPowerBeltBlockEntity` (Create 皮带 `Controller`) | **明确不动** — 双平台**各自读写配对** (1.20.1 `CompoundTag{X,Y,Z}` / 1.21.1 `IntArrayTag`), 属**方块实体存档格式**; 改成 NbtCodecs 会让**老存档读不出** ✗ (审计的价值也在于"确认哪些不该改" ✓) |
+| `origWorkPos` | ✓ 旧档迁移读取 (写侧已退役), 读侧已用 `NbtCodecs` |
+| void_excavation / dam_fill / farm 两个包 / 三条管线 / 全部 gametest | ✓ 全 `NbtCodecs` |
+
+### 验证 (0.9.64.3)
+双编译 ✓ · 单测 **84 类 547 用例 0 失败** ✓ · gametest **forge 111/111 + neoforge 111/111 全绿** ✓ ·
+逐节点 clean+jar ✓ · jar 内 `version = "0.9.64.3"` ✓ · 部署 `.bak-0917f` + md5 双端一致 ✓
+
+## 0.9.64.2 (2026-09-17) — 补丁: **修「右键交互绑定后方块信息丢失」** (木棍标记读写不对称) (已部署双平台)
+
+> 用户报告: 右键交互任务绑定方块后, 绑定信息丢失。**取证**: 解 `latest.log` + 解压 TLM 女仆备份 (gzip NBT) 与主世界
+> 实体区块, 得到完整链路 (见 lessons #348)。
+
+### Fixed (产品, 3 处)
+- **绑定坐标被静默替换成女仆自己脚下的格子** (根因): `BlockInteractSetupHandler` 标记路径**绕过**项目编解码器
+  —— 写 `tag.put(MARK1, NbtUtils.writeBlockPos(pos))` (1.21.1 返回 **IntArrayTag**), 读 `NbtUtils.readBlockPos(tag, MARK1)`
+  (期望 LongTag/CompoundTag) ⇒ **读空** ⇒ `.orElse(maid.blockPosition())` 兜底生效 ⇒ 绑成女仆自己站的格
+  (实测: 标记 `-3092,63,2269` → 绑成 `-3091,63,2270`) ⇒ 下一 tick 该格非目标方块 ⇒ 走"方块被破坏"分支把绑定清掉 ✗
+  **修法**: 标记读写统一走 `NbtCodecs` (与 `VoidExcavationSetupHandler` 同款, 双平台对称, 错题 #183), 并**取消危险兜底**
+  —— 读不到就明确提示重标, 绝不静默绑到她脚下 ✓
+- **未加载区块被误判为"方块被破坏"**: `world.getBlockState(pos).isAir()` 对未加载区块也返回空气 ⇒ 女仆远离/传送/跨维度时
+  会把用户绑定静默清掉 ✗ ⇒ 加 `if (!world.isLoaded(pos)) return;` ✓
+- **`NbtCodecs.readBlockPos` 1.20.1 坏数据返回 `(0,0,0)`** (与 1.21 的 null 语义不一致) ⇒ 补键存在性校验, 双平台统一 null ✓
+  (此条由**新增单测** `NbtCodecsTest` 抓到 — 见下)
+
+### Added (测试)
+- **单测 `NbtCodecsTest`** (3 例, 纯 JVM): 锁"标记编解码**对称**"契约 (往返逐字段相等 / 缺键与坏数据必须 null 不伪造坐标 / 多键互不干扰) ✓
+- 顺带修正 1 处: 我新加的玩家提示原为硬编码中文 ⇒ 改 `Component.translatable`
+  (`message.littlemaidmoreaction.bind.mark_invalid`, zh_cn + en_us) — **被既有 `PlayerTextI18nGuardTest` 当场抓到** ✓ (守护有效 ✓)
+
+### 验证 (0.9.64.2)
+双编译 ✓ · 单测 **84 类 547 用例 0 失败** ✓ · gametest **111/111** (forge ✓ / neo 连跑 2 轮全绿 ✓) ·
+逐节点 clean+jar ✓ · jar 内 `version = "0.9.64.2"` + lang 已打包 ✓ · 部署 `.bak-0917e` + md5 双端一致 ✓
+
+## 0.9.64.1 (2026-09-17) — 补丁: **修崩服** (老农场区域导入递归) + 右键交互屏标签重叠 (已部署双平台)
+
+### Fixed
+- **崩服 (StackOverflowError, crash-2026-09-17_12.49.53)**: v79.63.23 引入的"老 `farm_regions.json` 惰性导入"存在
+  **无限递归** —— `FarmRegionStorage.getFor()` → `FarmRegionLegacyImport.maybeImportFor()` → 又回调 `getFor()` ✗
+  ⇒ 服务器 tick 循环栈溢出崩服。
+  **修法**: ① `FarmRegionStorage` 拆出**无回调读** `readNbt(maid)` (纯 NBT 读取), `getFor` = 导入 + `readNbt`
+  ⇒ 导入流程内部一律走 `readNbt`, **结构上不可能再递归** ✓; ② 导入器解析成功后即**本进程收口** (原逻辑等"集齐
+  老文件里所有 uuid"才 seal, 而那些 uuid 未必都会加载 ⇒ 永不解封 ⇒ 每次 `getFor` 都重读重解析 ✗)。
+- **右键交互任务界面标签重叠** (`BlockInteractConfigScreen`): 标签画在 row0/row1, 而"定时开关/间隔步进"按钮
+  **也在 row0/row1** ⇒ 同排重叠 (错题 #331 第 7 条同款) ✗。**修法**: 标签独占 row0 (绑定方块) / row1 (定时间隔),
+  控件整体下移 row2 (定时开关) / row3 (±1/±10 四等分) / row4 (清除绑定) ⇒ **零同行重叠** ✓
+- **新增崩溃回归用例** `lmaFarmLegacyImportNoRecursion` (**独占批次 `z_legacy`**): 用**路径覆盖**造出"老文件含该女仆 uuid"
+  这一条件 (gametest 沙箱原本没有老文件 ⇒ 旧逻辑直接早退 ⇒ **测试从未覆盖到递归分支** ✗ 这正是上线才崩的原因) ✓
+
+### 验证 (0.9.64.1)
+双编译 ✓ · 单测 83 类 544 用例 0 失败 ✓ · gametest **111/111** (forge ✓ / **neo 连跑 3 轮全绿** ✓; 其中新增 z_legacy 用例实测
+`区域数=1 首区=1,2,3` = 导入正确执行且**无栈溢出** ✓) · 逐节点 clean+jar ✓ · jar 内 `version = "0.9.64.1"` ✓ ·
+部署 `.bak-0917d` + md5 双端一致 ✓
+
+## 0.9.64 (2026-09-17) — 本会话批次汇总: Cloth 杂项 / 节日纯读 jar / 作物区域随实体 / 用例治 flaky (已部署双平台)
+
+> 版本 0.9.63 → **0.9.64** (patch bump: 公开 API 面未变 — `PathingApi` 等 public 方法数与已发布 0.9.63 一致)。
+> 本节汇总本轮全部落地内容; 各批细节见下方 v79.63.21~26 各节与 `docs/lessons-learned.md` #338~#346。
+
+### Added / Changed (用户可见)
+- **Cloth 全局设置新增「杂项」分类** (`active.running_belt.stress` = 发电皮带应力, -1=原公式 / ≥0=固定);
+  顺带补齐三处"有 TOML 键零 GUI 入口"的配置 (稀有群系 ×3 → 环境感知; `dam_fill.default_chunks` → 填坝排水子屏)。
+- **节日数据改纯读 jar 预设** (`assets/littlemaidmoreaction/festival.json`): 删除 config 副本与"缺字段自愈"补丁;
+  老 `config/…/festival.json` 静默忽略 (不读不动) ⇒ 根治"老 config 永不升级 ⇒ 节日不送礼"。
+- **作物区域改存女仆 NBT** (`lma_cfg_farm.regions`, 对齐 TLM 做法): 数据随实体 ⇒ 删女仆/收魂符不再留孤儿条目、
+  编辑不再全量重写全局文件; 每区域记 **dimension** (换维度该区域暂停, 屏上橙字提示);
+  老 `config/farm_regions.json` **一次性导入** (惰性 + 全 uuid 命中才改名 `.imported`); `FarmRegionStorage` 从 `storage/` 迁 `task/service/harvest/`。
+
+### Fixed (测试夹具治 flaky — 产品逻辑零改动)
+- 塔族 2 例: ① GameTest 框架**屏障围墙**挡住模板外靶子 (`StructureUtils.encaseStructure`) ② 夹具主人是**创造模式** ⇒ 原版 `hurtAndBreak` 本就不扣耐久。
+- `lmaenginepanicisolation`: 夹具注入的全局必抛任务被"自动启动"**反复复活** ⇒ 两条断言建立在错误前提 (已改抗复活形式 + 护栏不变量断言)。
+- 采矿 3 例: `runAfterDelay` 定时断言 → **条件轮询** (达成即过, 实测 40-140t); 两例场地**不可走** (矿摆在高 1-2 格) ⇒ 降到可走平面 (用户规则"能走到才挖")。
+
+### 验证 (0.9.64, 2026-09-17 实测)
+双编译 `--no-build-cache` ✓ · 单测 **83 类 544 用例 0 失败** ✓ ·
+gametest **forge 110/110 ×3 轮 + neoforge 110/110 ×3 轮全绿** ✓ · 逐节点 clean+jar ✓ · 部署 `.bak-0917b/c` + md5 双端一致 ✓
+
+## 0.9.63 / v79.63.26 (2026-09-17) — 采矿用例**场地可走性**修正 (按"能走到才挖"规则) (已部署双平台)
+
+> 用户裁定 (2026-09-17): "这不是经典的走不到吗, 走不到就不挖, 只有能走到的头上才会挖" ⇒ 用例场地必须**可走**;
+> 产品侧现行行为 (斜上 >4 格的矿: 试 `target.above()` 悬空格 → 导航失败 → 跳过集) **符合该规则, 不改产品** ✓
+
+### Fixed (测试夹具, 场地几何)
+- `lmaChainOreCrossChunkMid`: 矿原在 `footAbs+0` = 平台面**上方 2 格** (悬空不可站层) ⇒ 女仆走不到 ⇒ 期望与场地矛盾;
+  现降到 `footAbs-2` (与平台面上表面同层, 垫石 `-3`) ✓
+- `lmaChainOreNearBeforeFar`: 近/远矿原在 `footAbs+0` = 女仆脚下**上方 1 格** ⇒ 同因; 现降到 `footAbs-2` ✓
+- 保持: 跨区块 (下一区块内 5 格) / 10 格与 15 格距离 / 3×3 石台 / `collect_ore` 链路 / 条件轮询断言 ✓
+
+### 验证 (2026-09-17)
+双编译 ✓ · 单测 **83 类 544 用例 0 失败** ✓ · gametest **forge 110/110 ×3 轮** + **neo 110/110 ×3 轮** (全绿, 此前每次 1-3 例 flaky) ✓ ·
+达成耗时更快 (跨区块 40t / 远矿 60t / 近远 60t) ✓ · 逐节点 clean+jar ✓ · 部署 `.bak-0917b` + md5 双端一致 ✓
+
+## 0.9.63 / v79.63.25 (2026-09-17) — 引擎护栏用例**抗自动复活**修复 (治偶发假红) (已部署双平台)
+
+> 用户裁定 (2026-09-17): `lmaenginepanicisolation` 的偶发红要修。
+
+### Fixed (测试夹具, 非产品缺陷)
+- **根因**: 该用例 `registerPassive("__panic", 必抛管线)` 是**进程全局注册**且 `TaskRegistry` **无注销 API** ⇒
+  任务留在注册表; 而 `tickStandalonePassives` 每 10t 有"自动启动"分支 (开关开 + 非 in_progress ⇒ 自动 submit)
+  ⇒ 降级 (cancelPassive 清 in_progress) 后**下一 tick 就被复活** ⇒ 同一执行内该 maid 被降级 3 次、
+  驱动次数观测到 6/9 ⇒ 两条断言 (`calls == 3` / `降级后不应再驱动`) 假红 ✗。
+- **修法**: ① `calls` 断言改为抗复活形式 — `calls ≥ MAX(3)` 且**必须出现"第 1..3 次 + 紧随降级"序列**;
+  ② 尾段"降级后不应再驱动"改为**护栏真正的不变量**: 降级后再驱动 **不得让异常逃逸** (连驱 3 次全绿) ✓;
+  ③ 收尾 `cancelPassive` 减小复活窗口 ✓。
+- **撤销**: 期间试过的 `setDayTime` 时钟对齐**无效** (它只改白天时间, 不推进 `getGameTime` ⇒ 手工驱动每次仍推进 1t) — 已撤 ✓。
+
+### 验证
+双编译 ✓ · 单测 83 类 544 用例 0 失败 ✓ · gametest **neo 连跑 3 轮 panic 用例全绿** ✓ · 逐节点 clean+jar ✓ · 部署 `.bak-0917a` + md5 双端一致 ✓
+
+## 0.9.63 / v79.63.24 (2026-09-17) — 采矿用例**条件轮询**改造 (治时序 flaky) + gametest 口径修正 (已部署双平台)
+
+> 用户裁定 (2026-09-17): 采矿面 flaky 的根因是"断言写在固定 `runAfterDelay(N)` 墙点上, 而走路+挖穿耗时浮动"
+> ⇒ 改为**条件轮询** (成立即通过)。
+
+### Changed
+- **3 个采矿用例改条件轮询** (`lmaChainOreFar` / `lmaChainOreCrossChunkMid` / `lmaChainOreNearBeforeFar`):
+  新增共用工具 `pollUntil(...)` — 每 20t 检查一次, **成立即 `succeed`** (顺带记录**实际达成耗时**用于校准窗口),
+  到期未成则打印现场 (女仆位置/观察点方块名) 后 `fail` ✓。窗口: 900/800/1200 (`timeoutTicks`)。
+  实测达成耗时: **60t / 60t / 140t** (改前固定窗口 400/400/1000 ⇒ 原设计余量其实很大, 说明 flaky 来自
+  "偶发改走其它目标"这类路径抖动, 轮询能在条件成立的**当刻**收口 ✓)。
+- 塔族用例批次复位: `lmaDefenseTowerDurability` 从 `z_tower4` 回到独占批次 `z_tower6` (另一会话曾把它并进 z_tower4)。
+
+### Fixed (文档口径)
+- 基线表 gametest 数字 **111 → 110**: 逐批求和 (defaultBatch 73 + z_ore 15 + z_slow 8 + z_void 8 + z_tower1/2/3/5/6/7 各 1)
+  与源码 `public static void …(GameTestHelper)` 计数、merged 源、编译 class **四者一致 = 110** ✓;
+  此前 111 记录来自**另一会话并发编辑同一测试文件的中间产物**, 非本期回归 ✓。
+
+### 验证 (2026-09-17)
+双编译 ✓ · 单测 **83 类 544 用例 0 失败** ✓ · gametest **forge 110/110** ✓ / **neo 110/110** ✓
+(中间轮 neo 曾 1 例 `lmaenginepanicisolation` 红 = 既有 flaky, 非采矿) · 逐节点 clean+jar ✓ · 部署 `.bak-0916s` + md5 双端一致 ✓
+
+## 0.9.63 / v79.63.23 (2026-09-16) — 作物区域改存**女仆 NBT** (对齐 TLM) + 记维度 / 老文件一次性导入 (已部署双平台)
+
+> 用户裁定 (2026-09-16): 区域数据应跟女仆实体走 (TLM 做法: 任务信息挂实体), 不用全局 config 文件;
+> 每区域记 **dimension** (换维度该区域暂停); 老 `farm_regions.json` **一次性导入**。
+
+### Changed
+- **`FarmRegionStorage` 迁 `storage/` → `task/service/harvest/`** (ArchGuard 硬红线: `storage` 不得 import `task.*`,
+  而区域要经 `MaidData` 写女仆 NBT) — 存储形态从"全局文件 `Map<uuid,List<区域>>`"改为**该女仆 NBT
+  `lma_cfg_farm.regions`** (ListTag)。数据随实体消失 ⇒ 删女仆/收魂符不再留孤儿条目; 编辑不再**全量重写整份文件**。
+- `FarmRegion` 记录加 **`dimension`** 字段; `FarmExecute.tick` 只处理**当前维度有效**的区域
+  (`isActiveIn`), 其余暂停; 区域管理屏显示维度 (异维度时橙字「⚠ 其他维度·暂停」)。
+- 网络包 (Bind/Edit) 改为**按 uuid 在玩家所在维度解析女仆实体** (`FarmRegionStorage.findMaid` —
+  `level.getEntity(UUID)` 在 1.20.1 不存在, 用 `getAllEntities()` 遍历); 女仆不在线 ⇒ 静默放弃。
+  Sync 包新增 dimension 字段 (双平台同构, `writeUtf(...,128)`)。
+
+### Added
+- **`FarmRegionLegacyImport`** — 老 `config/littlemaidmoreaction/farm_regions.json` **一次性导入**:
+  惰性触发 (`FarmRegionStorage.getFor` 首次读时, 幂等) · 老数据无维度 ⇒ 补**该女仆当前维度** ·
+  **全 uuid 都遇到过才改名 `.imported`** (避免"改名太早 ⇒ 后续才加载的女仆数据丢") · 坏 JSON 收口不重试。
+
+### Removed
+- 旧 `storage/FarmRegionStorage` (全局表 + `load`/`save` 文件面) · 旧 `FarmRegionStorageTest` (uuid 版契约, 由
+  `FarmRegionStoragePureTest` 纯函数面 + gametest `lmaFarm*` 实体面替代) · 主类/neo 入口的 `onServerStarting` 加载调用。
+
+### 验证 (2026-09-16 实测)
+双编译 ✓ · 单测 **83 类 544 用例 0 失败** ✓ (旧 uuid 版 6 例退役, 新纯函数 8 例) ·
+gametest **forge 111/111** ✓ / neo 111 跑满 3 例 (2 塔视线 + 1 既有 flake `lmachainorenearbeforefar`) ✓ ·
+逐节点 clean+jar ✓ · 5b 双平台 (新类在位/旧类零残留/dimension+findMaid 在位/forge SRG 10-31 抽样正常) ✓ · 部署 `.bak-0916q` + md5 双端一致 ✓
+
+## 0.9.63 / v79.63.22 (2026-09-16) — 节日数据改为**只读 jar 预设** (删除 config 副本与自愈补丁) (已部署双平台)
+
+> 用户裁定 (2026-09-16): 节日是**预设数据**, 不给用户改 ⇒ 不需要 config 副本; 老 config 文件**静默不管**;
+> 自愈代码**直接删干净** (仅节日面)。
+
+### Changed
+- `storage/FestivalLoader` 重写为**纯读 jar 资源** `assets/littlemaidmoreaction/festival.json` → `FestivalTable`
+  (178 → 114 行): 删除 `copyPresetIfMissing()` (不再往 config 写文件)、删除 `selfHealEnabled` 开关与自愈块 (~45 行)、
+  删除 config 路径读取。新增纯解析入口 `parse(Reader)` + `loadFromJar()` ⇒ **纯 JVM 可测**; `loadFromFile(Path)` 保留为测试/调试入口。
+- 加载 INFO 保留并明确来源: `[LMA/Festival] 节日表已从 jar 预设加载 — 17 节日`。
+
+### Fixed
+- **根治「节日不送礼」的结构性病根** (lessons #335/#337): 旧设计把预设复制成 `config/…/festival.json` 且
+  **只在缺失时复制** ⇒ 老 config 永久冻结 ⇒ 后续新增节日/新增字段 (`foods`) 老用户**永远拿不到** ✗。
+  改单源后, jar 预设与版本天然一致, 不会再复发; 之前的"缺字段自愈"补丁随之失去意义而删除。
+- 老 `config/littlemaidmoreaction/festival.json` 残留: **静默忽略, 不读不动** (不删用户文件)。
+
+### 验证 (2026-09-16 实测)
+双编译 `--no-build-cache` ✓ · 单测 **83 类 542 用例 0 失败** ✓ (+2: jar 预设契约用例) ·
+gametest **forge 111/111** ✓ / neo 111 跑满 / 2 例 = 既有塔视线用例 (无新增回归) ✓ ·
+逐节点 `clean+jar` ✓ · 5b 双平台 (`FestivalLoader` 属"零原版调用"类 ⇒ SRG 计数天然为 0, 改按**类抽样**判定:
+`DefenseTowerFire` m_=21 / `GameTickPipelineManager` m_=6 / 主类 m_=3 ⇒ jar 已 reobf ✓) · 部署 `.bak-0916p` + md5 双端一致 ✓
+
+## 0.9.63 / v79.63.21 (2026-09-16) — Cloth「杂项」分类 + 全局配置项接线补缺 (已部署双平台)
+
+> 用户裁定 (2026-09-16): 跑步发电应力**不进 TLM 任务设置页**, 改为**全局设置**里新增「杂项」分类承载。
+> 顺带修掉三处「有 TOML 键、无任何 GUI 入口」的配置 (新增 define 忘接线 GUI 的空档)。
+
+### Changed
+- **Cloth 设置新增「杂项」分类** (真全局参数归属; 判据: 不属于任何单个任务、无任务子屏/无 per-maid 覆盖):
+  `发电皮带应力` = `active.running_belt.stress` (-1 = 原公式随蛋糕 1024/2048/4096; ≥0 = 固定应力; 转速仍随蛋糕 96/192/256 RPM)。
+- **环境感知**分类补 `稀有群系通报` / `稀有群系检测间隔` / `稀有群系信号半径` = `passive.env_sense.rare_biome_*` (此前无入口)。
+- **任务自定义 → 填坝排水** 子屏补 `默认区块数` = `active.dam_fill.default_chunks` (此前无入口; 单女仆仍可在 TLM 任务设置页覆盖)。
+- `ConfigConsistencyTest` 人工核对条目数更正为实测值 (Cloth 45 / 任务子屏 43, 旧注释 36/27 已严重漂移), 并注明回写方法。
+- README/文档: `screen/README.md` 补「配置项归属判据」+ 漏接线警示; `docs/ARCHITECTURE.md` 基线表按实测回写 (单测 83 类 540 用例; gametest forge 111/111, neoforge 111 跑满/5 例塔 mock 噪音); 错题集头声明 #333/184 → **#337/188**。
+
+### Fixed
+- 全局配置**专用服务器同步**面复核: 三键均已在 `MoreActionConfig.reg` 注册 (否则改 `active.*` 只写客户端无效) — 无缺陷, 记录为交付检查项。
+
+### Fixed (neo gametest 夹具, 用户 2026-09-16 批准)
+- **塔族 7 例 `sync_data` 崩溃消除** (2 例剩余): 根因 = mock 主人注册路径 `PlayerList.placeNewPlayer` 中途触发
+  TLM 1.21.1 `onPlayerJoinWorld` 无条件发 `SyncDataPackage` ⇒ mock 连接被拒抛异常 ⇒ 原版末尾 `players.add` /
+  `playersByUUID.put` 被跳过 ⇒ 主人从未注册。修法: 夹具 `registeredOwner` **per-dimension 缓存复用** +
+  容错注册 (**只补 `playersByUUID`** — `getPlayer(uuid)` 的唯一入口; 不进 `players` 以免 `broadcastAll`
+  拿 null connection 发包污染其它用例)。实证: `TOWER-DIAG ownerOnline=true` + 塔真开火; 7 例 ⇒ **2 例**。
+  只动测试夹具, 未碰 `defense/` 产品代码。详见 lessons #339。
+
+### 待查 (非本批次引入)
+- `lmadefensetowerdurability` / `lmadefensetowerfarrange`: TOWER-DIAG 显示 `ownerOnline=true` 但
+  `no LOS target candidates=1` ⇒ 塔卡**视线判定** (`hasLineOfSight` 不通过 ⇒ 不开火 ⇒ 箭数不变/弓不掉耐久)。
+  **两平台都有该日志** (非平台差异) ⇒ 属塔视线判定或夹具几何待查。
+- gametest 套件本身有既有 flaky (同日三次 forge 运行各 1 例不同失败: `lmafurnaceblacklist` / `lmafarmplant`),
+  与错题 #270「全绿不可复现」同源。
+
+## 0.9.63 / v79.63 (2026-09-11 补记) — 成就感知 + 任务树 + 防御塔/五子棋 (已部署双平台)
+
+> ⚠️ 本条为 **2026-09-11 文档审计批次补记** (0.9.62/0.9.63 发布时 changelog 未同步)。细节权威: [docs/lessons-learned.md](docs/lessons-learned.md) 错题 #262-268 + [docs/plans/doc-audit-2026-09-11.md](docs/plans/doc-audit-2026-09-11.md)。
+
+- **成就感知 API** `AdvancementSenseApi` (2026-08-31, 待用户写反应验收): 主人完成成就 → 女仆反应; 通配 + 精确注册可叠加; 回调统一 String advancementId (双平台差异消化在事件层)。
+- **任务树**: `task/quest/` 4 类 (QuestNode/QuestTreeLoader/QuestTreeLayout/QuestProgressReader[占位]) + `screen/LmaQuestScreen` 成就树屏 (数据 = 运行时读原版成就 JSON, 双平台 `advancement(s)/` 路径; 进度走 ClientAdvancements.Listener)。
+- **防御塔** `defense/` (v79.62.3): garage_kit 扩展为可放置防御塔 (箭/弹幕双模式自动判定), BE 继承 TLM TileEntityGarageKit; `config/DefenseTowerConfig` + Cloth 分类 + 每塔 GUI 覆盖。
+- **五子棋「直接判你赢」** (v79.62.3): 女仆开关 (PD `lma_gomoku_instant_win`) + 2 网络包 + `MaidOtherSettingsScreen`; 判赢走 TLM 原生链路 (不取消事件/不重发包)。
+- **挖空置域大修 + 填坝排水** (v79.62 → 0.9.63): 见 0.9.62 条 (两条同批发布)。
+- **TaskTree NPE 修复** + quest 任务树/advancement 感知 (commit 431a5f4)。
+
+## 0.9.62 / v79.62.2 (2026-09-11 补记) — 填坝排水 + 挖空置域大修 + 温度触发语义
+
+> ⚠️ 同样为审计批次补记; 详细设计见 [docs/design/void-excavation-and-dam-fill.md](docs/design/void-excavation-and-dam-fill.md)。
+
+- **新任务 dam_fill 填坝排水** (用户逐条裁定): 填坝 = 外圈 4 方向 (北南西东) 筑**重力方块自落**墙 [沙/砾石/铁砧, 放一批等自然下落, 检测列堆顶到 topY = 标记层+3, 列间等 20t]; 排水 = 按**排**从墙边往里 [第 1 排 x=minX 横穿所有区块 → x+1 → maxX, 液体→空气 + 破坏粒子 + 舀水声 + 挥桶]; 两模式**独立** (cfg `drain_enabled`, 不做「墙完自动接排水」); cfg 只存 start/size/input/drain_enabled, **游标/方向/列/排全 PD 内存**; 任务期间 HOME + 每 200t 续水下呼吸; TLM 任务栏配置屏「模式」切换按钮。
+- **挖空置域系列修复**: 液体提前空气化 + 相邻扫描 + 清 WATER 缓存 / 矿 6 邻面至少 1 面空气才挖 + 脚下 >2 格深矿扫描排除 / `navGoal = target.above()` + 看门狗 5s→2s CD→2 次→跳过集 10s / 递归 `idleScan` 三处改 CONTINUE / **ChunkWorkArea 每 tick 设 work·idle·sleep 三中心** (防 Activity.IDLE 被拉回) + anchorY 用游标 y / 挖产物遍历全槽 `insertItemStacked` / 认领新区块清 navCd·navTimeout / 空气格跳过去掉限距。
+- **温度感知语义改造** (用户裁定): 触发即写 5 分钟 CD + tick 未冷却即 `cancelPassive` + 到火/水旁立即 CD 并结束 (删 30 秒停留)。
+- **认领池生命周期死锁修复**: `MaidUnloadRegistry` → 收魂符/死亡/移除时 `poolMark(0)` 释放 + 清游标。
+
+## 0.9.61+ / v79.62 (2026-08-19) — 新功能: 种菜区域制 (未发布, 待验收)
+
+- **作物区域种植管线** (用户裁定区域制): 木棒框选 AABB 区域 + 指定作物 (cropId), 女仆 farm 任务在绑定区域内收成熟 + 种指定作物 (跨区块续)。`config/littlemaidmoreaction/farm_regions.json` 按女仆 uuid 持久化 (区域管理 GUI + 木棒选区注册)。
+- **收获面**: 区域内全部成熟作物 (不限指定, 用户裁定) — 左键 destroyBlock 整株拔 + 掉落, 右键 FakePlayer 交互; CropRegistry 内置原版作物族 (CropBlock/甘蔗竹仙人掌/下界疣/可可/西瓜南瓜) + registerHandler 第三方扩展 + 骨粉可催熟通用 fallback (未知 mod 作物按 age 属性上界判定)。
+- **播种面**: 区域内可种耕地种区域指定种子 (种子不足跳过该区域); 种子源箱 (FARM_SEED_CONT 绑定, 背包无种自动取)。
+- **收获箱**: FARM_HARVEST_CONT 绑定, 空转 tick 把背包**收获产物**存入 (只存产物 — 排除空/区域种子/可损坏工具武器护甲/标记物, isHarvestProduct 纯判定)。
+- **容器绑定**: 主手标记物品 + FarmContainerBindPacket 选角色 (seed/harvest/take/deposit) → 右键女仆交付 PD。
+- **区域配置修复**: `FarmRegionStorage.load()` 双平台 onServerStarting 挂载 (原只 save 不 load → 重启丢区域); config 路径归一化 (去双嵌套)。
+- **BlockPatternCache 全列扫描修复** (错题 #238 同类): CROP/FARMLAND 改全列扫描 — 悬浮/地下农场不再被 WORLD_SURFACE±8 窗 miss (原 height 窗只扫近地表)。
+- **FestivalTable 守卫** (连带): lunar 农历库缺失时静默跳过农历条目 (jar-in-jar 生产有, dev classpath 无)。
+- **gametest +3** (18/18 ×2): lmaFarmPlant (播种) / lmaFarmSeedBox (种子源箱取种) / lmaFarmHarvestBox (收获箱只存产物, 四向判定) + 存量 lmaFarmJob。
+- 验证 (2026-08-19 实测, 清 run world 后): 双编译 --no-build-cache ✅ + 单测 64 类 468 用例 0 失败 ✅ + gametest 双节点 **18/18 ×2** ✅ (错题 #251)
+
+- **8/20-21 追加批次 (种地实测修复 + 三新管线 + 节日/可爱/驱赶)**:
+  - **种地链路修复** (用户实测): ① 产物不进收获箱 (storeHarvests 移 tick 开头) ② 种子被当产物收进收获箱 (isSeedItem 纯种子留背包, 种子即作物留 1 组余进箱) ③ 西瓜/南瓜根茎被当成熟收 (排除 StemBlock) ④ 种到收到死循环 (实时验证+invalidateBlock) ⑤ 女仆不寻路 (navigate 改设 WALK_TARGET)
+  - **背包管理** (用户裁定): 保 1 空位+1 种子; 满时回种/丢种; 收获箱满省流 600t
+  - **GUI 修复**: 3D 预览朝向 / 按钮重叠 / farm 汉化
+  - **节日礼物**: 17 节日 + 食物随机 + 狗修金文案 + 全局限频 + /lma festival 调试
+  - **可爱动作**: 挥手/歪头/回头 (MaidCuteIdleBehavior)
+  - **苦力怕驱赶**: AvoidEntityGoal 注入
+  - **酒狐奶管线** (jiuhu_milk 被动): 主人受伤自动喂奶
+  - **锻造管线** (smithing 主动): 钻石装备+合金锭→合金 (无模板)
+  - **探险家地图** (explorer_map 被动): 报宝藏坐标一次
+  - **刷子管线** (brush 主动): 自动刷可疑方块
+  - **修复速度 20s** / **哈气默认关** / **温度气泡**
+  - 验证: 双编译 + 单测 469 + gametest 18/18 x2 + 双平台部署 (错题 #252-253)
+
+  - **8/28 空置域配置接线修复批次 (v79.62.1 收尾)**:
+    - **per-maid 配置屏复活专用 VoidExcavationConfigScreen** (用户裁定: 空置域只要名单不要白名单 → 自绘框 + 空置域专名): 管线 `getConfigGuiProvider` 原返回通用黑白名单屏 (写 `blacklist` 键, 与 tryDig 读的 `pickup_blacklist` 断链 → per-maid 配置静默失效); 改回专用屏后断链修复
+    - **黑名单 → 销毁名单 (用户裁定)**: 名单内物品挖出即销毁消失 (不进背包不落地, 消除"落地不捡"地面实体卡顿); 删销毁开关 (全局 + per-maid); per-maid 键 `pickup_blacklist`→`destroy_list`, 全局 `VOID_PICKUP_BLACKLIST`→`VOID_DESTROY_LIST` + 删 `VOID_DESTROY_ENABLED`; 关闭寻路 toggle 保留
+    - **销毁名单框预填**: 配置到达后一次性预填当前名单 (修"打开空框/误存覆盖"隐患); 保存空值=清空名单回退全局; toggle 文案读当前配置自纠
+    - **ActiveTaskConfig reg 同步**: 空置域全局配置漏 reg() 修复 (ConfigConsistencyTest 平衡) (错题 #259)
+    - **工具耐久补扣 (用户实测「没见掉耐久」)**: `world.destroyBlock` 是直接世界操作, 不经玩家挖矿流程不扣耐久 → `tryDig` 挖掉后补 1 点/格 (对齐 DigThrough/SelfRescue, 双平台 hurtAndBreak 分支 + isDamageableItem 守卫); 耗完 vanilla 自动移除 → 下一格 `ensureToolFor` 换下一把; 全没了走「无工具提醒」 (错题 #260)
+    - **死代码清理 (用户裁定 start.y=可挖最高y)**: 删 surfaceY 整套后台补扫 (probeSurfaceY/continueSurfaceScan/PD键) — 认领直接设定高度, 不补扫不算量, 天然支持挖地底; 删死方法 searchInputExpansion/searchOutputExpansion/findSafeStand + 常量; VOID-MOVE 三条 warn 降 debug; 注释修正 (错题 #262)
+    - **实测修复批次 (用户实测, 错题 #263)**: ① 认领池对女仆生命周期反应 — MaidUnloadRegistry 登记 onMaidUnload, 死亡/收入魂符/移除时释放认领区块为未挖 (修"收起再放出后不动" = pool 残留 1 永久死等, cursor=0,0,0 + claimWait 循环); ② 边界液体改女仆 4 格检测 (sealBoundaryLiquid 从游标驱动改女仆位置驱动, ±4 扫区域外液体, 预算封顶) — 修"只填几次没填完"; ③ 配置屏坐标修正 — "区域"文字/销毁名单提示下移避开 toggle 按钮 (topPos+112/+124), 修"区块显示和开关重叠"; ④ toggle 文案配置到达后自纠 (renderAddition 同步)
+    - **区块工作制 (behavior 通用化, 用户裁定)**: TLM `MAID_WORK_RANGE` 上限 64 且 `SchedulePos.tick` 每 40t 重置 restrict → 大面积 (>64 格) 工作只设大半径无效。新增 `api/pathing/ChunkWorkArea` + 接入 `LmaFlowCoordinationBehavior` (注册于 WORK 活动): HOME 模式 + 任务 `isChunkWork()` (void/farm 覆写) + 工作时间 (`Activity.WORK`) → 临时把 home/workPos 移到当前工作区块中心 (`restrictTo` 12) + **内置 3×3 区块预载缓存** (换块才重发); `stop()`/非工作时段恢复原点。种菜 `expandHomeToFarm` 大半径方案退役; 空置域管线重复跟随 + `updateChunkLoads` 并入 behavior; `VoidExcavationChunkManager` 瘦身为 forceChunk + regionBounds; +ChunkWorkAreaTest 3 例 (错题 #261)
+    - 验证 (2026-08-28): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 476 用例 0 失败 ✅ + gametest 双节点 **24/24 ×2** ✅
+
+## 0.9.60 (2026-08-18) — 修复批次: 坐下被动拦截 / 奶桶跨平台 / 配方双格式 / 清雪移除 / 挥手补位
+
+- **坐下不再移动 (2026-08-16 用户实测「坐下还往水边走」)**: 温度取暖/铲雪/火把独立心跳被动自己 `maid.getNavigation().moveTo`, 不走 Brain 导航行为 — 坐下判断移入 `GameTickPipelineManager.tickStandalonePassives` 入口统一拦 (`isMaidInSittingPose()`), Brain 侧判断拦不到
+- **酒狐奶/野生酒狐奶奶桶功能 (用户验收)**: ① 蛋糕 — LMA 自注册 2 配方 (奶桶×3+糖+蛋+小麦→原版蛋糕); ② 其他 mod 当奶桶 — 双平台牛奶标签矩阵: 1.20.1 = forge:milk + c:milk (tags/items 复数), 1.21.1 = c:milk + forge:milk (tags/item 单数 — 1.20.5+ 目录单数化), 全 replace:false 追加
+- **1.21.1 配方双坑修复 (JEI 无配方最终根因)**: ① 配方目录 `recipes/`(复数)→`recipe/`(单数, 1.21.1 数据包格式 48); ② result 格式 `{"item":...}`→`{"id":...,"count":1}`; 配方按平台拆目录 (forge 1.20.1 格式 / neoforge 1.21.1 格式); +gametest `lmaMilkRecipesLoaded` (byKey 双平台锁)
+- **清雪移除 (用户裁定: TLM 原版清雪覆盖)**: 删 SnowShovelPipeline + SnowQuery; 被动 7→6 (管线 5→4); BlockPatternCache SNOW 缓存/ScanFilters.SNOW/SenseApi.scanSnow 删; **天气检测保留** (SNOWING/WEATHER_CLEAR 检出 + Signals 常量 → LLM 对话上下文, 用户裁定)
+- **挥手补位 (1.21.1 装填/右键互动无挥手)**: 装填 swing 从 `%10==0` 改每 tick (原版节流自持, 快装填不整段错过); block_interact 补 `maid.swing()` (interact 成功后 swing_hand 快速摆臂, 双平台统一)
+- **连带修复 (clean 重打暴露)**: forge mods.toml GBK+BOM 双重损坏重写 (UTF-8 无 BOM, nightconfig ParsingException); en_us.json 补 itemGroup key (LangConsistencyTest 红)
+- **0.9.60 历史批次 (2026-08-16~18 合入)**: 唱片识别 1.21.1 (isVanillaDisc) / 创造栏 LmaCreativeTab / PatPat 抚摸 (选区不再 cancel 右键) / 选区渲染修复 (归一化+端点盒+删网格) / 绑定 0,0,0+不落盘 (readBlockPos+cfgOrCreate) / 任务切换擦 LOOK_TARGET / ArmTransfer 自然流程 / 工作站导航提速 (10t) / 气泡公共 CD 5s / CannonLoad 缺弹节流 600t / 温度取暖 30s+10min CD / 女仆图鉴全维度合并 / 坐下判断 (上述) — 详见 docs/lessons-learned.md #243-250
+- 验证 (2026-08-18 实测): 双编译 --no-build-cache ✅ + 单测 63 类 462 用例 0 失败 ✅ + gametest 双节点 **14/14 ×2** ✅ (13/13 + lmaMilkRecipesLoaded) + 双 jar 部署 (21:36) + 上传 GitHub LMA-Releases (0.9.60)
 
 ## 0.9.59 (2026-08-15) — 新功能: 酒狐奶桶 / 野生酒狐奶饰品
 
+- **版本转正 0.9.59 (2026-08-16)**: gradle.properties ×2 + mods.toml ×2 升版 (原 0.9.58); 本节约 2026-08-15~16 全部批次 (酒狐奶饰品/结构 enter/B-CBC 移植/预算 P/工具分层/环境感知缓存/文档工程/被动细节/自救 v2/属性界面/死代码清理/管线修复/RecoveryLadder/PatPat/酒狐奶扩展/被动脱管线/温度热源安全) 随 0.9.59 发布; 双 jar 已重打包 unzip 验 (0.9.59 名 + toml 版本 + 新类/数据/零残留)
+
 - **两个可饮+可装备饰品的奶桶** (继承 TLM `IMaidBauble`, 经 `bindMaidBauble` 注册): 酒狐奶桶 (喝=抗性提升II+生命恢复I 10s; 饰品受伤=双buff+掉耐久, 总30) / 野生酒狐奶 (喝=生命恢复I 30s; 无法破坏; 饰品濒死=无敌30s+音乐+CD10min 图腾式, 触发后保留)
-- **右键挤奶三态判定 (主人维度)**: 空桶右键已驯服自己的女仆→酒狐奶桶+好感+1 (CD 5min 硬编码, 仅好感有CD); 未驯服→野生奶(副开关开)/奶桶(副开关关)+哈气动画+攻击(伤害读哈气管线HAQI_HIT_DAMAGE); 已驯服别人的→不能挤 (TLM mobInteract 事实: InteractMaidEvent 只主人 fire, 未驯服走 EntityInteract)
-- **配置 8 项** `kitsune_milk.toml`: 主/副开关 + 3 效果时长 + 耐久 + 无敌时长 + CD; 加好感CD不进配置 (用户裁定)
+- **右键挤奶三态判定 (主人维度)**: 空桶右键已驯服自己的女仆→酒狐奶+好感+1 (CD 5min 硬编码, 仅好感有CD); 未驯服→野生奶(副开关开)/酒狐奶(副开关关) 同样冒爱心产奶但不加好感; 已驯服别人的→不能挤 (TLM mobInteract 事实: InteractMaidEvent 只主人 fire, 未驯服走 EntityInteract); 挤奶无 CD + 去重守卫 (一次右键只产一个)
+- **配置 9 项** `kitsune_milk.toml`: 主/副开关 + 3 效果时长 + 耐久 + 无敌时长 + CD + 音乐音量(默认0.5); 加好感CD不进配置 (用户裁定)
 - **落位**: `bauble/` 只放饰品 API 基座 (BaubleApi 时间戳状态), `bauble/WildKitsuneMilk/` 放业务实现 (API/实现分离)
 - **素材**: 野生奶贴图 dogmilk.png (32×32 缩放落盘) + 音乐 dogmilk.ogg (SoundEvent 注册, 播放时附近全听)
-- **测试**: KitsuneMilkInteract.decide 纯函数 5 用例 + ConfigConsistency 补 kitsune 段断言; 口径 54 类 392 用例 0 失败
-- 验证 (2026-08-15 实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 54 类 392 用例 0 失败 ✅ + gametest 双节点 11/11 ×2 ✅
+- **反馈**: 挤奶 COW_MILK + 经验声 + 心形粒子; 喝奶 GENERIC_DRINK; 野生奶触发图腾粒子 + 无敌期每 3s 一次图腾特效; 野生奶紫名 EPIC + 无法破坏标注; 奶桶 30 耐久
+- **结构气泡优化 (用户批准)**: pickMaid 全实体遍历 → AABB 范围粗筛 + 圆形精筛; 结构名/方向词(前后左右上下 6 向相对玩家朝向)/语气词模板(6 far + 6 near: 去看看/狗修金我饿了/好吃的/蛋糕) 全走 lang 键 Component.translatable 客户端双语 (labelOf 中文硬编码删除); scanAllStructures registry 查找提循环外; 注释漂移修正
+- **测试**: KitsuneMilkInteract.decide 5 用例 + ConfigConsistency kitsune 段 + StructureSenseDirectionTest 8 用例 (relativeDir 6 向/语气组件/合并组件); 口径 55 类 398 用例 0 失败
+- **结构感知 enter 提示 (2026-08-16 用户裁定)**: 进入结构不再全静默 — ENTER 信号补气泡+聊天 (村庄专属模板「到村庄啦，来收集小麦做蛋糕吧」+ 通用池「到%s啦」×3, 双语 lang 键 tip.enter.*); 首扫即 IN 改发 ENTER (避免「附近有X」+「到X啦」两连弹); IN 进入即提示、停留恒静默 (删 IN 转正分支防 60s 重复弹, 流程审查发现); NEAR 环带 discover/refresh 不变 (displaced NEAR 转正保留); leave 保持静默 (LLM 预留); 状态机测试 28→30 例
+- 验证 (2026-08-15 实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 55 类 398 用例 0 失败 ✅ + gametest 双节点 11/11 ×2 ✅
+- **结构判定 BB 语义升级 (2026-08-16 用户裁定)**: 相位判定从「距结构中心」改为「距结构边界盒」— scanAllStructures 返回 StructBox (MC BoundingBox 六元组纯数据, 双平台 minX() 访问器 javap/源码实证一致); 在盒内=0, 进入 = 距盒 ≤enter(默认 40→8), 离开 = 距盒 >leave(默认 100→24), 刷新环带 = 距盒 8~24; 「到村庄啦」真在村里触发、「离开」真出村触发, 大小结构一视同仁 (村庄 153×120 实测错位问题解决); +StructBox 边界距离 3 用例
+- **调试指令 /lma structure (2026-08-16)**: fire <discover|refresh|enter|leave> — 立即以玩家为中心走真实链路发射结构信号 (气泡+聊天, 绕过节流/状态机, 调试几分钟才变的效果); state — 状态机+文案缓存快照; reset — 清缓存重测首次发现 (权限 2)
+- **CBC 火炮兼容移植 1.21.1 (2026-08-16)**: CannonLoadService/Pipeline 从 forge/src 移 common 双平台编译 (CBC 5.11.7 compileOnly); API 差异适配 (//? if): BigCannonMunitionBlock.getExtractedItem/getHandloadingInfo 1.21 增 HolderLookup.Provider 参数, getInitialOrientation 双平台在位 (javap 实证);
+- **结构扫描预算方案 P (2026-08-16 用户裁定: 区块作基本单位/附近有女仆才扫/缓存慢慢读)**: 新建 vanilla/input/world/StructureScanCache — 区块级共享缓存 (维度+chunkPos 键, TTL 20s, 懒清理 4096 条/10min 陈旧) + 由近及远摊薄螺旋 (RingSpiral, 预算耗尽近处优先) + 每广播轮结构通道 2ms 墙钟预算 (跨玩家共享先到先得); StructureSense.detect 门控前置 (无附近主人女仆直接跳过, 不扫不推进); EnvScanner.scanAllStructures 迁入并退役 (vanilla 工具 API 分层 — 寻路用 TLM brain 放 behavior, 管线放 service, 原版执行复用放 vanilla)
+- 验证 (2026-08-16 预算 P 实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 56 类 409 用例 0 失败 ✅ (+StructureScanCacheTest 5 用例) + gametest 双节点 11/11 ×2 ✅ + 0.9.58 双 jar 重打包 unzip 验 ✅ + 部署双平台 (.bak-0816e 轮换) ✅
+- **原版工具分层收口 A+B 批 (2026-08-16 用户裁定: 所有管线能移植的原版工具重构进 vanilla)**: A 收口 — task/sense/WorldStateReader 退役 (describe 迁 vanilla, GetWorldInfoTool 改引用); ToolJudge 迁 vanilla/input/item (原 task.service 纯原版工具判断计算层, ToolStateReader 文档倒置消除); EnvScanner.directionWord/directionLabel 死 API 删 (生产零引用, 结构气泡方向词已 lang 化)。B 抽离 — 新建 SnowQuery (scanSnowBlocks 迁入) / EntityScanner (EntityScan+EnvScanner.scanEntities+CAT_* 合并收编, monster 分类原样保留) / SoundOutput (SoundEvent 双平台注册表解析 + 播放原语, Haqi/Craft/BellRing 改委托) / HeatSourceQuery + WaterQuery (TempAdapt 热/水源判定迁入, LIT-only 保留) / NearbyContainerScanner (通配符+容器扫描提取迁 vanilla/input/container); StructureScanCache +structuresAt, WorldStateReader +biome 温度/降水/describe; TorchLight 亮度读取委托 LightQuery (判定阈值不动); EnvScanner 收敛为 WorldInfo 快照组装。分层实况: vanilla 51→60, task/service 16→14, task/sense 16→14
+- **最终完整性审计 (2026-08-16 用户要求: 流程/重复性/完整性/可读性/健壮性/模块化)**: ① 重复性 — scanAround 三段同构实体并入循环抽私有原语 mergeInto (1 定义 3 调用, 语义单一); 纯函数间补空行分隔。② 模块化 — 依赖方向全树终审: v79.6x A/B 批新增 12 个 vanilla 类零越层 ✓; 历史遗留 5 处越层 (execute 协调器族→task/service 等 + CombatOutput→MaidData + MaidAttrRegistry→compat) 如实记录进 AI-CODING-GUIDE 分层表「历史例外」, 新代码禁止新增。③ 完整性 — 缓存三层生命周期闭环复核 (区块 lazyClean / queryCache onEntityRemoved+懒清理 / 时钟回退自愈) 全部闭环。④ 验证: 双编译 ✅ + 单测 57 类 431 用例 0 失败 ✅ + gametest 11/11 ×2 ✅ + 部署 (.bak-0816m 终审版) ✅
+- **全流程走查修复 P1/P2 (2026-08-16 用户要求走流程找问题)**: 走查环境感知全链路 (收集→分流→L1/L2/L0→边沿→分发→快照→消费→生命周期) — P1: L1 漂移快路径直接复用旧结果, 缓存期内死实体泄漏进 presenceOf 判定 → 快路径返回前 isAlive 重建过滤 (与 L2 一致); P2: 预算耗尽跳过 grace 外区块时结果不完整仍写 L1 → 漏报放大到多轮 → incomplete 标志, 不完整结果不进 L1; 顺手拆 lazyClean 双独立清理分支; 已兜底复核 (时钟回退自愈/预热同 tick 命中/warm grace 一致/螺旋中心优先)
+- **测试写满 (2026-08-16 用户要求)**: EntityScanCache 内联数学抽纯函数 (chunkRadiusOf 半径→区块半径 / shouldReuseQuery L1 命中判定) + EnvSenseBroadcaster.shouldUseCache 分流判定抽纯 → EntityScanCacheTest 8→24 用例 (isFresh 5 / grace 2 / 漂移常量 1 / driftSq 4 / reuse 5 / chunkRadius 5 / 螺旋覆盖 2) + EnvSenseBroadcasterTest 新建 5 用例 (0/1/2→直扫, 3/10→缓存); 单测 57 类 431 用例 0 失败; 全树旧测试数字残留清零
+- **环境感知扫描: 混合分流 + Retold 两细节 + 螺旋枚举 (2026-08-16 用户裁定, GitHub 调研: lithium 系增量维护/Retold 漂移门限+grace/Magnot per-tick)**: 广播器先收集 eligible 女仆 (开关+门控) → ≤2 直扫原路 (家庭场景缓存反而更贵) / ≥3 预热主人区块+区块缓存共享; EntityScanCache 吸收 Retold 模式① per-查询漂移门限 (中心漂移 ≤3.5 格且结果未过期 → 直接复用上次结果, 静止/小幅走动女仆零重扫零合并) + 模式② grace 40t (过期宽限内仍可读 — 预算耗尽不漏报); onMaidUnload 清 per-查询缓存闭环; +3 测试用例
+- **环境感知实体扫描缓存 (2026-08-16 用户裁定: 和结构一样做缓存)**: 新建 vanilla/input/search/EntityScanCache — 区块级实体缓存 (维度+chunkPos 键, TTL 200t 与环境扫描间隔对齐: 同轮共享轮间重扫, 新鲜度零变化) + 每广播轮主人区块预热 (warm, 独立 2ms 预算不挤占广播 pass 8ms) + per-maid 查询 scanAround 全命中零重扫; 缓存存区块全高清单 (无分类无自排除 — 分类/垂直窗 ±4/maxHits 截断在查询方, 原 scanEntities 语义逐项保留); 广播器扫描半径统一 ENV_DEFAULT_RADIUS (restriction 分支删, 缓存 key 不带半径); 门控半径 20 不动 (用户确认); +EntityScanCacheTest 5 用例
+- **文档工程 (2026-08-16 用户要求: 给低配 API 写最终架构+完整文档)**: ARCHITECTURE.md 大修 — 顶部新增「实测基线表」(唯一数字真相源, 其他文档禁止抄数字) + §1-§13 全数字回写 (313 main/55 test/89 task/60 vanilla/48 compat/16+16 主动/55 类 402 用例) + §4 信号体系退役口径修正 (event: 5 信号 v77.4 退役实证 — 事件直调 TaskDispatcher); **AI-CODING-GUIDE.md 新建** (低配 API 开发手册: 开工流程/分层判据/7 铁律/新增任务·被动·原语 howto/双平台/测试/验证/文档同步); docs/README 重写 (权威链+死文档清单); 死文档横幅 3 (task-development/ENGINE-REFACTOR-PLAN/architecture-review); 12 份小文档漂移修复 (PROJECT_OVERVIEW 等); 全树旧数字残留 grep 清零
+- 验证 (2026-08-16 A+B 实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 55 类 402 用例 0 失败 ✅ (EnvScannerDirectionTest 5 用例 + FilterTest 方向词 2 用例随死 API 删除, ToolJudgeLogicTest 同包同搬) + gametest 双节点 11/11 ×2 ✅ + 0.9.58 双 jar 重打包 unzip 验 (新类齐/旧类零残留) ✅ + 部署双平台 (.bak-0816f 轮换) ✅ TaskRegistry/Manifest 加 neoforge 注册分支; neoforge 主动任务 15→16
+- 验证 (2026-08-16 实测, 结构 enter 提示批次): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 55 类 401 用例 0 失败 ✅ (含 0.9.59 口径 398 + 本次 +2; 差 1 为口径细节) + gametest 双节点 11/11 ×2 ✅ + 0.9.58 双 jar 重打包 unzip 验 ✅
+- **被动管线细节调整批次 (2026-08-16 用户裁定, 7 条)**: ① 铲雪导航式 — 女仆走到雪旁 4 格内才破坏 (替代原地隔空清雪, temp_adapt 同款 moveTo); ② 雪天中途积新雪 — 删预检无条件提交 + tick 无雪 200t 降频等待 (pipelineData waiting 标记) + 增订 WEATHER_CLEAR 边沿收线 (原「雪清完即 cancel」+ SNOWING 严格边沿 → 整场雪不再触发); ③ 温度抖动冷却门 — NORMAL 写戳, COLD/HOT 200t 冷却内忽略重提交 (日志实证 7s 内 cancel→submit 压制); ⑨ 不可达背压 — 同目标连续 3 次无进展 (300t) → interval 600, 目标变化/接近/到达重置 (隔墙热源反复 100t 重寻路修复); ⑩ 无灯重扫降频 — TorchLightPipeline 加 TaskConfigurable, lightUp 失败置 no_light → 节流 100t→300t; ⑧ 哈气独立通道降频 — ENVSENSE 开 60t (与 200t 广播互补) / 关 20t 保底 (唯一触发源历史根因); ⑦ 日志降噪 — [LMA/Haqi] LOOK 进入 + submitPassive/cancelPassive INFO→DEBUG (被动周期高频成对刷屏)
+- 验证 (2026-08-16 被动细节批次实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 57 类 431 用例 0 失败 ✅ + gametest 双节点 11/11 ×2 ✅ + 0.9.58 双 jar 重打包 unzip 验 (6 改动类齐) ✅ + 部署双平台 (.bak-0816o 轮换) ✅
+- **自救 v2 批次 (2026-08-16 用户裁定: Numen/Baritone 调研后移植, 固定序 被埋>摔落>卡住)**: ① **MLG 摔落自救** — MlgRescueCoordinator (vanilla/execute, Numen MLGChain 移植): 判速度不判落差 (fallDistance 客户端权威坑) + 五射线探落点 (中心+四角防格缝漏) + 水桶/软方块双通道 + 收水闭环 (20t 窗口); **女仆直接世界操作** (world.setBlock + 背包水桶↔空桶 — 用户裁定「我们的类是 maid 不是假人」, TLM destroyBlock 同款模型; 假人右键链 1.20.1 桶族 use() 视线驱动平台分裂撤销); ② **卡住脱困** — UnstuckDetector 纯类 (40t 窗口/80% 尝试占比/0.75 格圆盘, 空闲不误报) + UnstuckCoordinator (导航激活态 !isDone 采样 + 137° 换向 30t burst + 周期跳); ③ **摔落预触发** — SelfRescueTrigger (TaskTickHandler 主循环内联, 便宜判定先行 — 掉血事件通道外, 摔落中启动落地前放水); ④ **RecoveryLadder 纯类** (task/runtime, Numen 恢复阶梯: Rung 重试上限/失败穿透/耗尽 — v1 纯逻辑, 接守卫链第二阶段); ⑤ 不移植项 (TLM 原生已有, 源码实证): 换气 MaidBreathAirTask / 低血进食 MaidHealSelfTask / 逃跑 MaidPanicTask; ⑥ gametest lmaMlgRescue (12 测试)
+- 验证 (2026-08-16 自救 v2 实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 60 类 452 用例 0 失败 ✅ (UnstuckDetectorTest 9 + MlgJudgeTest 5 + RecoveryLadderTest 7) + gametest 双节点 12/12 ×2 ✅ + 0.9.58 双 jar 重打包 unzip 验 ✅ + 部署双平台 (.bak-0816p 轮换) ✅
+- **女仆属性界面重写 (2026-08-16 用户裁定)**: 暗色玻璃风 — 半透明黑行底 (0x80000000, hover 提亮) + 白字 + 金色值/组标题 (去米黄纸感); 字号分级放大 (MC 位图字体无多字号 API, pose.scale 缩放: 标题 2x / 组标题与女仆名 1.5x / 属性行 1.25x, 行高 36/28, 面板 480×400); 底部双按钮 — 返回 + **「LMA 参数」** → TLM 任务配置屏 (当前任务配置链: 1.20.1 TLM NetworkHandler.CHANNEL 发 OpenMaidGuiMessage / 1.21.1 PacketDistributor 发 OpenMaidGuiPackage — TLM 1.21 包改名 Message→Package javap 实证, TabIndex.TASK_CONFIG 双平台同值); +lang 键 lma_params (zh/en)
+- **续哈气开关补查 (#5)**: HaqiTrigger.tryContinue 加 HAQI_ENABLED 检查 — 运行中关配置即停续哈气 (原无视开关配置不即时生效)
+- 验证 (2026-08-16 界面重写实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 60 类 452 用例 0 失败 ✅ + gametest 双节点 12/12 ×2 ✅ + 0.9.58 双 jar 重打包 ✅ + 部署双平台 (.bak-0816q 轮换) ✅
+- **被动细节收尾 #4/#6 (2026-08-16)**: #4 哈气 MOVE 语义修正 — 到达判定 1.5²→2.5² 格 (用户裁定「发现后走到旁边就 LOOK, 不是精确贴身」) + move_ticks 超时 200t 兜底 (目标持续跑动走不到旁才放弃; 4 触发口同步重置); #6 任务开关禁用清理 — GMPM tickPassiveFor 入口统一 pass (10t 节流, 哈气独享分支前, in_progress 且禁用 → cancelPassive, 覆盖全路径含 haqi) + TorchLight onCleanup 兜底 (副手灯插回背包 — 原禁用后火把留副手)
+- 验证 (2026-08-16 #4/#6 实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 60 类 452 用例 0 失败 ✅ + gametest 双节点 12/12 ×2 ✅ + 0.9.58 双 jar 重打包 ✅ + 部署双平台 (.bak-0816r 轮换 → .bak-0816s MOVE 语义修正版) ✅
+- **死代码清理 + CompatRegistry 双平台 + 文档口径回写批次 (2026-08-16, 用户批准, 项目通读后)**: ① CombatOutput 死 import×3 删 (vanilla→task.data 越层死后清理) + launchProjectile 嵌套双层 //? if 死分支简化 (内层 `BuiltInRegistries.ENTITY_TYPE.getValue` 双平台产物均不可达); ② MaidHarvestCropEvent 死事件全删 (发布 1 消费 0 + javadoc 幽灵引用 MaidHarvestSignalBridge 全项目不存在; AutoCropHandler postHarvestEvent 撤 — 每收割一次空 post 白开销); ③ TaskKeys.WAIT_TICKS 只写不读键删 (AnimExecute 4 处 putInt 撤, ANIM_RUNTIME_KEYS/ANIM_CLEANUP_KEYS 摘除 — 写删读零行为变化); ④ TaskToggle.isEnabledFor per-maid 死分支删 (签名收敛全局 isEnabled, GMPM×3 + EnvSenseBroadcaster×1 同步, 行为零变化); ⑤ CompatRegistry createbigcannons 模块注册移出 //? if 1.20.1 分支 — CBC 双平台 GUI 模块表对齐 (任务 0816 已双平台注册, 门控表漏移 = neoforge 模块开关不可见, 移植批次遗漏); ⑥ 文档口径 15+ 处 (根 README 数字+neoforge 16 主动 / ARCHITECTURE 基线表 60 类 452·318 main·12/12×2·分层数回写 / §1·§3.1·§6 同步 / AI-CODING-GUIDE 基线+历史例外 5→4 处 / AGENTS.md / task+service README 迁走类指引 / gametest 12 / compat GatedMaidTool 14+CBC 双平台 / 饰品 9 键 / KitsuneMilkInteract+README+Config 哈气攻击残留×6 / 悬空注释×4 / DangerGuard 240t→60t / event README)
+- 验证 (2026-08-16 死代码+文档批次实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 60 类 452 用例 0 失败 ✅ (XML 双证据) + gametest 双节点 12/12 ×2 ✅ (基线表已按实测回写)
+- **管线检查 + 低成本修复批次 (2026-08-16, 4 域并行深读 52 项发现)**: 管线全景检查 (工作站族/直接+FSM 族/被动族/驱动层, 报告落盘 multiprompts\output\pipeline-check-2026-08-16\S1~S4)。低成本修复: ① CANCELLED 钩子 6 处清理 (TaskStateMachine/GMPM/ChainHarvestExecute/ChainHarvestPipeline/RunningBeltPipeline/MaidAssemblyPipeline — 实证 cancel 同帧 clearAll 状态零残留不可达; TaskStateManager.isCancelled 死方法删; LmaFlowCoordinationBehavior 启动守卫保留注释); ② TorchLight 补盾死注释修正 (代码实际语义"有怪保火把", 无补盾实现); ③ VanillaConstants 死常量×4 删 (JUKEBOX_PLAY_TICKS/FURNACE_INPUT_LIMIT/FURNACE_FUEL_LIMIT/TASK_DEFAULT_TIMEOUT); ④ 哈气续写疑点用户裁定驳回 (tryContinue 只扫女仆, javadoc 与代码一致, S3-4.6-1 为误报); ⑤ RecoveryLadder 接守卫链方案已出 (recovery-ladder-guardchain-plan.md, 待批准)
+- 验证 (2026-08-16 管线检查+低成本实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 60 类 452 用例 0 失败 ✅ (XML 双证据)
+- **RecoveryLadder 接守卫链 + 导航守护 (2026-08-16 用户批准实施, 🟡 待办第二阶段)**: 新增 `api/pathing/NavProgressGuard` (寻路 API 域) — 进展检测纯类 (目标未变 + 位移<0.5² 持续 100t → nav_stuck; 状态存 MaidData.pl("navguard") 内存态零 NBT, 目标变自动重置, 时钟回绕守卫; 纯函数 shouldFlagStuck/hasProgress/parsePos JVM 可测)。挂接: ① **TLM Brain behavior 层** (LmaFlowCoordinationBehavior — 用户裁定位置, 每女仆实例持 RecoveryLadder: R1 重搜×2 → R2 等重试×3 → R3 放弃擦目标+气泡; stop() 重置防跨任务残留) — 工作站族 TARGET_POS 路径全受益; ② **FSM 路径** (ArmTransferPipeline TO_TAKE/TO_DEPOSIT — 目标绑定不可重搜, 轻量两档: 等重试一窗口 → fail"取货点/放货点不可达", stage 存 pl 随终结闭环)。不动 GMPM/TaskDispatcher/PathingApi (红线 2/3 零触碰; ChainHarvest 路径已有 240t 超时兜底不重复挂接)。+NavProgressGuardTest 9 例
+- 验证 (2026-08-16 导航守护实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 61 类 461 用例 0 失败 ✅ (XML 双证据; BlockPos 纯数据类 JVM 直测安全实证)
+- **管线检查问题修复批次 S1-F2/F3/F4 + 哈气边沿冻结增强 (2026-08-16 用户裁定)**: ① **furnace 无料降频** (S1-F2): 无料/料烧完不再每拍刷"furnace 失败"气泡 — 1200t 冷却后重查 + 气泡提醒 (与看门狗同周期, ThrottleUtil "furnace_no_ingredient" 时间戳自过期); ② **jukebox 弹碟死循环修复** (S1-F3): EJECTING 区分"机内空"与"全拒" — 全拒 (背包满) 保持 EJECTING 每 tick 重试 + 600t 节流气泡"背包已满" (原全拒误判空 → INSERTING→PLAYING→EJECTING 震荡, 碟永久滞留); ③ **jukebox 目标匹配统一** (S1-F4): 新增 matchesTarget (注册表 key + 描述名 + 显示名统一 lowercase — 修 toString() 双平台漂移 #191 同根 + validate/INSERTING 大小写判据分裂); 目标碟缺失 → 600t 节流气泡提醒 (原静默卡 INSERTING); ④ **哈气期间边沿整体冻结增强** (S3-1.6-1 用户裁定): EnvSenseBroadcaster 哈气运行中连分发一起跳过 — 边沿信号不消费 (原只冻结基线照常分发 → 无效 onSignal + 噪音); 哈气结束下轮重检测重放; 结构/节日走 flushPending 独立通道不受影响
+- 验证 (2026-08-16 管线修复批次实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 61 类 461 用例 0 失败 ✅ (XML 双证据)
+- **Create+CBC 管线修复批次 (2026-08-16 用户裁定, V1/V2 源码验证后)**: ① **P0 转换图补边 ×3** (Crank NAVIGATING→SEARCHING + CRANKING→NAVIGATING / Power NAVIGATING→SEARCHING — 修图-码矛盾 latch + warn 刷屏 + 远距离空摇); ② **NavProgressGuard + 跳过集接入 4 个 Create FSM 管线** (crank/power/press/mix — 导航卡死 → 目标进跳过集 60t 换目标, 对齐 ChainHarvest SKIP_TTL; 用户裁定"导航刚需走到工作方块旁+可能有跳过集"); 新建 **api/pathing/NavSkipSet** (跳过集通用门面, BlockTargetNavigation default 委托, CannonLoad 复用); ③ **无目标静默 → 600t 节流气泡** ×5 (crank/power/press/mix 无目标 + running_belt 缺皮带/缺食物); ④ **CannonLoad 3 项** (MOVING 导航兜底+炮架跳过集 / LOADING 滞留超时 200t→气泡+回搜索 / 满装判定先过 isLoadOrderCorrect — 顺序错满装走 worm 清膛); ⑤ **死代码清理** (PressService PRESS_DURATION+canBasinProcess / MixService IDLE_INTERVAL / RunningBeltService 3 死方法 / Power "rpm" 死读分支 / MaidAssembly InProc 死写×2 + ADVANCE→IDLE 悬空边 + itemLocks/slotBlocked 全死面含 LOCKS_KEY/BLOCKED_KEY 常量 / CannonLoad CLEARING→OPENING 悬空边); ⑥ **V1/V2 源码验证修正** (crank turn 每 tick 32 RPM 幂等无害 = 误报撤销 / Power 应力容量缺口记录在案待实测 / CBC worm 口径批量版 10 块 / 多炮闩不可能存在 = 误报撤销; Screw/Sliding 炮闩漏识别待后续)
+- 验证 (2026-08-16 Create+CBC 批次实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 61 类 461 用例 0 失败 ✅ (XML 双证据)
+- **PatPat 抚摸兼容批次 (2026-08-16 用户裁定)**: 安装 PatPat (fabric 1.2.1+1.20.1 / neoforge 1.2.4+1.21.1) 后, 玩家抚摸女仆触发反应链 — 好感 +1 + 爱心粒子 (挤奶同款头顶 5 颗) + **对主人哈气专用语音 (littlemaid_peco 包 idle 子集随机, 同 HaqiOwnerVoicePacket 链路 — 用户裁定「不是哈气音效, 是特别选的对主人哈气音效」, 非 ha_1..5/laowu_1..5 原版清单)** + 气泡 3 选 1 (「好舒服~」「多摸一点」「今天中午吃什么呢~」, lang 键 tip.pat.1/2/3 双语可改)。**检测链 (关键)**: PatPat 抚摸按键 (Shift+右键) 取消 KeyMapping.click (PatPat KeybindingMixin 源码实证) → 抚摸期间服务端 EntityInteractEvent 不 fire → 放弃事件监听, 改为客户端 20t 轮询 PatPatClientManager.getPatEntity 状态表 (与 PatPat 渲染层同源, 本地+远程抚摸共享同一张表) → 新 C2S 包 **PatPatReactionPacket** (PacketRegistry id 4 回收空洞, forge 双驱动注册 + neoforge TYPE/STREAM_CODEC) → 服务端三道轻校验 (owner `isOwnedBy` + 3 格距离 + per-maid 600t 节流 — 信任客户端模型与 PatPat 自身一致, 客户端节流仅降载)。**门控**: ModList.isLoaded("patpat") (CompatRegistry.doScan checkModLoad, forge 1.20.1 无 PatPat 构建恒关 → TLM 默认坐下行为不变); 客户端节流表断线清空 (LoggingOut 双平台接线)。依赖登记 ×3: common + forge + neoforge build.gradle compileOnly。
+- 验证 (2026-08-16 PatPat 批次实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 61 类 461 用例 0 失败 ✅ (XML 双证据; NetworkPacketManifestTest 同步 forge 视图 14→15 项 / 6→7 C2S / id 4 回收 + PacketRegistry javadoc 空洞口径同步)
+- **酒狐奶扩展批次 (2026-08-16 用户裁定)**: ① **替乳合成** — 两奶桶加入 `forge:milk` 标签 (标准做法, `data/forge/tags/items/milk.json`, replace:false 合并不覆盖) → 引用该标签的第三方 mod 牛奶配方自动接受三奶; 原版蛋糕/硬编码配方**零改动** (不覆盖不改写), 另自注册 2 个蛋糕配方 (`recipes/cake_from_tamed_milk.json` / `cake_from_wild_milk.json`, 与原版 cake 逐字段同构 [实证: category misc + show_notification true + key A/B/C/E], 产物原版蛋糕) — 酒狐奶桶/野生奶各自可合成蛋糕; ② **喝奶食饱食度** — 取消 (用户裁定不要了, 饥饿值不变); ③ **清负面配置** — `kitsune_milk.toml` effect 段新增 `clear_negative` (默认 true, 酒狐奶+野生奶共用; 实现先 `removeAllEffects` 再加正面效果 [顺序防自删]), Config 9→10 项, ConfigConsistencyTest 自动覆盖 (allValues/前缀校验免改测试)
+- 验证 (2026-08-16 酒狐奶批次实测): 双编译 --no-build-cache ✅ + 单测 --rerun-tasks 61 类 461 用例 0 失败 ✅ (XML 双证据) + 双平台 jar unzip 验 ✅ (forge:milk tag + cake_from_*×2 在位; **jar 内无 data/minecraft/recipes/cake.json 覆盖物**)
+- **被动系统脱管线改造批次 (2026-08-16 用户批准一次性实施, 5 阶段)**: 被动不再共用单一 GMPM tick 通道 — 三形态分层: ① **纯触发型** (structure_sense/festival, 零 tick) — 新建 `task/passive/` (PassiveTask 接口 + PassiveDispatcher 四道闸 [注册/TaskToggle/ha qi 底层覆盖/冷却表, 卸载声明式清理]) + `impl/`×2 (原管线逻辑搬入, 旧管线类删除); ② **跨 tick 动作型** (snow_shovel/temp_adapt/torch_light) — 移出 GMPM 共享通道, 新增 `tickStandalonePassives` 独立心跳 (每 tick 调用, 动作频率由管线内 ThrottleUtil 节流自持 40/100/200/300t, 行为等价); ③ **GMPM 真管线** (haqi FSM + 底层覆盖 / self_rescue 时间关键) — 保留 `tickPassiveFor` (haqi 运行中 self_rescue 停 tick); **haqi 底层覆盖统一入口** (用户裁定: 启动不结束不做其他事 — PassiveDispatcher.haqiRunning, submitPassive/心跳/Dispatcher 三处收敛); **TaskRegistry.TaskHandler 无 pipeline 占位** (用户裁定: 任务树标签兜底 taskType, 可见性/开关零改动 — TaskToggle 零耦合); 删除: PASSIVE_TICK_BUDGET 配置 / PassiveRotation 轮转类+测试 / 位掩码缓存+clearMaidCaches; gametest lmaPassiveBudget → lmaPassiveTickIsolation (通道隔离断言)
+- 验证 (2026-08-16 被动脱管线批次实测): 双编译 --no-build-cache ✅ (每阶段) + 单测 --rerun-tasks **60 类 455 用例 0 失败** ✅ (XML 双证据; -6 = PassiveRotationTest 随机制删) + gametest 双节点 **12/12 ×2** ✅ (lmaPassiveTickIsolation 新断言; neoforge sync_data = 已文档化 mock 噪音)
+- **温度热源安全修复 (2026-08-16 用户裁定 A+B, 用户质询发现)**: temp_adapt 热源清单历史缺陷 (v63 起) — ① **剔除 FIRE/SOUL_FIRE** (火方块无碰撞箱、寻路不避, 女仆 COLD 导航会走进火里被点燃); ② **导航落点偏移** — HeatSourceQuery 新增 `safeStand` (热源旁水平 ±2/垂直 -1..+1 扫描: 非危险方块 + 非流体 + 无碰撞 + 下方有支撑, 本体格跳过), TempAdaptPipeline 导航目标改指安全落点, 找不到兜底热源本体 (岩浆块可站立烫脚/岩浆贴边一并解决); 危险方块集与热源清单同源 (火/灵魂火/岩浆/岩浆块/点燃营火×2); 新增 gametest `lmaTempAdaptSafeTarget` (构造火+岩浆块+点燃营火场景, 断言热源不含火 + 落点非危险邻格)
+- 验证 (2026-08-16 热源修复实测): 双编译 --no-build-cache ✅ + 单测 60 类 455 用例 0 失败 ✅ + gametest 双节点 **13/13 ×2** ✅ (新 lmaTempAdaptSafeTarget)
+- **缓存体系 L3 + 选区调试功能批次 (2026-08-16 用户裁定一批走, 落位 execute 层; 调研: lithium VicinityCache/WorldEditCUI/TLM 样板源码实证)**: ① **`vanilla/execute/BlockPatternCache`** — 单区块方块模式缓存 (L3 增量): 键 (维度+chunk+type), per-type TTL (雪 40t 对齐铲雪/热 100/水 100/容器 200), 地表高度窗 ±8 扫描 (WORLD_SURFACE, minY 兜底), 粗匹配缓存+查询方细筛防脏读 (v79.61x 原则), 维度清理; 接入 SnowQuery/HeatSourceQuery/WaterQuery (消除各自三重循环重复扫描; HEAT 判定抽 isHeatSource 单一来源); ② **结构静态层 (L1 增强)** — StructureScanCache 条目存在即有效 (结构位置世界生成后不可变, lithium 哲学), TTL 移除, 新结构增量填充; ③ **`vanilla/execute/DebugSelectionCoordinator`** — 选区高亮调试: 潜行+木棒右键 = 标记 (客户端 cancel 兼容既有 BlockInteract/ArmTransfer 标记, 用户裁定), 三击循环状态机 (起点黄盒/终点红盒 0.03 内缩 [WorldEditCUI 同款]/区域青 12 边线框/1 格 3D 网格 [32 格上限]/HUD 尺寸 WxHxD [1.21.1 世界内 Font 未实证→屏幕层可靠]/缓存区块边界叠加), 双平台 RenderLevelStageEvent (neoforge javap 实证) + RenderGuiEvent overlay 注册, 断线清除; ④ gametest lmaTempAdaptSafeTarget 修正 (热源放世界地表面 — BlockPatternCache 高度窗语义, 悬浮平台 miss 实证)
+- 验证 (2026-08-16 缓存+选区批次实测): 双编译 --no-build-cache ✅ (双平台渲染 API 差异修复: 1.20.1 vertex/color/normal vs 1.21.1 addVertex/setColor [TLM 实证], AABB(BlockPos) 1.21 移除→Vec3 版, Font String 3D 重载 1.21 缺→Component 2D/HUD) + 单测 61 类 459 用例 0 失败 ✅ (+BlockPatternCacheTest 4) + gametest 双节点 13/13 ×2 ✅
+- **温度感知取暖停留 + 长冷却 (2026-08-16 用户裁定)**: temp_adapt 不再「到了火旁就长期挂机」 — ① **到达停留取暖**: 到热源/水源旁 (4 格内, ARRIVE_DIST_SQR) 停止导航, 停留计时 (取暖节奏 interval 20t 精确累计 elapsed), **30 秒 (600t) 后完成** → 写 10 分钟冷却 (KEY_CD_DEADLINE 存 maid 根 PD 绝对截止, cancelPassive 不清) + cancelPassive 回工作; ② **10 分钟 CD (12000t)** — onSignal COLD/HOT 先查 CD (isCooled 纯函数: cd<=now/未设置/时钟回绕 → 放行), 冷却期内不再导航去热源/水源; ③ 未到达移动中/无目标 → 重置取暖计时 (resetWarm); 目标形态: 女仆 COLD 走到火旁待 30 秒取暖 → 离开工作 → 10 分钟内不去 (防一直往火旁跑); +TempAdaptPipelineTest 4 (isCooled 纯函数)
+- 验证 (2026-08-16 温度 CD 实测): 双编译 --no-build-cache ✅ (--rerun-tasks 强制) + 单测 62 类 463 用例 0 失败 ✅ (+4) + gametest 双节点 13/13 ×2 ✅
+- **死信号 DARKNESS_CLEAR 删除 + 广播粒度分析 (2026-08-16 被动走查用户裁定)**: 被动系统走查 (7 被动全链 + 系统横切, 报告落盘 passive-system-walkthrough-2026-08-16.md); 用户裁定: ① 哈气完全独享 tick 设计不动 (含自救冻结) ② temp 取暖被哈气覆盖在设计内 ③ **删 DARKNESS_CLEAR 死信号** — EnvSignal 枚举 / Signals 常量 / EnvEdgeDetector 检出 / 测试断言行全删 (TorchLight 靠 tick 自轮询「亮且无怪」闭环不用清边沿, 每广播轮白算); ④ **广播粒度结论**: per-owner 广播不划算 (温度/亮度/雪强位置相关 — 分头作业失真 + 主人移动抖动 + readWorld 本身便宜); 最优 = 数据分层粒度 (天气 per-dim / 温度亮度 per-chunk / 雪热实体结构节日已区块/player/stateless 共享); 潜在优化: EnvScanner.readWorld 加 200t 区块缓存 (同区块 N 女仆共享 1 次温度/亮度/天气读, 待用户裁定)
+- 验证 (2026-08-16 死信号删除实测): 双编译 --no-build-cache --rerun-tasks ✅ + 单测 62 类 463 用例 0 失败 ✅ + gametest 双节点 13/13 ×2 ✅
+- **打包部署 0.9.60 (2026-08-16 用户指令, 5 批合包)**: 缓存+选区 (BlockPatternCache/StructureScanCache 静态层/DebugSelectionCoordinator) + 温度取暖 30s+10min CD + DARKNESS_CLEAR 死信号删 + WorldInfoCache 广播粒度 + README 全量更新 + 死信号同族 10 删/ServerStopping 维度缓存接线/挤奶→奶文案 — 版本升 0.9.60 (gradle.properties×2 [versions/] + mods.toml [forge/src] + neoforge.mods.toml [neoforge/src], 共 4 文件; **neoforge jar toml 卡旧版坑 (stonecutter 资源合并缓存未感知 — 需改 neoforge/src 独立源 neoforge.mods.toml)**) → 双 jar jar --rerun-tasks -x javadoc → unzip 验证 (toml 0.9.60 双平台 + BlockPatternCache/DebugSelectionCoordinator/WorldInfoCache/EnvSignal 类 + 蛋糕配方×2 + forge:milk 标签全在位) → 部署双平台 (.bak-0816u 轮换, 活跃 0.9.59→0.9.60)
+- **0.9.60 部署崩溃 hotfix (2026-08-16, 用户报 1.21.1 crash-reports)**: LmaNeoForgeClientEntry 选区 HUD 注册用 RenderGuiEvent.class (抽象类) — NeoForge 禁止监听抽象事件类 → `<init>:96` IllegalArgumentException → 改子类 **RenderGuiEvent.Layer.class** → neoforge 重编译 + 重打 jar + 替换部署 (同 0.9.60); 错题 #243 (红线违反实证: RFC for 新监听先查 abstract)
+- **WorldInfoCache 广播粒度优化 + README 全量更新 (2026-08-16 用户裁定数据分层)**: ① **`task/sense/WorldInfoCache`** — 广播粒度最终落地: per-dimension 天气/昼夜/时间 (每轮 1 次查询, 全维度共享) + per-chunk 温度/亮度/biome/降水/站立结构 (同区块女仆共享, TTL 200t 对齐广播间隔 + 时钟回绕 + 懒清理 + clearDimension); EnvScanner.readWorld 接入 — 广播计算 N×readWorld → 1×分区读+快照组装; +WorldInfoCacheTest 4; ② **README 全量更新** (功能/工具/兼容/管线): 版本 0.9.59、单测 63 类 467、gametest 13/13、被动三形态细分、温度取暖 CD、热源安全、缓存体系 4 件套、选区调试工具、兼容 +PatPat、信号 18、布局 327 main/63 test、#150-240
+- 验证 (2026-08-16 WorldInfoCache 实测): 双编译 --no-build-cache --rerun-tasks ✅ + 单测 63 类 467 用例 0 失败 ✅ (+WorldInfoCacheTest 4) + gametest 双节点 13/13 ×2 ✅
 
 ## 0.9.58 (2026-08-15) — 全量重审修复批次 (B1 正确性 + B2 卫生 + T1 测试) + 文档 P0
 

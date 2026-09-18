@@ -19,6 +19,7 @@ import net.minecraft.world.entity.player.Inventory;
  * 关寻路 "no_pathfind" 经 ACTION_TOGGLE, per-maid 优先回退全局 VOID_NO_PATHFIND。
  * 区域区块数 (size) v79.62.1 裁定不再在此屏编辑 — 只读显示, 走全局 VOID_DEFAULT_CHUNKS。
  */
+
 public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavationConfigMenu> {
 
     public VoidExcavationConfigScreen(VoidExcavationConfigMenu menu, Inventory playerInv, Component title) {
@@ -46,15 +47,16 @@ public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavati
         final EntityMaid m = getMaid();
         if (m != null) RequestTaskConfigPacket.send(m.getId(), getTaskType());
 
-        int cx = contentX();
-        int y = contentY();
+        int rowW = contentRight() - contentX();   // v79.63.22 (用户): 控件占满整行 ✓
+        int rowX = contentX();
 
         // v79.62.1 用户裁定: 删 size 步进 + 删销毁开关 → 销毁名单输入 + 关闭寻路切换.
         // 布局 (TLM 单女仆界面窄, 控件宽度 ≤100 防超界):
         //  行1: 销毁名单输入框; 行2: 保存名单; 行3: 关闭寻路.
         // 销毁名单输入框 (物品 id, 逗号分隔; 名单内物品挖出即销毁消失)
-        destroyListBox = new net.minecraft.client.gui.components.EditBox(font, cx, y, 100, 18,
-                Component.literal("销毁名单 (物品id,逗号分隔)"));
+        destroyListBox = tipBox(rowX, rowY(0) - 2, rowW,
+                net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.destroy_list"),
+                net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.destroy_list.tip"));
         destroyListBox.setMaxLength(256);
         addRenderableWidget(destroyListBox);
 
@@ -62,28 +64,30 @@ public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavati
         addRenderableWidget(Button.builder(Component.literal("保存名单"),
                 btn -> {
                     String val = destroyListBox.getValue() == null ? "" : destroyListBox.getValue();
-                    sendAction(TaskConfigurable.ACTION_SET_LIST,
-                            makePayload(VoidExcavationPipeline.KEY_DESTROY_LIST, val));
+                    sendSetList(VoidExcavationPipeline.KEY_DESTROY_LIST, val);   // 基类助手 (README §二 契约) ✓
                     if (m != null) {
                         // 本地同步为 ListTag (与服务端 ACTION_SET_LIST 一致)
                         getMenu().getConfig().put(VoidExcavationPipeline.KEY_DESTROY_LIST, csvToList(val));
                     }
-                }).pos(cx, y + 24).size(100, 20).build());
+                }).pos(rowX, rowY(1) - 2).size(rowW, 20).tooltip(net.minecraft.client.gui.components.Tooltip.create(
+                net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.save_list.tip"))).build());
 
         // v79.62.2 导航开关 — 下一栏 (noPathfind=true=关闭导航=传送区块中间开挖; false=开启导航=TLM 走)
         boolean npCur = getMenu().getConfig().getBoolean(VoidExcavationPipeline.KEY_NO_PATHFIND);
         noPathfindBtn = addRenderableWidget(Button.builder(
                 Component.literal(npCur ? "关闭导航" : "开启导航"),
                 btn -> {
-                    sendToggleAction(VoidExcavationPipeline.KEY_NO_PATHFIND);
+                    sendToggle(VoidExcavationPipeline.KEY_NO_PATHFIND);   // 基类助手 ✓
                     boolean cur = getMenu().getConfig().getBoolean(VoidExcavationPipeline.KEY_NO_PATHFIND);
                     getMenu().getConfig().putBoolean(VoidExcavationPipeline.KEY_NO_PATHFIND, !cur);
                     btn.setMessage(Component.literal(!cur ? "关闭导航" : "开启导航"));
-                }).pos(cx, y + 48).size(100, 20).build());
+                }).pos(rowX, rowY(2) - 2).size(rowW, 20).tooltip(net.minecraft.client.gui.components.Tooltip.create(
+                        net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.nav.tip"))).build());
 
         // v79.62.2 自定义最低高度 — 下一栏 (空 = 自动检测基岩层; 设定 = 挖到该层停)
-        minYBox = new net.minecraft.client.gui.components.EditBox(font, cx, y + 72, 100, 18,
-                Component.literal("最低高度 (空=自动)"));
+        minYBox = tipBox(rowX, rowY(3) - 2, rowW,
+                net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.min_y"),
+                net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.min_y.tip"));
         minYBox.setMaxLength(6);
         addRenderableWidget(minYBox);
         // 保存最低高度
@@ -91,23 +95,42 @@ public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavati
                 btn -> {
                     String val = minYBox.getValue() == null ? "" : minYBox.getValue().trim();
                     if (val.isEmpty()) {
-                        sendAction(TaskConfigurable.ACTION_REMOVE,
-                                makePayload(VoidExcavationPipeline.KEY_MIN_Y, ""));
+                        // 空 = 移除键 ⇒ 回落"自动检测基岩层" (README §二: 用 ACTION_REMOVE 而非写默认值 ✓)
+                        sendRemove(VoidExcavationPipeline.KEY_MIN_Y);
                         if (m != null) getMenu().getConfig().remove(VoidExcavationPipeline.KEY_MIN_Y);
                     } else {
                         try {
                             int yv = Integer.parseInt(val);
-                            sendAction(TaskConfigurable.ACTION_SET_INT,
-                                    makePayload(VoidExcavationPipeline.KEY_MIN_Y, val));
+                            // ★ v79.66.1 校验 (与管线同口径): min_y 必须 < 标记层 start.y — 否则"无可挖层" ⇒
+                            //   管线首 tick 就会把区块判"已挖完"(旧实现还会删 start) ✗ 故在此直接拒绝保存 + 提示 ✓
+                            net.minecraft.core.BlockPos startPos = com.github.xiaozhaoz1.littlemaidmoreaction.api.nbt.NbtCodecs
+                                    .readBlockPos(getMenu().getConfig(),
+                                            com.github.xiaozhaoz1.littlemaidmoreaction.task.data.TaskKeys.CFG_START);
+                            if (startPos != null && yv >= startPos.getY()) {
+                                var pl = net.minecraft.client.Minecraft.getInstance().player;
+                                if (pl != null) {
+                                    pl.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                                            "screen.littlemaidmoreaction.void.min_y.invalid", yv, startPos.getY()), false);
+                                }
+                                return;   // 不保存
+                            }
+                            // ★ v79.64.4 修「保存后 Y 变 0」(用户实测): 原**绕过基类助手**手写 payload —
+                            //   用 {@code putString("value", val)} 配 ACTION_SET_INT, 而服务端是
+                            //   {@code cfg.putInt(key, payload.getInt("value"))} ⇒ 对 StringTag 取 int = **0** ✗
+                            //   (min_y=0 会被管线当作"挖到 y=0"= 世界底部, 覆盖自动检测) ⇒ 必须走 sendSetInt ✓
+                            sendSetInt(VoidExcavationPipeline.KEY_MIN_Y, yv);
                             if (m != null) getMenu().getConfig().putInt(VoidExcavationPipeline.KEY_MIN_Y, yv);
                         } catch (NumberFormatException ex) { /* 非法数字忽略 */ }
                     }
-                }).pos(cx, y + 96).size(100, 20).build());
+                }).pos(rowX, rowY(4) - 2).size(rowW, 20).tooltip(net.minecraft.client.gui.components.Tooltip.create(
+                net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.save_min_y.tip"))).build());
     }
 
     @Override
     protected void renderAddition(GuiGraphics g, int mouseX, int mouseY, float partialTicks) {
         CompoundTag cfg = getMenu().getConfig();
+        // v79.63.10: 与管线同源 — 只读全局 (忽略旧版残留的 per-maid size ✗, 用户实测显示与实挖不符)
+        // v79.63.16: 显示与管线同链条 (单女仆 → 全局 ✓); 用户可在下方输入框改/清 ✓
         int size = cfg.contains(VoidExcavationPipeline.KEY_SIZE)
                 ? cfg.getInt(VoidExcavationPipeline.KEY_SIZE)
                 : ActiveTaskConfig.VOID_DEFAULT_CHUNKS.get();
@@ -167,19 +190,4 @@ public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavati
         return list;
     }
 
-    /** Toggle 动作 (sendSetInt 不含 toggle) — 用 ACTION_TOGGLE */
-    private void sendToggleAction(String key) {
-        if (getMaid() != null) {
-            net.minecraft.nbt.CompoundTag p = new net.minecraft.nbt.CompoundTag();
-            p.putString("key", key);
-            sendAction(TaskConfigurable.ACTION_TOGGLE, p);
-        }
-    }
-
-    private net.minecraft.nbt.CompoundTag makePayload(String key, String value) {
-        net.minecraft.nbt.CompoundTag p = new net.minecraft.nbt.CompoundTag();
-        p.putString("key", key);
-        p.putString("value", value);
-        return p;
-    }
 }

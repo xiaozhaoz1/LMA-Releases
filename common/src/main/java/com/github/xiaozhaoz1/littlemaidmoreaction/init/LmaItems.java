@@ -56,6 +56,26 @@ public final class LmaItems {
             ITEMS.register("maid_codex", MaidCodexItem::new);
     //?}
 
+    /** v79.72: Token (女仆饰品 · 可食用) — 食用 2 点饱食度; 佩戴给「生命恢复 I」(见 bauble/token/) ✓ */
+    //? if 1.20.1 {
+    public static final RegistryObject<Item> TOKEN =
+            ITEMS.register("token", com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenItem::new);
+    //?} else {
+    public static final Supplier<Item> TOKEN =
+            ITEMS.register("token", com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenItem::new);
+    //?}
+
+    /** v79.62.3: 防御塔物品 (garage_kit_defense) — 原版手办合成, NBT 继承 */
+    //? if 1.20.1 {
+    public static final RegistryObject<Item> GARAGE_KIT_DEFENSE =
+            ITEMS.register("garage_kit_defense",
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitItem::new);
+    //?} else {
+    public static final Supplier<Item> GARAGE_KIT_DEFENSE =
+            ITEMS.register("garage_kit_defense",
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitItem::new);
+    //?}
+
     public static void register(IEventBus bus) {
         ITEMS.register(bus);
     }

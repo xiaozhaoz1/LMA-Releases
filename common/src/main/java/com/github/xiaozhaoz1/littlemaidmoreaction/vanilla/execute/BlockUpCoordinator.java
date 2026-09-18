@@ -2,7 +2,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.fakeplayer.FakePlayerInteract;
-import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.item.HandSwap;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.item.HandSwap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -32,7 +32,7 @@ public final class BlockUpCoordinator {
     /** 放方块 — 柱材换主手再放置 (假人主手物品点击 pos 的 face 面 → 块落 pos.relative(face)),
      *  放完恢复原工具。package-private static — 危险堵护 (DangerGuardCoordinator)
      *  复用同一放置链 (pos+face 参数化); 垫柱链删后仅堵护调用。 */
-    static boolean placeMaterial(ServerLevel world, EntityMaid maid, BlockPos pos, Direction face) {
+    public static boolean placeMaterial(ServerLevel world, EntityMaid maid, BlockPos pos, Direction face) {
         var inv = maid.getAvailableInv(true);
         int slot = findMaterialSlot(maid);
         if (slot < 0) return false;

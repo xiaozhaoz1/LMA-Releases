@@ -2,8 +2,8 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.network;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LmaNetwork;
 
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage;
-import com.github.xiaozhaoz1.littlemaidmoreaction.storage.FarmRegionStorage.FarmRegion;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.FarmRegionStorage;
+import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.FarmRegionStorage.FarmRegion;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 //? if 1.20.1 {
@@ -118,29 +118,37 @@ public record FarmRegionEditPacket(int action, String maidUuid, int index,
     }
 //?}
 
-    /** 服务端统一处理: 改存储 + save + 回 sync 刷新 */
+    /** 服务端统一处理: 改该女仆 NBT 里的区域 + 回 sync 刷新 (v79.64: 按 uuid 解析女仆实体) */
     private static void handleFarm(ServerPlayer player, FarmRegionEditPacket msg) {
         String uuid = msg.maidUuid();
         if (uuid == null || uuid.isBlank() || uuid.length() > 64) return;
+        // 按 uuid 找女仆 (包只带 uuid; 找不到 = 未加载/已收魂符)
+        if (!(player.level() instanceof net.minecraft.server.level.ServerLevel ownerLevel)) return;
+        var m = FarmRegionStorage.findMaid(ownerLevel, uuid);
+        if (m == null) return;
+        String dim = player.level().dimension().location().toString();
         switch (msg.action()) {
             case ACTION_ADD -> {
-                FarmRegion r = FarmRegionStorage.of(msg.minX(), msg.minY(), msg.minZ(),
+                FarmRegionStorage.FarmRegion r = FarmRegionStorage.of(msg.minX(), msg.minY(), msg.minZ(),
                         msg.maxX(), msg.maxY(), msg.maxZ(), msg.cropId(), msg.harvestMode());
-                FarmRegionStorage.addRegion(uuid, r);
+                // 维度 = 玩家(操作者)当前世界 (区域是玩家在眼前框选的)
+                r = new FarmRegionStorage.FarmRegion(r.minX(), r.minY(), r.minZ(), r.maxX(), r.maxY(), r.maxZ(),
+                        r.cropId(), r.harvestMode(), r.seedX(), r.seedY(), r.seedZ(),
+                        r.harvestX(), r.harvestY(), r.harvestZ(), msg.name(), dim);
+                FarmRegionStorage.addRegion(m, r);
             }
-            case ACTION_REMOVE -> FarmRegionStorage.removeRegion(uuid, msg.index());
-            case ACTION_CLEAR -> FarmRegionStorage.putRegions(uuid, List.of());
-            case ACTION_UPDATE -> FarmRegionStorage.updateRegionFull(uuid, msg.index(),
+            case ACTION_REMOVE -> FarmRegionStorage.removeRegion(m, msg.index());
+            case ACTION_CLEAR -> FarmRegionStorage.putRegions(m, List.of());
+            // 边界不可变 (区域几何在绑定时确定; 改边界 = 重新框选绑定), 故不传 min/max
+            case ACTION_UPDATE -> FarmRegionStorage.updateRegionFull(m, msg.index(),
                     msg.name(), msg.cropId(), msg.harvestMode(),
                     msg.seedX(), msg.seedY(), msg.seedZ(),
-                    msg.harvestX(), msg.harvestY(), msg.harvestZ(),
-                    msg.minX(), msg.minY(), msg.minZ(), msg.maxX(), msg.maxY(), msg.maxZ());
+                    msg.harvestX(), msg.harvestY(), msg.harvestZ());
             case ACTION_QUERY -> { /* 仅查询 */ }
             default -> { return; }
         }
-        // 保存到 config 文件 + 回客户端刷新
-        FarmRegionStorage.save(com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.CONFIG_DIR);
-        FarmRegionSyncPacket.sendToPlayer(player, uuid, FarmRegionStorage.getFor(uuid));
+        // 数据已写进女仆 NBT (随实体保存) ⇒ 无文件落盘; 回客户端刷新
+        FarmRegionSyncPacket.sendToPlayer(player, uuid, FarmRegionStorage.getFor(m));
     }
 
     /** 客户端发送区域编辑请求 (v79.62.1 全字段) */

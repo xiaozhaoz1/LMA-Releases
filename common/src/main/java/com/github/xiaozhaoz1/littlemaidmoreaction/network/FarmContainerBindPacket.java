@@ -79,12 +79,12 @@ public record FarmContainerBindPacket(String role, int x, int y, int z) implemen
         if (msg.role().isEmpty() || msg.role().length() > 16) return;
         ItemStack held = player.getMainHandItem();
         if (!StickBindUtil.isMarkItem(held)) {
-            player.sendSystemMessage(ComponentOf("§c主手需持有标记物品 (默认木棍)"));
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.mark.need_tool"));
             return;
         }
         BlockPos pos = new BlockPos(msg.x(), msg.y(), msg.z());
         if (player.level().isLoaded(pos) && !StickBindUtil.isContainer(player.level(), pos)) {
-            player.sendSystemMessage(ComponentOf("§c目标方块不是容器"));
+            player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.mark.not_container"));
             return;
         }
         // 写主手 CUSTOM_DATA
@@ -108,7 +108,7 @@ public record FarmContainerBindPacket(String role, int x, int y, int z) implemen
 //? if !1.20.1 {
         held.set(net.minecraft.core.component.DataComponents.CUSTOM_DATA, net.minecraft.world.item.component.CustomData.of(tag));
 //?}
-        player.sendSystemMessage(ComponentOf("§a已标记" + roleName(msg.role()) + ": " + pos.toShortString()
+        player.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.mark.done", roleName(msg.role()) + ": " + pos.toShortString()
                 + " §7(右键女仆交付)"));
     }
 

@@ -148,6 +148,33 @@ class NetworkCodecRoundTripTest {
     }
 
     @Test
+    @DisplayName("MaidGomokuTogglePacket: action+UUID round-trip")
+    void maidGomokuToggle_roundTrip() {
+        UUID id = UUID.randomUUID();
+        assertRoundTrip(new MaidGomokuTogglePacket(1, id), new CodecOps<>() {
+            @Override public void encode(MaidGomokuTogglePacket m, FriendlyByteBuf b) { MaidGomokuTogglePacket.encode(m, b); }
+            @Override public MaidGomokuTogglePacket decode(FriendlyByteBuf b) { return MaidGomokuTogglePacket.decode(b); }
+        });
+        assertRoundTrip(new MaidGomokuTogglePacket(0, id), new CodecOps<>() {
+            @Override public void encode(MaidGomokuTogglePacket m, FriendlyByteBuf b) { MaidGomokuTogglePacket.encode(m, b); }
+            @Override public MaidGomokuTogglePacket decode(FriendlyByteBuf b) { return MaidGomokuTogglePacket.decode(b); }
+        });
+    }
+
+    @Test
+    @DisplayName("MaidGomokuStatePacket: boolean round-trip")
+    void maidGomokuState_roundTrip() {
+        assertRoundTrip(new MaidGomokuStatePacket(true), new CodecOps<>() {
+            @Override public void encode(MaidGomokuStatePacket m, FriendlyByteBuf b) { MaidGomokuStatePacket.encode(m, b); }
+            @Override public MaidGomokuStatePacket decode(FriendlyByteBuf b) { return MaidGomokuStatePacket.decode(b); }
+        });
+        assertRoundTrip(new MaidGomokuStatePacket(false), new CodecOps<>() {
+            @Override public void encode(MaidGomokuStatePacket m, FriendlyByteBuf b) { MaidGomokuStatePacket.encode(m, b); }
+            @Override public MaidGomokuStatePacket decode(FriendlyByteBuf b) { return MaidGomokuStatePacket.decode(b); }
+        });
+    }
+
+    @Test
     @DisplayName("MaidChatBubblePacket: int+byte round-trip")
     void maidChatBubble_roundTrip() {
         assertRoundTrip(new MaidChatBubblePacket(9, (byte) 2), new CodecOps<>() {

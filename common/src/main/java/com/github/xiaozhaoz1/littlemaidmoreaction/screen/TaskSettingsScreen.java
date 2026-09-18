@@ -255,6 +255,15 @@ public final class TaskSettingsScreen {
                         .setTooltip(Component.literal("开启后不 BFS 寻路, 传送到区块中间直接挖 (避免寻路卡顿)"))
                         .setSaveConsumer(ActiveTaskConfig.VOID_NO_PATHFIND::set).build());
             }
+            case "dam_fill" -> {
+                // v79.63.21 补缺口 (用户裁定: 任务自己的参数归本任务 cloth 子屏): 全局键一直存在但**无任何 GUI 入口**
+                cat.addEntry(eb.startIntField(
+                                Component.literal("默认区块数"), ActiveTaskConfig.DAM_FILL_DEFAULT_CHUNKS.get())
+                        .setDefaultValue(ActiveTaskConfig.DAM_FILL_DEFAULT_CHUNKS.getDefault())
+                        .setMin(1).setMax(256)
+                        .setTooltip(Component.literal("起点为中心 N×N 区块 (默认 1 = 单区块); 单女仆可在 TLM 任务设置页覆盖"))
+                        .setSaveConsumer(ActiveTaskConfig.DAM_FILL_DEFAULT_CHUNKS::set).build());
+            }
             case "jiuhu_milk" -> {
                 cat.addEntry(eb.startBooleanToggle(Component.literal("酒狐奶自动喂食"),
                                 PassiveTaskConfig.JIUHU_MILK_AUTO_FEED.get())

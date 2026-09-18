@@ -12,7 +12,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class BlockInteractConfigMenu extends LmaTaskConfigContainer {
 
     public BlockInteractConfigMenu(int containerId, Inventory playerInv, int maidId) {
-        super(LmaMenus.BLOCK_INTERACT_CONFIG_MENU, containerId, playerInv, maidId);
+        super(LmaMenus.BLOCK_INTERACT_CONFIG_MENU.get(), containerId, playerInv, maidId);
     }
 
 }

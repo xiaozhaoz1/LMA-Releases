@@ -28,6 +28,10 @@ import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
 public final class LmaNeoForgeClientEntry {
 
     public LmaNeoForgeClientEntry(IEventBus modBus, ModContainer modContainer) {
+            // v79.63 (A4): 选区调试的木棒判定由客户端注入 (vanilla 层不得 import event.StickBindUtil)
+            com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.DebugSelectionCoordinator.bindStickCheck(
+                    stack -> com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isMarkItem(stack)
+                            || com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isBindItem(stack));
         // v79.51: 打开入口收敛 ScreenRegistry "lma_config"
         modContainer.registerExtensionPoint(IConfigScreenFactory.class,
                 (modContainer1, parent) -> com.github.xiaozhaoz1.littlemaidmoreaction.screen.ScreenRegistry
@@ -46,6 +50,11 @@ public final class LmaNeoForgeClientEntry {
         // v79.18: 客户端资源重载 listener — YSM 注入 + ISS 热合并 (RegisterClientReloadListenersEvent 是 IModBusEvent → MOD bus 注册合法)
         modBus.addListener(net.neoforged.neoforge.client.event.RegisterClientReloadListenersEvent.class,
                 event -> event.registerReloadListener(new com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmReloadListener()));
+        // v79.62.3: 防御塔方块实体渲染 — 自绘 DefenseTowerRenderer (泛型绑定 DefenseGarageKitBlockEntity, 修复 1.21.1 BER 泛型不匹配不渲染)
+        modBus.addListener(net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers.class,
+                event -> event.registerBlockEntityRenderer(
+                        com.github.xiaozhaoz1.littlemaidmoreaction.init.LmaBlockEntityTypes.GARAGE_KIT_DEFENSE.get(),
+                        com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerRenderer::new));
         // v79.18: tick 延迟补全 — TLM 模型异步加载晚于 reload listener (ClientTickEvent.Post 是具体类, 可监听)
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
                 net.neoforged.neoforge.client.event.ClientTickEvent.Post.class,
@@ -109,26 +118,7 @@ public final class LmaNeoForgeClientEntry {
         // 选区尺寸 HUD (屏幕层) — v79.61x 修复: RenderGuiEvent 是抽象类, NeoForge 禁止直接监听
         // (0.9.60 崩溃根因); 子类经 javap neoforge-21.1.247-universal.jar 实证只有 Pre/Post (无 Layer —
         // 首修猜 Layer 又编译失败, #243 补记), 用 Post (HUD 绘制后叠加尺寸文本)
-        // v79.62 锻造: 右键女仆 + smithing 任务 + 附近锻造台 → 打开锻造升级界面
-        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
-                net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.EntityInteract.class,
-                event -> {
-                    if (!event.getLevel().isClientSide()) return;
-                    if (!(event.getTarget() instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid2)) return;
-                    var held2 = event.getEntity().getMainHandItem();
-                    if (com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isMarkItem(held2)
-                            || com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isBindItem(held2)) return;
-                    String task2 = com.github.xiaozhaoz1.littlemaidmoreaction.task.data.FlowTaskData.getTask(maid2);
-                    if (!"smithing".equals(task2)) return;
-                    if (com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.SmithingPipeline
-                            .findSmithingTable((net.minecraft.server.level.ServerLevel) maid2.level(), maid2) == null) return;
-                    // v79.62.1: 打开 TLM 任务设置标签页 → TaskConfigGuiFactory 返回锻造容器界面 (原版锻造台样式, 无模板)
-                    net.neoforged.neoforge.network.PacketDistributor.sendToServer(
-                            new com.github.tartaricacid.touhoulittlemaid.network.message.OpenMaidGuiPackage(
-                                    maid2.getId(), com.github.tartaricacid.touhoulittlemaid.entity.passive.TabIndex.TASK_CONFIG));
-                    event.setCanceled(true);
-                    event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
-                });
+        // v79.62.5 锻造任务已删 (用户裁定) — 原 smithing 右键打开 GUI listener 移除
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
                 net.neoforged.neoforge.event.entity.player.PlayerInteractEvent.EntityInteract.class,
                 event -> {
@@ -137,6 +127,10 @@ public final class LmaNeoForgeClientEntry {
                     var player = event.getEntity();
                     if (!(com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isMarkItem(player.getMainHandItem())
                             || com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isBindItem(player.getMainHandItem()))) return;
+                    // v79.63: 记住"当前交付目标" ⇒ 之后右键容器时菜单只列该任务需要的角色 (用户裁定 B)
+                    com.github.xiaozhaoz1.littlemaidmoreaction.screen.MarkTarget.set(
+                            com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskTypeRegistry
+                                    .extractTaskType(maid.getTask().getUid().getPath()));
                     // 仅在木棍已标记种子源/目标箱 (farm 区域绑定模式) 时发 — 避免与 arm_transfer 交付冲突
                     var heldCd = player.getMainHandItem().getOrDefault(
                             net.minecraft.core.component.DataComponents.CUSTOM_DATA,
@@ -181,11 +175,12 @@ public final class LmaNeoForgeClientEntry {
                     LmaNeoForgeEntry.VOID_EXCAVATION_CONFIG_MENU.get(),
                     (menu, inv, title) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigScreen(menu, inv, title));
             event.<AiControlConfigMenu, AiControlConfigScreen>register(LmaNeoForgeEntry.AI_CONTROL_CONFIG_MENU.get(), (menu, inv, title) -> new AiControlConfigScreen(menu, inv, title));
-            // v79.62.1: 锻造容器界面 (原版锻造台样式, 无模板)
-            event.<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingMenu,
-                    com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingScreen>register(
-                    LmaNeoForgeEntry.SMITHING_MENU.get(),
-                    (menu, inv, title) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.MaidSmithingScreen(menu, inv, title));
+            // v79.62.5 锻造任务已删 (用户裁定) — Screen 绑定移除
+            // v79.62.3: 防御塔 GUI (弹药槽 + 范围/伤害/模式)
+            event.<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu,
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerScreen>register(
+                    LmaNeoForgeEntry.DEFENSE_TOWER_MENU.get(),
+                    (menu, inv, title) -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerScreen(menu, inv, title));
         }
 
     }

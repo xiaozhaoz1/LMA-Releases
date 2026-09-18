@@ -13,18 +13,18 @@ import static org.junit.jupiter.api.Assertions.*;
 /**
  * 网络包注册清单一致性测试 (批次 A4) — {@link PacketRegistry#DEFS} 不变量 + 双平台注册面对齐。
  *
- * <p>测试跑在 forge 节点 → DEFS 为 1.20.1 视图 (15 项, 2 个 neoOnly 项被 stonecutter 剥离)。
+ * <p>测试跑在 forge 节点 → DEFS 为 1.20.1 视图 (21 项, 2 个 neoOnly 项被 stonecutter 剥离)。
  * 清单 ↔ 驱动注册 map 的等价断言: 运行时由 {@link PacketRegistry#validatePlatformNames} 在
  * forge commonSetup / neoforge RegisterPayloadHandlersEvent 时 fail-fast (本测试引
  * LittleMaidMoreAction 会触发 FMLPaths 类加载, 禁 — 单测铁律); 本测试只验清单侧 + 校验器自身。</p>
  *
- * <p>纯 JVM 铁律: 只读静态清单; PacketRegistry 类加载仅解析 15 个包类字面量
+ * <p>纯 JVM 铁律: 只读静态清单; PacketRegistry 类加载仅解析包类字面量
  * (NetworkCodecRoundTripTest 先例实证安全 — 包类静态字段零 MC 耦合)。</p>
  */
 class NetworkPacketManifestTest {
 
-    /** forge 可见 ID 表 (R-04: 空洞 1 = 历史已删包, 不回收; id 4 已回收给 patpat_reaction — v79.61x; 16-19 = 作物区域 v79.62) */
-    private static final Set<Integer> FORGE_IDS = Set.of(0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20);
+    /** forge 可见 ID 表 (R-04: 空洞 1/20 = 历史已删包, 不回收; id 4 已回收给 patpat_reaction — v79.61x; 16-19 = 作物区域 v79.62; 21/22 = 五子棋开关 v79.62.3; 20 = smithing 锻造任务整体删除 — v79.63 用户裁定) */
+    private static final Set<Integer> FORGE_IDS = Set.of(0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 21, 22);
 
     /** forge 可见 name 表 — 与 ForgePacketRegistrar.REGISTRATIONS keySet 必须全等 (运行时校验兜底) */
     private static final Set<String> FORGE_NAMES = Set.of(
@@ -33,7 +33,8 @@ class NetworkPacketManifestTest {
             "reply_task_config", "config_sync", "config_sync_s2c", "anim_file_sync",
             "haqi_owner_voice", "maid_chat_bubble", "maid_list_query", "maid_list_response",
             "maid_codex_screen", "maid_env_sense_toggle", "farm_region_edit", "farm_region_sync",
-            "farm_container_bind", "farm_region_bind", "smithing_craft");
+            "farm_container_bind", "farm_region_bind",
+            "maid_gomoku_toggle", "maid_gomoku_state");
 
     /** forge 视图条目 (neoOnly 在 1.20.1 视图不存在 — 全项可见) */
     private static List<PacketDef> forgeDefs() {
@@ -55,13 +56,13 @@ class NetworkPacketManifestTest {
     }
 
     @Test
-    @DisplayName("forge 可见 = 19 项 (15 双平台包类 + ConfigSync 双条目 + 作物区域 4)")
+    @DisplayName("forge 可见 = 21 项 (双平台包类 + ConfigSync 双条目 + 作物区域 4 + 五子棋开关 2)")
     void forgeVisible_count() {
-        assertEquals(20, forgeDefs().size());
+        assertEquals(21, forgeDefs().size());
     }
 
     @Test
-    @DisplayName("forge ID 表精确匹配 (空洞 1/4 文档化, 不回收)")
+    @DisplayName("forge ID 表精确匹配 (空洞 1/20 文档化, 不回收)")
     void forge_ids_exact() {
         Set<Integer> actual = forgeDefs().stream().map(PacketDef::id).collect(Collectors.toSet());
         assertEquals(FORGE_IDS, actual);
@@ -79,10 +80,10 @@ class NetworkPacketManifestTest {
     }
 
     @Test
-    @DisplayName("方向计数: 10 C2S / 9 S2C (forge 视图; +farm_region_edit/farm_container_bind/farm_region_bind C2S + farm_region_sync S2C)")
+    @DisplayName("方向计数: 11 C2S / 10 S2C (forge 视图; -smithing_craft C2S v79.63)")
     void direction_counts() {
         assertEquals(11, forgeDefs().stream().filter(d -> d.direction() == PacketDef.Direction.C2S).count());
-        assertEquals(9, forgeDefs().stream().filter(d -> d.direction() == PacketDef.Direction.S2C).count());
+        assertEquals(10, forgeDefs().stream().filter(d -> d.direction() == PacketDef.Direction.S2C).count());
     }
 
     @Test

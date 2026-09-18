@@ -98,7 +98,14 @@ public final class TaskConfigGuiFactory {
      * Pipeline 覆写兜底 — 新任务一行注册接入 TLM 任务设置标签页。</p>
      */
     public static MenuProvider forTask(EntityMaid maid, String taskType) {
+        // v79.63 诊断 (装配 GUI 打不开排查): 记录分派分支 — 下次复现可直接看日志定位
         Function<EntityMaid, MenuProvider> registered = CONFIG_PROVIDERS.get(taskType);
+        if (com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER != null) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.warn(
+                    "[TaskGui] forTask task={} 注册表={} 装配菜单类型已注入={}",
+                    taskType, registered != null ? "命中" : "未命中",
+                    com.github.xiaozhaoz1.littlemaidmoreaction.LmaMenus.MAID_ASSEMBLY_MENU.get() != null);
+        }
         if (registered != null) {
             return registered.apply(maid);
         }

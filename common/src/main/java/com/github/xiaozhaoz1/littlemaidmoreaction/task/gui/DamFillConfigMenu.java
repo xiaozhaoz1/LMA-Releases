@@ -10,7 +10,7 @@ import net.minecraft.world.entity.player.Inventory;
 public class DamFillConfigMenu extends LmaTaskConfigContainer {
 
     public DamFillConfigMenu(int containerId, Inventory playerInv, int maidId) {
-        super(LmaMenus.DAM_FILL_CONFIG_MENU, containerId, playerInv, maidId);
+        super(LmaMenus.DAM_FILL_CONFIG_MENU.get(), containerId, playerInv, maidId);
     }
 
 }
