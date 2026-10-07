@@ -279,3 +279,8 @@ gate-jar: gate
     ./gradlew -x javadoc :forge:1.20.1:jar :neoforge:1.21.1:jar
     @echo "✅ jar 已出: forge/versions/1.20.1/build/libs + neoforge/versions/1.21.1/build/libs"
     @echo "   部署请用: bash build-logs/deploy-lma.sh <版本>  (含三方 md5 门禁)"
+
+# 本地部署门禁 (被跟踪版; 等价于原 build-logs/deploy-lma.sh ✓)
+# 用法: just deploy 0.9.78   = 先建后换 + 构建/交付/mods 三方 md5 比对 (红了拒绝部署 ✓)
+deploy version:
+    bash deploy-local.sh {{version}}
