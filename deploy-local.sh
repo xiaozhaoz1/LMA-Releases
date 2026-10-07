@@ -9,7 +9,21 @@
 #     (纪律 6b: 红了不部署 ✓ — 数字来源 = forge/versions/1.20.1/build/test-results/test/*.xml;
 #      单测只在 forge 节点跑, neoforge 节点 test = NO-SOURCE ⇒ 本闸门仅以 forge 为准)
 set -u
-VER="${1:-0.9.74}"
+# ★ 版本号: 优先取参数; 缺省时**从版本真相源读取** ✓ (严禁写死旧版本 ✗ —— 曾因此误降级, 见错题 #367)
+if [ $# -ge 1 ] && [ -n "${1:-}" ]; then VER="$1"; else
+  VER=$(grep -h -m1 '^project.version=' versions/1.20.1/gradle.properties 2>/dev/null | sed 's/.*=//; s/+.*//')
+fi
+[ -n "$VER" ] || { echo "[FAIL] 无法确定版本号 (请传参 或 检查 versions/1.20.1/gradle.properties)"; exit 1; }
+# ★ 四文件一致性校验 (gradle.properties x2 + mods.toml x2) —— 版本号漂移一律拒绝 ✓
+for f in versions/1.20.1/gradle.properties versions/1.21.1/gradle.properties; do
+  v=$(grep -h -m1 '^project.version=' "$f" | sed 's/.*=//; s/+.*//')
+  [ "$v" = "$VER" ] || { echo "[FAIL] 版本不一致: $f=$v 但目标=$VER (先统一版本号再部署 ✓)"; exit 1; }
+done
+for f in forge/src/main/resources/META-INF/mods.toml neoforge/src/main/resources/META-INF/neoforge.mods.toml; do
+  v=$(grep -m1 '^version = ' "$f" | sed 's/.*"//; s/".*//')
+  [ "$v" = "$VER" ] || { echo "[FAIL] 版本不一致: $f=$v 但目标=$VER"; exit 1; }
+done
+echo "[gate] 版本号一致 = $VER ✓ (真相源 versions/*/gradle.properties)"
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 REL=/d/claudecode/release-$VER
 F="$ROOT/forge/versions/1.20.1/build/libs/littlemaidmoreaction-forge-$VER+1.20.1.jar"
