@@ -56,9 +56,14 @@ class IMaidDowncastGuardTest {
                 while (m.find()) {
                     int line = 1 + (int) text.substring(0, m.start()).chars().filter(c -> c == '\n').count();
                     String file = root.relativize(p).toString().replace('\\', '/');
-                    if (ALLOWED.stream().noneMatch(file::endsWith)) {
-                        offenders.add(file + ":" + line + "  →  " + m.group().trim());
+                    if (ALLOWED.stream().anyMatch(file::endsWith)) continue;
+                    // ⚠ **跳过注释行** ✓ —— 本守护自己就在 javadoc 里写了反例
+                    // (§ 规则 1 那句 "(EntityMaid) xxx.asEntity()" ✗) ⇒ 不跳过会**误报自己** ✗
+                    String srcLine = text.lines().skip(line - 1).findFirst().orElse("").trim();
+                    if (srcLine.startsWith("*") || srcLine.startsWith("//") || srcLine.startsWith("/*") || srcLine.endsWith("*/")) {
+                        continue;
                     }
+                    offenders.add(file + ":" + line + "  →  " + m.group().trim());
                 }
             }
         }

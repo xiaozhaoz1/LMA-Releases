@@ -26,10 +26,18 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class TokenSpecGuardTest {
 
+    /**
+     * 定位仓库根 —— **只许用"被 git 跟踪"的标志文件** ✓
+     *
+     * <p>⚠ 教训 (CI 复现): 上一版用 `docs/ARCHITECTURE.md` 当标志 ✗ ⇒ 而 `docs/` **被 .gitignore 忽略、不在库里** ✗
+     * ⇒ 干净检出 (CI / 新克隆) 里根本没有它 ⇒ 测试**必红** ✗。
+     * 现在改用 `settings.gradle.kts` + `versions/` ✓（都是被跟踪的 ✓）。
+     */
     private static Path repoRoot() {
-        Path p = ArchSource.findMainRoot();
+        Path p = ArchSource.findMainRoot();          // = <root>/common/src/main/java ✓ (查目录, 不查 gitignore 内容 ✓)
         for (int i = 0; i < 8 && p != null; i++) {
-            if (Files.isRegularFile(p.resolve("docs").resolve("ARCHITECTURE.md"))) return p;
+            if (Files.isRegularFile(p.resolve("settings.gradle.kts"))
+                    && Files.isDirectory(p.resolve("versions"))) return p;
             p = p.getParent();
         }
         return null;
