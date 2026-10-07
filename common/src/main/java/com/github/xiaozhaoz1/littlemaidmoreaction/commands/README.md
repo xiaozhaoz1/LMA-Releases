@@ -6,11 +6,14 @@
 ## 一、类明细 (1 类)
 | 类 | 行数 | 职责 |
 |---|---|---|
-`LmaCommand` | 265 | 命令注册 + 全部子命令 (任务/区域/调试; 内部读 `FlowTaskData`/`TaskRegistry`/`FarmRegionStorage` 等) |
+`LmaCommand` | 330 | 命令注册 + 全部子命令 (任务/区域/调试/**token**; 内部读 `FlowTaskData`/`TaskRegistry`/`FarmRegionStorage` 等) |
 
 ## 二、连接链
 ```
 玩家/控制台 → /lma ... → LmaCommand (解析)
+   ├─ token 类 (v79.66o): /lma token info  (距下次判定 / 双方 token 数 / 是否在 8 格内)
+   │                      /lma token steal [count] → TokenStealService.forceAttempt(跳过冷却与概率,
+   │                        但**仍走**真实条件分支: 8格 / 背包空间 / 物品 ⇒ 测的就是生产路径 ✓)
    ├─ 任务类: TaskDispatcher.submit/cancel · TaskRegistry 查询
    ├─ 区域类: storage/FarmRegionStorage 增删改查
    └─ 调试类: 输出状态 (如 pipeline.steps() 展示)

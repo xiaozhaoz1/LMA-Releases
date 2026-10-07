@@ -32,15 +32,15 @@ task/
 > 数量口径: **一律以 `docs/ARCHITECTURE.md` 顶部实测基线表为准** (本 README 不抄数字)。
 > 任务清单: `docs/design/pipeline-inventory.md` (主动 21 + 被动 5 管线 + 纯触发 3)。
 
-## 子包索引 (131 类, 逐包 `find` 实测 2026-09-13 — 改结构必须同步此表)
+## 子包索引 (135 类, 逐包 `find` 实测 2026-09-21 — 改结构必须同步此表)
 
 | 子包 | 类数 | 一句话职责 | 明细 README |
 |---|---|---|---|
-| **顶层** `TaskRegistryManifest.java` (145 行) | 1 | **任务注册唯一事实源**: 5 个列表 (ALWAYS 13 / NUMEN 1 / CREATE 6 / CBC 2 / PASSIVE 5) + **启动期 fail-fast 三连** (被动注册缺失 / 被动驱动漂移 / 纯触发注册缺失) + `Drive` 声明 (谁 tick 我); **加任务只改这里** | (本节) |
+| **顶层** `TaskRegistryManifest.java` (145 行) | 1 | **任务注册唯一事实源**: 5 个列表 (ALWAYS 13 / NUMEN 1 / CREATE 6 / CBC 2 / PASSIVE 5) + **启动期 fail-fast 三连** (被动注册缺失 / 被动驱动漂移 / 纯触发注册缺失) + `Drive` 声明 (谁 tick 我); **加任务只改这里**。★ **已登记的架构例外**: 本文件是全包**唯一**被允许 `import compat.*` 的地方 (规格表必须能直接引用 Create/CBC 任务实现类) — 守护测试 `ArchGuardTest.task_mustNotImportCompat` 对它显式豁免, **其余 task 文件一律禁止 import compat** (正解 = api 定义门面 + 实现方自注册, 先例 `YsmAnimationProvider`) | (本节) |
 | `api/` | 7 | **接口契约** (管线/可配置/注册中心/信号/屏工厂/UID) — 改它影响全部管线 | [api/README.md](api/README.md) |
 | `pipeline/` | 23 | **流程判定**: 21 主动管线 + 被动 sense 子包 (14 类中部分) | [pipeline/README.md](pipeline/README.md) |
-| `service/` | 31 | **业务算法 + 单拍编排** (含 harvest 子包 13 类: 采集/导航安全/自救/空置域) | [service/README.md](service/README.md) |
-| `runtime/` | 11 | **运行态**: GMPM 驱动 / Dispatcher 生命周期 / FSM 基类 / 看门狗 / 卸载清理 | [runtime/README.md](runtime/README.md) |
+| `service/` | 33 | **业务算法 + 单拍编排** (含 harvest 子包 15 类: 采集/导航安全/自救/空置域) | [service/README.md](service/README.md) |
+| `runtime/` | 12 | **运行态**: GMPM 驱动 / Dispatcher 生命周期 / FSM 基类 / 看门狗 / 卸载清理 | [runtime/README.md](runtime/README.md) |
 | `data/` | 10 | **NBT 读写唯一入口** (键常量/缓存纪律/清理) | [data/README.md](data/README.md) |
 | `gui/` | 20 | **per-task 配置屏** (屏↔任务↔配置键 + 配置读写链路) | [gui/README.md](gui/README.md) |
 | `sense/` | 14 | **环境感知层 (信号生产)**: 扫描/规则/边沿/预算/缓存/结构感知/广播 — ⚠ **与 `pipeline/sense` 是两个包** (那边是信号消费的 7 个被动管线) | [sense/README.md](sense/README.md) |

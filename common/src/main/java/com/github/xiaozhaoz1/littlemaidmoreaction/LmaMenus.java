@@ -42,7 +42,7 @@ public final class LmaMenus {
     /** v79.62.2: dam_fill config menu (drain toggle) */
     public static Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigMenu>> DAM_FILL_CONFIG_MENU;
     /** v79.62.3: 防御塔 GUI (弹药槽 + 范围/伤害/模式) */
-    public static Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu>> DEFENSE_TOWER_MENU;
+    public static Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.tower.DefenseTowerMenu>> DEFENSE_TOWER_MENU;
 
     private LmaMenus() {
     }

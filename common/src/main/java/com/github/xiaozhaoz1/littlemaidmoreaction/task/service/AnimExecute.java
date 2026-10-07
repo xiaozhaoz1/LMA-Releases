@@ -7,6 +7,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.movement.BrainH
 import com.github.xiaozhaoz1.littlemaidmoreaction.resource.LmaAnimationDef;
 import com.github.xiaozhaoz1.littlemaidmoreaction.network.LmaAnimSyncMessage;
 import com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationDurationManager;
+import com.github.xiaozhaoz1.littlemaidmoreaction.api.output.YsmAnimationProvider;
 import com.github.xiaozhaoz1.littlemaidmoreaction.storage.LmaAnimationStorage;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -47,7 +48,7 @@ public final class AnimExecute {
         if (animName.isEmpty()) return false;
 
         if (maid.isYsmModel()) {
-            com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmOutput.playRoulette(maid, animName);
+            YsmAnimationProvider.playRoulette(maid, animName);
             data.putString(TaskKeys.ANIM_MODE, "YSM_ROULETTE");
             data.putString(TaskKeys.ANIM_NAME, animName);
             data.putLong(TaskKeys.ANIM_TICK, gameTime);
@@ -85,9 +86,9 @@ public final class AnimExecute {
         String end = pickRandom(animEnd);
 
         // YSM 分流 (executeInstant 同款) — YSM 模型渲染不吃 TLM ISS 动画,
-        // FULL 语义 = 循环播放 → YsmOutput.playRoulette (循环由动画文件 loop 决定, YSM 管理停止)
+        // FULL 语义 = 循环播放 → YsmAnimationProvider.playRoulette (循环由动画文件 loop 决定, YSM 管理停止)
         if (maid.isYsmModel()) {
-            com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmOutput.playRoulette(maid, start);
+            YsmAnimationProvider.playRoulette(maid, start);
             data.putString(TaskKeys.ANIM_MODE, "YSM_ROULETTE");
             data.putString(TaskKeys.ANIM_NAME, start);
             data.putLong(TaskKeys.ANIM_TICK, gameTime);

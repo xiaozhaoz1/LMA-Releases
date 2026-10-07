@@ -278,7 +278,7 @@ public final class FarmExecute {
         maid.dropResourcesToMaidInv(st, world, crop, st.hasBlockEntity() ? world.getBlockEntity(crop) : null,
                 maid, ItemStack.EMPTY);
         // 破坏方块本体 (掉落已捕获, setBlock 空气)
-        world.setBlock(crop, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.clear(world, crop);
         maid.swing(InteractionHand.MAIN_HAND);
         return true;
     }
@@ -325,7 +325,7 @@ public final class FarmExecute {
             return true;
         }
         BlockState plantState = item.getBlock().defaultBlockState();
-        world.setBlock(cropPos, plantState, 3);
+                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.place(world, cropPos, plantState);
         seed.shrink(1);
         maid.swing(InteractionHand.MAIN_HAND);
         com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);
@@ -351,7 +351,7 @@ public final class FarmExecute {
                 }
                 BlockState cocoaState = net.minecraft.world.level.block.Blocks.COCOA
                         .defaultBlockState().setValue(net.minecraft.world.level.block.HorizontalDirectionalBlock.FACING, dir.getOpposite());
-                world.setBlock(sidePos, cocoaState, 3);
+                                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.place(world, sidePos, cocoaState);
                 seed.shrink(1);
                 maid.swing(InteractionHand.MAIN_HAND);
                 com.github.xiaozhaoz1.littlemaidmoreaction.api.pathing.NavProgressGuard.clear(maid);

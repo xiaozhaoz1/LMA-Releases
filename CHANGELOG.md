@@ -5,6 +5,146 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 0.9.78 (2026-09-21) — 结案: "手办变模型"= TLM 官方联动 (非缺陷) + 用例/文档增强
+
+### 结案 — 手办被"御币右键"改成玩家模型: **TLM 官方功能，不是 LMA 缺陷** ✓
+- **现象**: 创造模式手持**博丽的御币**右键手办 ⇒ 手办外观变成**玩家的模型**（空手/持弓不会 x）
+- **正解**（TLM 2.4.0 更新日志）: 「现在**创造模式**拿着**御币**右击**雕像或者手办**，
+  可以把自己的模型**复制**到雕像手办上」⇒ 官方联动功能 ✓
+- **取证手法留档**（本仓库两代探针，后者必需）:
+  ① `setData` 栈探针 —— 抓"走 setter"的改写 ✓（本次**零命中** x）
+  ② **每 tick 影子对比** —— 抓"**原地改写**"✓（本次一击命中 `[TowerProbe2] … 旧: DS鲸鱼娘flash.ysm → 新: …` ✓）
+  根因: TLM `TileEntityGarageKit.getExtraData()` **直接返回可变 CompoundTag** ⇒ 调用方可原地改，绕开一切 setter x
+  （诊断探针**仅诊断期存在，已清净** —— 发布 jar 内不含探针 ✓）
+
+### Changed — gametest 增强 (第 121 条用例逐步断言)
+- `lmaTowerGoheiRightClickKeepsStatue` 改为**逐入口断言**: ①御币 `use`(蓄力) ②御币 `releaseUsing`(发射)
+  ③御币 `useOn`(祭坛判定) ④手办方块 `use/useItemOn`(认主+GUI) —— 每步后都校验
+  `id/ModelId/YsmModelId/IsYsmModel/Owner/CustomName` **逐键不变** ⇒ 失败即点名是哪一步写了模型 x
+- 独立批 `z_gohei` ✓（挤进 `defaultBatch` 会干扰 `lmaBrushNothing` x）
+- 说明: 御币的"使用/施法"走 **TLM 客户端动画/施法系统**（`ItemHakureiGohei extends ProjectileWeaponItem`，
+  无 `use` 覆写 ⇒ 服务端 `use` 返回 PASS）⇒ 纯服务端 gametest **原理上测不到**该联动 x
+  （其数据改写只发生于**真实客户端**触发的服务端路径 ✓）
+
+### Docs
+- `defense/README.md` 新增 §五: 「手办模型被御币右键复制 = TLM 官方联动」+ 结论纪律
+  （**先查模组更新日志/wiki 再动代码** ✓）
+- `docs/lessons-learned.md` **教训 10**: 高度特化行为（特定物品+特定交互+特定模式）= 强"有意设计"信号；
+  本地排查要设时间盒；**"返回内部可变对象"的 API 是 setter 探针盲区** ⇒ 用每 tick 影子对比 ✓
+
+### Testing
+- 单测 562 用例 0 失败 · gametest 121/121 双平台 ✓
+
+## 0.9.77 (2026-09-21) — 御币武器判定真删除 + 手办施法动画护栏 + 右键手办回归用例
+
+### Fixed — 御币"武器判定"未真正删除（上一批被静默回退 ✗）
+- **根因**: v79.66n 删除御币弹幕攻击时，`DefenseTowerFire.java` 曾被脚本破坏后经 `git checkout` 复原 ⇒
+  **该文件里的两处删除被一起回退** ✗（`weaponMode` 的 `御币→NONE` 与 `fireDanmaku` 整体），
+  只有 `fire()` / `hasAmmoFor()` 的 `DANMAKU→false` 存活 ⇒ **御币仍被判成 `DANMAKU` 武器** ✗
+- **修**: `weaponMode` 御币 → **`NONE`** ✓（仍显式特判，避免被误判为弓 ✗）；删除残留 `fireDanmaku` +
+  `DanmakuShoot` 导入 + `findGohei` ✓
+- **由新增用例抓到** ✓（见下）—— 该 bug 在旧用例下**测不到**（只测了"御币不得掉耐久"）
+
+### Added — 手办动画名护栏 (施法动画一律拒绝 ✓)
+- **根因**: 塔的**瞄准动画由「有目标」直接触发**（`if (hasTarget) beginAimAnim();`，与武器/弹药无关 ✗）；
+  配置里的**历史默认值** `aim_anim = iss:charge_arrow` / `fire_anim = iss:instant_projectile`
+  （= **ISS 施法动画** ✗）不会被新默认覆盖 ⇒ 手办持续播"施法动作" ✗
+- **修**: 新增纯函数护栏 `DefenseTowerAnimNames` — 任何 `iss:` 前缀的动画名在塔上一律**拒绝并回退安全默认**
+  （瞄准 → `use_mainhand:bow` ✓ · 开火 → 空=只松手 ✓），并**只警告一次** ✓；配置写空 = 显式关闭，尊重原样 ✓
+- 单测 `DefenseTowerAnimNamesTest` 锁定：施法拒绝 / 普通名通过 / 空值尊重 ✓
+
+### Added — 新增 gametest `lmaTowerGoheiRightClickKeepsStatue`（第 121 条 ✓）
+- **断言**: 拿御币右键手办后，BE 的 `ExtraData`（女仆 NBT：`id`/`ModelId`/`YsmModelId`/`IsYsmModel`/
+  `Owner`/`CustomName`）**逐键不变** ✓ + `weaponMode == NONE` ✓（复刻真实调用顺序：物品 `useOn` → 方块 `use` ✓）
+- **独立批 `z_gohei`** ✓：实测挤在 `defaultBatch` 时会干扰 `lmaBrushNothing` ✗ ⇒ 隔离后双平台稳定 ✓
+- ⚠ 能力边界：gametest 纯服务端**看不到画面** ✗ ⇒ 它守的是"渲染输入（模型数据）不被改动"这一半 ✓
+
+### Testing
+- 单测 **562 用例 0 失败**（+`DefenseTowerAnimNamesTest`）· gametest **121/121** 双平台 ✓
+
+## 0.9.76 (2026-09-20) — 女仆偷吃 Token + /lma token 调试命令
+
+### Added — 女仆偷吃 Token（用户需求，逐条裁定 ✓）
+- **行为**: 每只女仆独立计时，**6000t（5 分钟）掷一次 5% 概率**；计时**从"上一次概率判定"起算** ⇒
+  cd 一转完立即判定（不是"偷到了才计时"）✓ 配置 `active.token_steal.{enabled,interval_ticks,chance}` ✓
+- **条件**: 主人必须在 **8 格内** ✓ · 女仆背包**放不下就不偷**（先 `simulate` 全量校验 ⇒ **原子**，
+  绝不"偷一半掉地上"）✓ · 只偷 Token，不碰其它物品，女仆之间不互偷 ✓
+- **动作**: 把主人身上**那一整组 Token** 直接搬进女仆背包（**不满一组也有多少偷多少** ✓）⇒
+  **偷到就开始吃**：立刻吃 1 个（走 TLM 原生 `maid.eat` ⇒ 音效/食物属性/事件同源 + `TokenItem.applyEffects`）✓
+  ⇒ 气泡「**token真好吃**」✓ + INFO 日志（外部行为不留白 — #358 教训）✓
+- **`/lma token info`** — 逐只列: 距离 / 主人 token / 女仆 token / 距下次判定 tick（+ 是否在 8 格内）✓
+- **`/lma token steal [count]`** — **立即强制偷**（跳过冷却与概率；距离/背包/物品条件照旧 ⇒ 测的就是真实分支）✓
+- 状态存 per-maid **PD**（瞬态 ✓ 不落盘）；判定逻辑抽 `TokenStealMath` 纯函数 ⇒ 单测 3 例
+  （冷却起算/概率边界/8 格边界），`bauble/README.md` 新增陷阱 d~g（mock 玩家 `getOwner()` 反查为 null 等）✓
+
+### Fixed — 心跳索引误除名（"采矿 flake" 的真因，产品级）
+- **症状**: `lmaChainOreNeighbourChunk` 偶发"扫到矿却零位移"跑满 1800t 超时（长期被当 flake ✗）
+- **现场**（探针 t=40/200/600 三次一致）: `在册=false · 任务=collect_ore · BFS可达=true · 能动=true ·
+  导航已完成=true · 在册数只减不增` ⇒ **任务在，但没人驱动她**
+- **根因**: `EntityLeaveLevelEvent` **对活着的女仆也会触发**（传送/换维度/区块或结构卸载）⇒
+  `MaidIndex.remove` **无条件除名** ⇒ `TaskTickHandler` 不再 tick 她 ⇒ 任务永远不动 ✗；
+  且 `reconcile` 的 `getAllEntities()` 在该环境**扫不到**相距数百万格的这些女仆 ⇒ 补不回来 ✗
+- **修**: 除名**只对"真的已移除/死亡"**（`maid.isRemoved() || !maid.isAlive()`）✓（换维度由
+  `snapshot(level)` 的 `m.level()==level` 过滤天然排除）；并把该用例的"在册"探针**升级为硬断言**
+  （漏册**直接红**，不再默默跑满超时 ✗）
+- **验证**: 双平台 gametest **120/120** ×2（neoforge 75s / forge 153s / neoforge 复跑），
+  探针现场从 `在册=false 导航目标=null` 变为 **`在册=true 导航目标=BlockPos{…}`**（她被正常驱动 ✓）
+
+### Testing
+- 单测 **560 用例 0 失败**（新增 `TokenStealMathTest` 3 例）· gametest **120/120**（新增 `lmaTokenSteal`:
+  整组偷 / 不满一组 / 偷后进食 / 超 8 格不偷 / 背包满原子不偷 / 无 Token no-op）✓
+
+## 0.9.75 (2026-09-20) — 防御塔手办动作显示 + 心跳性能修复 + 夹具根因清理
+
+### Added — 防御塔手办动画（用户需求: "像正常女仆一样射箭/用弹幕"）
+- **瞄准循环 + 开火触发**（弓/弩与御币弹幕各自一套名）: 默认 `use_mainhand:bow` / 御币 `use_mainhand:gohei`；
+  开火默认**不播额外动画**（= 真实女仆的"松手"表现；`swing:bow` 实测依赖模型变量 `v.qh` ⇒ 退化成空挥手，改为可选）
+- **双通道**: ① 原生 gecko 模型 = 塔把手办 NBT 的 `lma_anim*` 键写进**实体持久数据子标签**
+  （`ForgeData` / `NeoForgeData`，客户端 `getPersistentData()` 才读得到）⇒ LMA 既有 `LmaMagicCastingProvider` 驱动
+  ② YSM 模型 = 新增客户端 `TowerStatueAnimationDriver`（`playRouletteAnim`，seq 感知）
+- **手办手里渲染武器**（用户洞察: TLM 手办会清装备 ⇒ 拉弓看着像空手挥手）: 新增 `show_weapon`
+  = `auto`(默认)/`always`/`never`；**auto 按模型自动判定** —— 动画含自带弓骨骼（如圣女酒狐 `ysmGlow_MagicBow`）⇒ 不画原版弓 ✓
+- **与 TouhouLittleMaidStatueAnimation 模组避让**（用户裁定）: 只用自有 `lma_anim*` 键、绝不写它的
+  `YsmRouletteAnim`/`StatueRoulettePlaying`；检测到对方在播 ⇒ **让位**；只处理防御塔 BE（TLM 雕像/普通手办不碰）
+- **原生模型手办解冻**: TLM 对非 YSM 模型把 `tickCount` 恒置 0（动画永远停在第 0 帧）⇒ 塔渲染器推进它（`anim_enabled=false` 退回原样）
+- 配置 (`defense_tower.toml`): `anim_enabled` · `aim_anim` · `fire_anim` · `aim_anim_danmaku` · `fire_anim_danmaku` ·
+  `anim_ticks` · `show_weapon`
+
+### Fixed — 心跳性能（用户: "跑这么久就是有问题" ⇒ 线程转储定因）
+- **`TaskTickHandler` 原每 tick `sl.getAllEntities()` 遍历全实体** ⇒ 实体多/分散时主线程 RUNNABLE 烧 CPU 数分钟
+  （gametest 118 结构相距数百万格 ⇒ 套件卡死；真机 = "实体一多 mod 就卡"）⇒ 新增 **`MaidIndex` 在册女仆索引**
+  （join/leave 维护 + **任务提交即入册** + **每 100t `getAllEntities()` 对账**）⇒ 只遍历女仆 ✓
+  （实测: 套件 8 分钟+/卡死 → **56s**；`getEntitiesOfClass(±3e7 AABB)` 在该环境**查不到**实体 ⇒ 不可用于补册 ✗）
+- **`lmaEnginePanicIsolation` 全局必抛任务污染后续全部用例**（Registry 无注销 API + standalone 每 10t 自动启动）
+  ⇒ 4 万行刷屏 + tick 变慢 ⇒ 观测窗口后**自摘 + 静默** ✓（日志 168 万行 → 3.7 千行）
+
+### Removed — 御币(弹幕)攻击 (v79.66n, 用户裁定)
+- **删除御币弹幕攻击**: 实测弹幕从**塔主人(玩家)位置**生成, 且 TLM 会把施法动画/渲染挂到 thrower 身上
+  ⇒ "攻击从我身上发出 + 我的皮肤被当渲染体" ✗ (TLM `DanmakuShoot.aimedShot()` 内部
+  `new EntityDanmaku(world, thrower)` 位置 = thrower, 无位置参数可改) ⇒ **御币显式判 `NONE`** (⚠ 御币
+  `extends ProjectileWeaponItem`, 仍需特判否则会被误判 ARROW 当弓射 ✗) ⇒ 塔对御币**不开火** ✓;
+  `fireDanmaku` 实现 + 弹幕专用配置键 (`aim_anim_danmaku` / `fire_anim_danmaku`) 一并移除,
+  塔用例的御币段反转为**"御币不得掉耐久"回归守卫** ✓
+
+### Fixed — 手办武器显示 (v79.66l, 用户实测)
+- **不打开 GUI 就不显示弓 / 重进游戏弓消失**: 根因 = 修 GUI 弹药乱跳时把弹药容器移出更新包 ⇒ 客户端
+  只有开 GUI 才经菜单同步拿到槽 0 ✗ ⇒ 新增**武器显示镜像** (`DefenseTowerWeaponDisplay`, 随更新包下发;
+  容器仍剥离) + 渲染器改读镜像 ✓; 塔用例新增三条契约断言 (ANIM_SEQ>0 · 更新包**不含**弹药容器 ·
+  更新包**含**武器镜像) ✓
+
+### Fixed — 夹具/渲染根因
+- **采矿"不走"总根因**: 测试女仆带 **home 模式(restrict)** ⇒ TLM `MaidNodeEvaluator` 把限制外判 BLOCKED ⇒ 一步不走 ✗
+  ⇒ 共用夹具 `clearMaidTaskState` 增加 `setHomeModeEnable(false)+clearRestriction()` ✓
+- **扫描半径边界**: `lmaChainOreNeighbourChunk` 目标原在 16 格球边界 (3D d²) ⇒ 偏 1 格即不可见 ⇒ 改 15 格 ✓
+- **清场范围 vs 扫描半径**: 新增 `clearStrayOres`(半径 20, 只替换矿石格)；`lmaChainOreNearBeforeFar` 改球清场 ✓
+- **定点窗口 → 条件轮询/观测窗口**: 农场族 5 处 + 新增 `observeWindow`（"持续不该发生"类断言）✓
+- **GUI 弹药乱跳**: 动画同步的 `sendBlockUpdated` 会把客户端 BE 从 NBT 整体重载（含 `KEY_AMMO`）
+  ⇒ 覆写 `getUpdateTag()` **剥掉弹药**（弹药走菜单槽位同步 = 原版/TLM 语义: 一个个消耗、不搬运）✓
+- **双平台**: `getUpdateTag` 两套签名 · `ForgeData`/`NeoForgeData` · MLG 探针去掉 Forge 专属事件类 ✓
+
+### Testing
+双平台 gametest **118/118 ×2**（neoforge 56s / forge 112s，无卡死）· 单测 **557 用例 0 失败**（含配置锁表 + README 漂移守护）
+
 ## 0.9.74 (2026-09-18) — Token 定稿 (透明贴图 + 创造栏可见)
 
 > 0.9.73 是本功能的首版打包, **未对外发布**; 本版为定稿 (取代 0.9.73)。

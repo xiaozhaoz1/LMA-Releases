@@ -2,6 +2,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.commands;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.context.CommandContext;
 import com.mojang.brigadier.suggestion.SuggestionProvider;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
@@ -105,6 +106,13 @@ public final class LmaCommand {
                 .then(Commands.argument("name", StringArgumentType.word())
                     .suggests(SUGGEST_FESTIVAL)
                     .executes(LmaCommand::handleFestival)))
+            // ── v79.66o token (调试: 偷吃 Token — 用户要求"方便调试" ✓) ──
+            .then(Commands.literal("token")
+                .then(Commands.literal("info").executes(LmaCommand::handleTokenInfo))
+                .then(Commands.literal("steal")
+                    .executes(ctx -> handleTokenSteal(ctx, 1))
+                    .then(Commands.argument("count", IntegerArgumentType.integer(1, 200))
+                        .executes(ctx -> handleTokenSteal(ctx, IntegerArgumentType.getInteger(ctx, "count"))))))
             // ── structure ──
             .then(Commands.literal("structure")
                 .then(Commands.literal("fire")
@@ -256,6 +264,60 @@ public final class LmaCommand {
             return send(ctx, "§c该指令需玩家执行");
         }
         return send(ctx, "§6[结构重置] §f" + com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.StructureSense.debugReset(sp.getUUID()));
+    }
+
+    // ── v79.66o token 调试 (偷吃 Token 行为) ──
+
+    /** /lma token info — 打印每只己方女仆: 距离 / 女仆 token / 主人 token / 距下次判定 */
+    private static int handleTokenInfo(CommandContext<CommandSourceStack> ctx) {
+        var src = ctx.getSource();
+        if (!(src.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) {
+            return send(ctx, "§c该指令需玩家执行");
+        }
+        var level = (net.minecraft.server.level.ServerLevel) sp.level();
+        long now = level.getGameTime();
+        StringBuilder sb = new StringBuilder("§6═══ 偷吃 Token 状态 ═══\n");
+        int n = 0;
+        for (var e : level.getEntities().getAll()) {
+            if (!(e instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid)) continue;
+            if (maid.getOwner() != sp) continue;
+            n++;
+            double dist = Math.sqrt(maid.distanceToSqr(sp));
+            long cd = com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenStealService
+                    .ticksUntilNextAttempt(maid, now);
+            sb.append(String.format("§f女仆 %s §7距离=%.2f §f主人token=%d §f女仆token=%d §7下次判定=%dt (约%.1fs)%s\n",
+                    maid.getStringUUID().substring(0, 8), dist,
+                    com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenStealService.countOwnerTokens(maid),
+                    com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenStealService.countTokens(maid),
+                    cd, cd / 20.0, dist <= 8.0 ? " §a(在 8 格内 ✓)" : " §c(超出 8 格 ✗)"));
+        }
+        if (n == 0) return send(ctx, "§7同维度没有你的女仆");
+        return send(ctx, sb.toString());
+    }
+
+    /** /lma token steal [count] — 立即强制偷 count 次 (跳过冷却与概率; 距离/背包/物品条件照旧 ✓) */
+    private static int handleTokenSteal(CommandContext<CommandSourceStack> ctx, int count) {
+        var src = ctx.getSource();
+        if (!(src.getEntity() instanceof net.minecraft.server.level.ServerPlayer sp)) {
+            return send(ctx, "§c该指令需玩家执行");
+        }
+        var level = (net.minecraft.server.level.ServerLevel) sp.level();
+        int maids = 0;
+        int success = 0;
+        for (var e : level.getEntities().getAll()) {
+            if (!(e instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid)) continue;
+            if (maid.getOwner() != sp) continue;
+            maids++;
+            for (int i = 0; i < count; i++) {
+                if (com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenStealService
+                        .forceAttempt(level, maid)) {
+                    success++;
+                }
+            }
+        }
+        if (maids == 0) return send(ctx, "§7同维度没有你的女仆");
+        return send(ctx, String.format("§a偷取尝试完成: 女仆=%d 次/只=%d 成功=%d §7(成功需: 8格内 + 主人身上有 token + 女仆背包放得下)",
+                maids, count, success));
     }
 
     // ── helpers ──

@@ -60,9 +60,9 @@ public final class LmaNeoForgeEntry {
             MENU_TYPES.register("void_excavation_config", () -> IMenuTypeExtension.create(
                     (id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu(id, inv, buf.readInt())));
     /** v79.62.3: 防御塔 GUI (弹药槽 + 范围/伤害/模式; buf = BlockPos) */
-    public static final Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu>> DEFENSE_TOWER_MENU =
+    public static final Supplier<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.tower.DefenseTowerMenu>> DEFENSE_TOWER_MENU =
             MENU_TYPES.register("defense_tower", () -> IMenuTypeExtension.create(
-                    (id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu(id, inv, buf)));
+                    (id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.tower.DefenseTowerMenu(id, inv, buf)));
     public static final Supplier<MenuType<AiControlConfigMenu>> AI_CONTROL_CONFIG_MENU =
             MENU_TYPES.register("ai_control_config", () -> IMenuTypeExtension.create(
                     (id, inv, buf) -> new AiControlConfigMenu(id, inv, buf.readInt())));

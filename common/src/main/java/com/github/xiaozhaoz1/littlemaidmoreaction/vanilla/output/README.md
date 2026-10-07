@@ -19,6 +19,7 @@
 `BrainHelper` | `movement/` | 24 | 导航/移动**写**原语 (设 WALK_TARGET 等) | 工作站门 · 移动类任务 |
 `SoundOutput` | 顶层 | 52 | 声音原语 (`playAt`) | 敲钟 · 哈气 |
 `ProgressNotifier` | 顶层 | 11 | 进度**气泡/通知** | pipeline · service |
+`BlockWriter` | 顶层 | 39 | **方块写原语** (2026-09-21 新建): `place(level,pos,state)` / `clear(level,pos)` —— 固定 flag `UPDATE_NEIGHBORS\|UPDATE_CLIENTS`(=3, 联网实证: flag 1 会造"隐形方块" ✗)；只设有调用方的档位 (错题 #183: 0 调用方=漂移温床 ✗) | MLG 自救 · 空置域 · 农田 · 填坝 |
 | **空目录 (用户裁定保留, 无 java)** | `altar/` `block/` `effect/` `entity/` `visual/` `world/` | — | 历史分包残留 | 新增原语按两轴判据落位即可 |
 
 ## 二、连接链 (与读侧对称)

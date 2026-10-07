@@ -1,6 +1,7 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
+import com.github.xiaozhaoz1.littlemaidmoreaction.api.output.YsmAnimationProvider;
 import net.minecraft.network.chat.Component;
 
 import java.util.List;
@@ -13,11 +14,32 @@ import java.util.concurrent.ThreadLocalRandom;
  * roamingVars) — 零 ysm jar 依赖, 仅需 ModList 门控 (yes_steve_model)。
  * 方法逐字迁移自旧仓库 compat/ysm/output/YsmWriter (求值语义不变)。
  *
- * <p>v79.18: 由 vanilla/output/ysm/ 迁入 compat/ysm/ (YSM = 外部兼容模块, 属 compat 层)。</p>
+ * <p>v79.18: 由 vanilla/output/ysm/ 迁入 compat/ysm/ (YSM = 外部兼容模块, 属 compat 层)。
+ *
+ * <p><b>2026-09-21 接口倒置</b>: 本类实现 {@link YsmAnimationProvider.Impl} 并在静态块自注册,
+ * 核心层 (HaqiPipeline / AnimExecute) 改调 api 侧门面 ⇒ 清掉 3 处 {@code task → compat} 越层;
+ * 静态壳全部保留 (既有调用方零改动, 行为逐字不变)。
  */
-public final class YsmOutput {
+public final class YsmOutput implements YsmAnimationProvider.Impl {
+
+    static {
+        // 自注册: 本类一旦被加载 (门控短路时不会加载) 即向 api 门面注入实现
+        YsmAnimationProvider.install(new YsmOutput());
+    }
 
     private YsmOutput() {}
+
+    // ── impl 实例方法 (供 api 门面调用; 逐字委托静态壳) ──
+
+    @Override
+    public void play(EntityMaid maid, String animName) {
+        playRoulette(maid, animName);
+    }
+
+    @Override
+    public void stop(EntityMaid maid) {
+        stopRoulette(maid);
+    }
 
     // ── 内置 YSM 模型预设 (22 酒狐 — 迁移自旧 YsmWriter) ──
 

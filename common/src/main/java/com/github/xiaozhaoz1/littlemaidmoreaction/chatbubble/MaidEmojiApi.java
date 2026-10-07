@@ -31,7 +31,11 @@ public final class MaidEmojiApi {
                 .shouldFire(maid, "emoji", EMOJI_THROTTLE_TICKS)) {
             return;
         }
-        MaidChatBubblePacket.sendToTracking(maid, type);
+        // 2026-09-21 架构修环: 原调 MaidChatBubblePacket.sendToTracking(...) —— 该方法已删
+        //   (它需要 MaidEmojiType ⇒ 会让 network 层 import 本层 ✗)。发送动作改由**本层**(允许依赖 network)
+        //   直接完成: 构造包 + 交给网络层追踪发送 ✓ ⇒ 边方向恢复为 chatbubble→network ✓
+        com.github.xiaozhaoz1.littlemaidmoreaction.LmaNetwork.sender
+                .sendToTrackingEntity(maid, new MaidChatBubblePacket(maid.getId(), type.id()));
     }
 
     /** 对女仆表情 (emoji_10/05/09 随机) */

@@ -38,7 +38,7 @@ public final class LmaCreativeTab {
                         out.accept(new ItemStack(LmaItems.MAID_CODEX.get()));
                         out.accept(new ItemStack(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.TAMED_MILK_BUCKET.get()));
                         out.accept(new ItemStack(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.WILD_DOGMILK.get()));
-                        out.accept(com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitItem.creativeDefault());
+                        out.accept(com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitItem.creativeDefault());
                         // v79.73: Token (可食 · 女仆饰品) — 不加这行创造栏里就翻不到它 ✗ (只能 /give ✓)
                         out.accept(new ItemStack(LmaItems.TOKEN.get()));
                     })
@@ -52,7 +52,7 @@ public final class LmaCreativeTab {
                         out.accept(new ItemStack(LmaItems.MAID_CODEX.get()));
                         out.accept(new ItemStack(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.TAMED_MILK_BUCKET.get()));
                         out.accept(new ItemStack(com.github.xiaozhaoz1.littlemaidmoreaction.bauble.WildKitsuneMilk.KitsuneMilkItems.WILD_DOGMILK.get()));
-                        out.accept(com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitItem.creativeDefault());
+                        out.accept(com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitItem.creativeDefault());
                         // v79.73: Token (可食 · 女仆饰品) — 不加这行创造栏里就翻不到它 ✗ (只能 /give ✓)
                         out.accept(new ItemStack(LmaItems.TOKEN.get()));
                     })

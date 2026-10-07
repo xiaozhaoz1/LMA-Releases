@@ -11,7 +11,7 @@
 
 **依赖方向**: task/api + task/data + task/service; 被 TaskRegistry 注册 (PASSIVE 规格表)。
 
-**代表**: HaqiPipeline (双通道触发+LOOK 状态机) / HaqiTrigger / TorchLightPipeline / SelfRescuePipeline+SelfRescueTrigger / JiuhuMilkPipeline (jiuhu_milk, 主人低血喂奶) / ExplorerMapPipeline (探险家地图读宝藏坐标)
+**代表**: HaqiPipeline (双通道触发+LOOK 状态机) / HaqiTrigger / TorchLightPipeline / SelfRescuePipeline+SelfRescueTrigger / JiuhuMilkPipeline (jiuhu_milk, 主人低血喂奶) / ExplorerMapPipeline (探险家地图读宝藏坐标) / **TokenStealTrigger** (2026-09-21: 偷吃 Token 的触发口 —— 家族本尊已归位 `bauble/token/` ✓, 引擎不点名家族 ✓; 与 `SelfRescueTrigger` 同款形态)
 
 **驱动桶 (v79.63 — 由 `TaskRegistryManifest.Drive` 声明, 引擎按声明分派)**:
 | 管线 | Drive | 语义 |

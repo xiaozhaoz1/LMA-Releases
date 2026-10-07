@@ -38,6 +38,10 @@ public final class TaskDispatcher {
      */
     public static boolean submit(EntityMaid maid, String taskType, String target, int count) {
         if (!(maid.level() instanceof ServerLevel)) return false;
+        // ★ v79.66f (实机回归实证): 心跳只遍历 MaidIndex 在册女仆 ⇒ **凡被派任务的女仆必须先入册** ✓
+        //   (原先仅靠 EntityJoinLevelEvent, 实测 gametest 生成路径会漏 ⇒ 探针显示 `在册=false`
+        //    ⇒ 心跳不跑 ⇒ 不扫描/不导航/零位移 ✗ — 加此钩子后覆盖"mod 实际驱动"的全部女仆 ✓)
+        MaidIndex.add(maid);
 
         // 1. 先验证 (失败则旧任务不受影响)
         PipelineResult result = TaskRegistry.validate(maid, taskType,
@@ -195,6 +199,7 @@ public final class TaskDispatcher {
     /** 提交被动任务 (与 lma_flow_task 不冲突) — 哈气运行中拒绝其他被动 (底层覆盖, 统一入口) */
     public static void submitPassive(EntityMaid maid, String taskType) {
         if (TaskRegistry.get(taskType) == null) return;
+        MaidIndex.add(maid);   // v79.66f: 同上 — 被驱动前先入册 (心跳只遍历在册女仆) ✓
         // v79.63 统一开关判定 (原硬编码 if "haqi"||"jiuhu_milk"): 提交门 / 运行判定 / 关开关清理
         // 三处共用 PassiveConfigUtil.isPassiveEnabled — 开关归属由任务自己声明
         // (TaskConfigurable.switchScope), 消灭"提交看 per-maid, 清理看全局"的双轨漂移

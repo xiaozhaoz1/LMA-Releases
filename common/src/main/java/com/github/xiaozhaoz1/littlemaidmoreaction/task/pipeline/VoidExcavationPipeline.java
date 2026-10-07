@@ -41,11 +41,23 @@ import java.util.List;
  *
  * <p>PD 键: start(起点) / size(区块数) / input(输入箱) / output(输出箱) / y(当前层) /
  * x/z(当前列) / outIdx/inIdx(容器搜索方向).
+ *
+ * <p><b>tick() 阶段地图</b> (2026-09-21 加; 方法约 460 行, 以方法内 {@code ═══ 阶段 N} 标记定位):
+ * <ol>
+ *   <li>诊断/节流 (VOID-TICK / DEBUG-VOID / VOID-MOVE 探针) + 摔落伤害清零</li>
+ *   <li>前置守卫: 无 {@code cfg.start} ⇒ 直接 return</li>
+ *   <li>区域边界: size 区块 ⇒ minCX/maxCX/minCZ/maxCZ</li>
+ *   <li>多女仆认领: claimWait 冷却 / 自愈 (有 curCX 但池中无主 ⇒ 释放重领) / 无 curCX ⇒ 领新区块</li>
+ *   <li>强制 HOME ({@code wasHome} 只记一次) + 等待冷却 ({@code wait})</li>
+ *   <li>游标层 (y 拉回标记层) + 高度边界 (maxY/minY) + {@code min_y} 无效自愈</li>
+ *   <li>容器检查: 输入/输出箱 forceChunk + {@code handleContainers} (缺工具/箱满 ⇒ 提醒/暂停)</li>
+ *   <li>主挖掘循环 (列预算 {@code COLUMNS_PER_TICK}): 目标格 → 导航/传送 → tryDig → 液体 → 输出转存</li>
+ *   <li>进度保存 + 完成判定 (y ≤ minY ⇒ poolMark 已挖完 / 领下一块) + 耗时日志 (&gt;2ms)</li>
+ * </ol>
+ * <p>注: 单拍编排 (落点净空/液体清理/箱转存/提醒) 已迁 {@link VoidExcavationService} (2026-09-21 瘦身)。
  */
 public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigurable {
 
-    /** 箱满/无工具等待冷却 (tick) — 提醒玩家后暂停, 防每 tick 空转 */
-    private static final int WAIT_TICKS = 400;
     /** 每 tick 列处理预算 — 空气快速跳过但封顶, 防一 tick 扫整层 (32 区块高空 = 26万格) */
     private static final int COLUMNS_PER_TICK = 256;
 
@@ -102,6 +114,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
 
     @Override
     public void tick(ServerLevel world, EntityMaid maid) {
+        // ═══ 阶段 1-2: 诊断/节流探针 + 前置守卫 (无 cfg.start ⇒ return; 摔落伤害清零) ═══
         // v79.62.1 进度持久化: cfg (lma_cfg_void_excavation, 持久 NBT) 存 start/size/y/x/z/箱;
         // pd (lma_pl, 内存态) 存瞬态 (wait/nav/digTicks). 挖空超长任务重启不丢进度.
         // [VOID-TICK] 诊断: pipeline tick 是否在跑 + cfg start 是否存在 — 定位期临时 WARN
@@ -150,6 +163,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
                 pd.getInt("wait"), pd.getInt("claimWait"));
         }
         BlockPos start = NbtCodecs.readBlockPos(cfg, TaskKeys.CFG_START);
+        // ═══ 阶段 3: 区域边界 (size 区块 ⇒ minCX/maxCX/minCZ/maxCZ) ═══
         int size = readSize(maid, cfg);
 
         // v79.62.2 区块工作制接管: HOME 模式工作区跟随 (setWorkPos/restrictTo) 已上移到
@@ -164,6 +178,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
         // ── v79.62.1 多女仆动态领取 (用户裁定: 先到先挖, 挖完领下一块, 防同区块抢挖) ──
         // 女仆认领一个区块 (PD curCX/curCZ), 挖掘范围限制在该区块内; 区块挖到底 → 释放领下一个.
         // v79.62.1 运行时状态全放 PD (内存), cfg 只存标记点 (start/size/input/output) — 用户裁定.
+        // ═══ 阶段 4: 多女仆认领 (claimWait / curCX 自愈 / 无 curCX ⇒ 领新区块) ═══
         int curCX = pd.getInt("curCX"), curCZ = pd.getInt("curCZ");
         if (pd.getInt("claimWait") > 0) {
             pd.putInt("claimWait", pd.getInt("claimWait") - 1);   // 认领等待冷却, 防每 tick 空转 + Brain 高频重搜
@@ -255,6 +270,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
         //   原写法 `if (!isHome) {记 false; 开} else {记 true}` **每 tick 都跑** ⇒ 第 2 tick 起她已是 home
         //   ⇒ 走 else 把 false **覆盖成 true** ⇒ onCleanup 的 `!wasHome` 判定失败 ⇒ home 永不关 ✗
         //   ⇒ 改为「**只记一次**」(与 `DamFillPipeline.ensureHomeMode` 同款 ✓; 任务期间仍持续强制 home ✓)
+        // ═══ 阶段 5-6: 强制 HOME (wasHome 只记一次) + 等待冷却 (wait) ═══
         if (!pd.contains("wasHome")) {
             pd.putBoolean("wasHome", maid.isHomeModeEnable());
         }
@@ -270,6 +286,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
             return;
         }
 
+        // ═══ 阶段 7-8: 游标层 y / 高度边界 + min_y 无效自愈 ═══
         // 当前层 (用户裁定: 挖空置域 = 从标记层 start.getY() 往下挖).
         // v79.6x 越界复位: 旧版「补挖高处」会把 y 写到标记层以上并随女仆 NBT 持久化,
         // 重进后游标悬空在标记层上方 (实测 y=-54/-55 > -61) → 拉回标记层重挖.
@@ -280,6 +297,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
         int x = pd.getInt("x");
         int z = pd.getInt("z");
 
+        // ═══ 阶段 9: 容器检查 (输入/输出箱 forceChunk + handleContainers) ═══
         // 容器检查 (工具/输出) — 缺则回玩家提醒 (箱位置读持久 cfg)
         BlockPos input = NbtCodecs.readBlockPos(cfg, "input");
         BlockPos output = NbtCodecs.readBlockPos(cfg, "output");
@@ -294,7 +312,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
             com.github.xiaozhaoz1.littlemaidmoreaction.task.service.harvest.VoidExcavationChunkManager
                     .forceChunk(world, output.getX() >> 4, output.getZ() >> 4, true);
         }
-        boolean contOk = handleContainers(world, maid, pd, cfg, input, output);
+        boolean contOk = VoidExcavationService.handleContainers(world, maid, pd, cfg, input, output);
         if (world.getGameTime() % 200 == 0) {
             com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.warn(
                 "[VOID-DBG] containers ok={} input={} output={} wait={} y={} x={} z={}",
@@ -323,6 +341,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
         }
         int columns = 0;
         // v79.62.1 用户裁定: 最下层基岩排除 (y > minY — 基岩层整层不挖, 挖了女仆掉虚空)
+        // ═══ 阶段 10: 主挖掘循环 (列预算 COLUMNS_PER_TICK; 导航/传送/tryDig/液体/输出转存) ═══
         while (y > minY && columns < COLUMNS_PER_TICK) {
             columns++;
             BlockPos target = new BlockPos(x, y, z);
@@ -336,8 +355,8 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
                 if (!airCheck.getFluidState().isEmpty()) {
                     // v79.62.2 液体相邻扫描: 清当前格 + 相邻格液体 (水平 4 向 + 上下) —
                     // 防相邻区块/相邻格液体流进已挖空区 (用户裁定: 遇液体相邻扫描直接处理)
-                    clearLiquidAt(world, maid, target);
-                    clearAdjacentLiquids(world, maid, target, 8);
+                    VoidExcavationService.clearLiquidAt(world, maid, target);
+                    VoidExcavationService.clearAdjacentLiquids(world, maid, target, 8);
                     x++;
                     if (x > maxX) { x = minX; z++; }
                     if (z > maxZ) { z = minZ; y--; }
@@ -378,7 +397,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
                     // ★ v79.65.1 「第一层检查」(用户实测: 第一层的**头位是未开挖地表** ⇒ 直接传送 = 头埋
                     //   实心方块 ⇒ 窒息持续掉血 ✗; 后续层头位已在上层挖空 ⇒ 只有第一层中招 ✓):
                     //   传送前先挖净落点 2 格 (头位 → 本体), 挖穿后才传送 ✓
-                    if (ensureLandingClear(world, maid, pd, centerPos)) return;   // 本 tick 有动作, 下 tick 复查
+                    if (VoidExcavationService.ensureLandingClear(world, maid, pd, centerPos)) return;   // 本 tick 有动作, 下 tick 复查
                     // v79.62.2 关导航: 传区块中间 (站定不动开挖) — 100t 传送冷却 (防每 tick 重传)
                     int navCd = pd.getInt("navCd");
                     if (navCd > 0) {
@@ -418,7 +437,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
                 if (navTimeout > 100) {
                     // ★ v79.65.1 「第一层检查」同款: 导航路径传送到 navTarget (= target.above()), 第一层时
                     //   该格是**未开挖地表** ⇒ 先挖净落点再传, 防窒息 ✓
-                    if (ensureLandingClear(world, maid, pd, navTarget)) {
+                    if (VoidExcavationService.ensureLandingClear(world, maid, pd, navTarget)) {
                         pd.putInt("navTimeout", navTimeout);
                         return;   // 落点未净空 ⇒ 本 tick 不传送, 下 tick 复查
                     }
@@ -458,7 +477,7 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
                     ts.isAir(), !ts.getFluidState().isEmpty());
             }
             // 边界液体密封 (v79.62.2 用户裁定: 检测女仆 4 格内的区域外液体, 防流入已挖空区)
-            sealBoundaryLiquid(world, maid, output, minX, maxX, minZ, maxZ);
+            VoidExcavationService.sealBoundaryLiquid(world, maid, output, minX, maxX, minZ, maxZ);
             // ① 空气格跳过 (v79.62.1 修: 逐层横挖 — 空气格横向跳过不降层,
             // 一层可能有空气也可能有方块, 整层挖完才降 y; 原「空气就 y--」会漏挖同层方块 → 悬空)
             if (ts.isAir()) {
@@ -483,10 +502,10 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
             // v79.62.1 用户裁定加回: 背包满 → 转存输出箱; 转存后仍满 (输出箱满+无扩展)
             // → 停挖站原地提醒等待 (不继续挖积压; 转存=背包满 OR 每 20t 定期已覆盖).
             if (VoidExcavationContainerService.backpackFull(maid)) {
-                flushOutput(world, maid, pd, cfg, output);
+                VoidExcavationService.flushOutput(world, maid, pd, cfg, output);
                 if (VoidExcavationContainerService.backpackFull(maid)) {
-                    remindPlayer(maid, "背包满了，请补充输出箱或清理背包");
-                    pd.putInt("wait", WAIT_TICKS);
+                    VoidExcavationService.remindPlayer(maid, "背包满了，请补充输出箱或清理背包");
+                    pd.putInt("wait", VoidExcavationService.WAIT_TICKS);
                     return;   // 停挖等玩家补给
                 }
             }
@@ -494,8 +513,8 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
             // 破坏特效即时反馈; 不再依赖背包/输出箱方块, 无方块也不卡住)
             if (!ts.getFluidState().isEmpty()) {
                 // v79.62.2 液体: 清当前格 + 相邻扫描 (防相邻区块液体流过来) + 清缓存
-                clearLiquidAt(world, maid, target);
-                clearAdjacentLiquids(world, maid, target, 8);
+                VoidExcavationService.clearLiquidAt(world, maid, target);
+                VoidExcavationService.clearAdjacentLiquids(world, maid, target, 8);
                 pd.putInt("digTicks", 0);
                 pd.putInt("navTimeout", 0);
                 pd.putInt("navCd", 0);
@@ -532,11 +551,12 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
             // 原只背包满时转存, 输出箱满但背包未满时方块一直积 (不触发满提示 → 积压).
             // 定期转存 (20t ≈ 1 秒) 防积压; 背包满检查在 ② 已做, 这里背包满时也会转存.
             if (world.getGameTime() % 20 == 0 || VoidExcavationContainerService.backpackFull(maid)) {
-                flushOutput(world, maid, pd, cfg, output);
+                VoidExcavationService.flushOutput(world, maid, pd, cfg, output);
             }
             return;   // 每 tick 至少处理一列后收手
         }
 
+        // ═══ 阶段 11-12: 进度保存 + 完成判定 (y ≤ minY ⇒ poolMark) + 耗时日志 ═══
         // 保存进度 (PD 内存 — 重启从标记层重挖, 空气快跳)
         pd.putInt("y", y);
         pd.putInt("x", x);
@@ -563,174 +583,11 @@ public final class VoidExcavationPipeline implements TaskPipeline, TaskConfigura
     /** 挖掘心跳 — 活跃任务定时 (防 GMPM 看门狗误杀长任务).
      *  <p>v79.62.1 改只 heartbeat: keepAlive 会 setNavTarget(当前位置) 覆盖导航目标,
      *  干扰"走不到再传送"的导航优先设计 — 心跳只防看门狗, 不碰导航记忆. */
-    /**
-     * 「第一层检查」— 传送落点必须先成为 **2 格净空** (v79.65.1, 用户实测).
-     *
-     * <p><b>为什么</b>: 女仆站姿 = 脚在落点格、头在其上 1 格 (1.8 格高). 逐步下挖时后续层的头位已在
-     * 上一层挖空 ⇒ 安全; 但**第一层 (标记层) 的头位是未开挖的地表** ⇒ 直接传送 = 头埋实心方块
-     * ⇒ **窒息持续掉血** ✗ (用户实测现象) ✓
-     *
-     * <p><b>语义 (用户裁定)</b>: 先挖**头位** (落点 +1), 再挖**本体** (落点) — "第一层挖掉两块"后女仆
-     * 即可安全传送站位 ✓. 走既有 {@link VoidExcavationService#tryDig} 通道 (工具/耐久/销毁名单/背包
-     * 一致 ✓), 沿用同一挖掘节拍 {@code digTicks} (不额外加速) ✓; 清不掉 (基岩/屏障) 则跳过, 不阻塞进度 ✓
-     *
-     * @return true = 本 tick 有动作 (挖了一格或节拍等待) ⇒ 调用方**不要传送**, 下 tick 复查;
-     *         false = 落点已 2 格净空 ⇒ 可安全传送 ✓
-     */
-    private static boolean ensureLandingClear(ServerLevel world, EntityMaid maid, CompoundTag pd, BlockPos landing) {
-        for (BlockPos p : new BlockPos[]{landing.above(), landing}) {   // 顺序: 头位 → 本体 (用户裁定)
-            if (p.getY() > VoidExcavationService.maxY(world) || p.getY() < world.getMinBuildHeight()) continue;
-            if (!world.hasChunk(p.getX() >> 4, p.getZ() >> 4)) return false;   // 区块未加载: 交上层预加载/传送门控
-            BlockState st = world.getBlockState(p);
-            if (st.isAir()) continue;
-            if (st.is(net.minecraft.world.level.block.Blocks.BEDROCK) || !maid.canDestroyBlock(p)) continue;
-            int digTicks = pd.getInt("digTicks") + 1;
-            int interval = VoidExcavationService.digIntervalTicks(world, maid, p, st);
-            if (digTicks < interval) {
-                pd.putInt("digTicks", digTicks);
-                return true;   // 节拍未到 ⇒ 本 tick 不传送
-            }
-            pd.putInt("digTicks", 0);
-            VoidExcavationService.tryDig(world, maid, p);
-            com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.warn(
-                    "[VOID-LAND] 第一层检查: 挖净传送落点 {} ({}) 女仆={}",
-                    p.toShortString(), p.equals(landing) ? "本体" : "头位", maid.blockPosition().toShortString());
-            return true;   // 挖了一格 ⇒ 下 tick 复查 (头位挖完才轮到本体 ✓)
-        }
-        return false;
-    }
 
     private static void advance(ServerLevel world, EntityMaid maid) {
         com.github.xiaozhaoz1.littlemaidmoreaction.task.runtime.TaskStateManager.heartbeat(maid, world.getGameTime());
     }
 
-    /** 区域边界液体密封 (v79.62.2 用户裁定: 检测女仆 4 格内的区域外液体, 防流入已挖空区).
-     *  <p>以女仆位置为中心扫水平 ±4 格: 格子在区域外 (边界外 1 格密封层) 且是液体 →
-     *  直接空气化 + 破坏粒子 (v79.62.2 改: 不再依赖输出箱方块, 液体蒸发掉).
-     *  每 tick 检 (预算封顶防卡), 不是游标驱动 — 女仆挖到哪, 附近区域外液体就持续被清. */
-    /** v79.62.2 清单格液体 → 空气 + 破坏粒子 + 挥手 + 清 WATER 缓存 (防旧缓存读到水) */
-    private static void clearLiquidAt(ServerLevel world, EntityMaid maid, BlockPos p) {
-        if (!world.hasChunk(p.getX() >> 4, p.getZ() >> 4)) return;
-        net.minecraft.world.level.block.state.BlockState liq = world.getBlockState(p);
-        if (liq.getFluidState().isEmpty()) return;
-        world.setBlock(p, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
-        world.levelEvent(2001, p, net.minecraft.world.level.block.Block.getId(liq));
-        maid.swing(net.minecraft.world.InteractionHand.MAIN_HAND);
-        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache
-                .clearType(world.dimension().location().toString(),
-                        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.cache.BlockPatternCache.PatternType.WATER);
-    }
-
-    /** v79.62.2 液体相邻扫描: 清当前格四周 (水平 4 向 + 上下) 的液体 — 防相邻区块/格液体
-     *  流进已挖空区 (用户裁定: 遇液体相邻扫描直接处理). budget 封顶防卡. */
-    private static void clearAdjacentLiquids(ServerLevel world, EntityMaid maid, BlockPos center, int budget) {
-        int[][] offs = {{1,0,0},{-1,0,0},{0,1,0},{0,-1,0},{0,0,1},{0,0,-1}};
-        for (int[] o : offs) {
-            if (budget <= 0) break;
-            BlockPos p = new BlockPos(center.getX() + o[0], center.getY() + o[1], center.getZ() + o[2]);
-            clearLiquidAt(world, maid, p);
-            budget--;
-        }
-    }
-
-    private static void sealBoundaryLiquid(ServerLevel world, EntityMaid maid,
-                                           BlockPos output, int minX, int maxX, int minZ, int maxZ) {
-        BlockPos base = maid.blockPosition();
-        int budget = 16;   // 每 tick 封顶 (防大范围液体一次扫爆)
-        for (int dx = -4; dx <= 4 && budget > 0; dx++) {
-            for (int dz = -4; dz <= 4 && budget > 0; dz++) {
-                if (dx == 0 && dz == 0) continue;
-                BlockPos p = new BlockPos(base.getX() + dx, base.getY(), base.getZ() + dz);
-                // v79.62.2 区域内外都清: 已挖区/流入液体 (游标已过不回头) 由女仆经过时清掉 —
-                // 原只清区域外密封层 → 区域内新放/流入液体没人管 (用户实证: 新放液体女仆不处理)
-                // 修卡顿: 邻格区块未加载 → 跳过 (getFluidState 触发生成会卡主线程)
-                if (!world.hasChunk(p.getX() >> 4, p.getZ() >> 4)) continue;
-                if (world.getFluidState(p).isEmpty()) continue;
-                // v79.62.2 用户裁定: 液体直接空气化 + 破坏粒子 + 清缓存 (不再依赖输出箱方块填充)
-                clearLiquidAt(world, maid, p);
-                budget--;
-            }
-        }
-    }
-
-    // (releaseChunks 已删 v79.62.1 — 区块只强制当前 1 个, 无批量释放)
-
-    /** 容器检查 + 转存 — 返回 false = 需要玩家补给 (无工具/箱满), 已提醒 */
-    private static boolean handleContainers(ServerLevel world, EntityMaid maid, CompoundTag pd, CompoundTag cfg,
-                                            BlockPos input, BlockPos output) {
-        // v79.62.1 无箱标记提醒 (用户裁定): 未标记输入箱/输出箱 → 全局限频气泡提醒
-        // (不阻止挖掘 — 无输出箱时方块积背包, 无输入箱用自带工具/空手)
-        if (input == null) {
-            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
-                    .shouldFire(maid, "void_no_input", 1200)) {
-                MaidChatBubbleApi.showInfo(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.void.no_input_box"));
-            }
-        }
-        if (output == null) {
-            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
-                    .shouldFire(maid, "void_no_output", 1200)) {
-                MaidChatBubbleApi.showInfo(maid, net.minecraft.network.chat.Component.translatable("bubble.littlemaidmoreaction.void.no_output_box"));
-            }
-        }
-        // 工具: 先看背包 (全背包有工具 → 直接用, 不取箱) → 没有再取输入箱
-        // (v79.62.1 用户裁定: 背包优先, 箱兜底; 防反复换手)
-        if (input != null && !hasToolInInv(maid)) {
-            if (VoidExcavationContainerService.takeToolFromInput(world, maid, input)) {
-                // v79.6x 撤扩展扫描 — 取到工具即可
-            } else {
-                // v79.6x 用户裁定: 撤扩展扫描 — 只用标记输入箱, 没工具就提醒等补给
-                remindPlayer(maid, "输入箱没有工具了，请补工具");
-                pd.putInt("wait", WAIT_TICKS);
-                return false;
-            }
-        }
-        // v79.6x 用户裁定: 输出箱满也不停挖 — 只气泡提醒, 不 return false (溢出方块掉地上)
-        if (output != null && !VoidExcavationContainerService.hasSpace(world, output)) {
-            remindPlayer(maid, "输出箱满了，请清空或加容器");
-        }
-        return true;
-    }
-
-    /** 输出箱转存 (背包方块 → 输出箱) — 满则搜扩展容器并递归存入, 直到无可搜.
-     *  v79.62.1 修缓存更新 (用户裁定): 放入后清 outNoExpand — 箱子被写入了空间变化,
-     *  缓存必须刷新 (否则永久 noExpand 不重试主箱 → 背包积压不清理).
-     *  @return true = 背包仍有剩 (输出箱全满无扩展), false = 全部转存成功. */
-    private static boolean flushOutput(ServerLevel world, EntityMaid maid, CompoundTag pd, CompoundTag cfg, BlockPos output) {
-        if (output == null) return false;
-        int remaining = VoidExcavationContainerService.depositBlocks(world, maid, output);
-        // v79.6x 撤扩展扫描 — 只存标记输出箱, 存不下就提醒 (下次 tick handleContainers 再判)
-        if (remaining > 0) {
-            // v79.6x 输出箱满不停挖 (提醒即可, 不 wait)
-            remindPlayer(maid, "输出箱满了，请清空或加容器");
-            return true;
-        }
-        return false;
-    }
-
-    /** 全背包是否有可用工具 (镐/锹/斧 — damageable item 含工具/武器) */
-    private static boolean hasToolInInv(EntityMaid maid) {
-        var inv = maid.getAvailableInv(true);
-        for (int i = 0; i < inv.getSlots(); i++) {
-            ItemStack s = inv.getStackInSlot(i);
-            if (!s.isEmpty() && s.isDamageableItem()) return true;
-        }
-        return false;
-    }
-
-    /** 回玩家旁提醒 (气泡 + 主人聊天) — 1200t 节流防刷屏 + 首次必发 */
-    private static void remindPlayer(EntityMaid maid, String msg) {
-        if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.maid.ThrottleUtil
-                .shouldFire(maid, "void_excavation_remind", 1200)) {
-            return;
-        }
-        MaidChatBubbleApi.showInfo(maid, msg);
-        var owner = maid.getOwner();
-        if (owner instanceof ServerPlayer sp) {
-            sp.sendSystemMessage(net.minecraft.network.chat.Component.translatable("msg.littlemaidmoreaction.maid_prefix").append(msg));
-        }
-        // v79.62.1 修"挖完区块依旧会传送": 提醒不再传送到玩家旁 (挖空是远距离任务,
-        // 传回玩家会打断挖掘/瞬移回起点; 女仆原地等待玩家来补给, 不传送)
-    }
 
     /** 区块数 — v79.63.10 起**统一读全局** VOID_DEFAULT_CHUNKS (旧版 per-maid size 键已无写入点,
      *  NBT 残留值会覆盖全局 ⇒ 用户实测"全局设 2×2 仍挖 1×1" ✗; 将来加单女仆 UI 再恢复读键 ✓) */

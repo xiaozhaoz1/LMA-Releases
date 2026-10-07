@@ -13,7 +13,7 @@
 
 ## 一、逐类明细 (行数 / 读什么 / 典型调用方)
 
-### `world/` (5)
+### `world/` (6)
 | 类 | 行数 | 读什么 | 调用方 |
 |---|---|---|---|
 `WorldStateReader` | 63 | 世界状态聚合 (时间/天气/维度) | service · pipeline |
@@ -21,6 +21,7 @@
 **`RegionBox`** | 60 | **区域盒纯数据** (`contains`/`containsYExtended`(Y±1)/`centerX|Y|Z`/`maxDimension`/`horizontalArea`/`volume`); **项目内 import = 0** | FarmExecute (A4 修: 断 `CropQuery→storage.FarmRegion`) |
 `HeatSourceQuery` | 94 | 热源查找 (熔炉/岩浆/火) | 温度相关任务 |
 `WaterQuery` | 37 | 水源判定 | 农业/填坝 |
+`StickBindUtil` | 111 | **木棍标记/绑定通用工具** (2026-09-21 由 `event/` 迁入): 取绑定物 (主/副手) · 标记物/绑定物判定 (config 驱动, 无效回退木棍) · 容器判定 (任意面 ITEM_HANDLER) · 任务类型门控 — 配置与任务类型能力经 `api/input/StickBindAccess` 取 (实现在 `init/LmaTaskBinding`) | event 三 SetupHandler · `network/FarmContainerBindPacket` · `task/service/FarmRegionContainers` |
 
 ### `maid/` (4)
 | 类 | 行数 | 读什么 | 调用方 |
@@ -76,3 +77,10 @@
 4. **io 判据是通用性不是粒度** — 复合 io 原语合法, 但注意它属于哪一侧 (读/写)。
 5. **下游只要"形状"就给形状** — 上层要盒/坐标等数据时给**纯数据 record** (`RegionBox` 先例), 不要引入上层语义类型 (A4 越层教训)。
 6. **改本包必须同步本表** (计数 + 逐类明细), 否则文档立刻漂移 (本会话已见: `RegionBox` 加进来后计数未更新)。
+7. **单格 `getBlockState` 允许直读, 但"重复读"必须走缓存** (2026-09-21 io 判定, 用户流程第 4 项) —
+   实测 `task/*` 有 **48 处** `level.getBlockState(pos)` 单格读 (清单: `build-logs/LIST-io-primitive-gap.md`)。
+   **裁定: 不补"单格读原语"** ✗ —— 理由是**语义增益为零** (纯透传, 不隐藏 MC 类型也不带业务语义),
+   与错题 **#183**("契约工具 0 调用方 = 侧漂移温床") 同一判据; io 层的价值在**语义化读** (`BlockSearch`/`CropQuery`/
+   `WaterQuery`/`HeatSourceQuery` 等 ✓)。**但**: 若同一批格**跨 tick 反复读** ⇒ 必须走 `vanilla/cache/BlockPatternCache`
+   ✓ (错题 **#255** 的教训: 高频世界读要摊薄, 否则 TPS 崩 ✗);
+   **实体读** (`getEntitiesOfClass` 7 处 / `getAllEntities` 部分) ⇒ 应改调本包 `EntityScanner` (第 4 批迁, `MaidIndex` 两处为已登记例外 ✓)。

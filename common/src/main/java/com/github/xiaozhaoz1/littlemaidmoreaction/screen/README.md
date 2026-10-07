@@ -3,7 +3,7 @@
 **作用**: 所有**客户端 Screen**: 配置入口屏、任务相关屏、图鉴/农田/属性等域屏, 以及通用 UI 基建 (打开入口登记表/背景/生命周期日志)。
 **依赖方向**: 原版客户端 + TLM 客户端 API + task/api + config + chatbubble; **仅客户端加载** (dedicated server 不加载本包)。
 
-## 一、组成 (21 类, 按用途分组)
+## 一、组成 (30 类 = 原 21 + 2026-09-21 由 task/gui/ 迁入的 9 个 per-task 配置屏, 按用途分组)
 ### 1. 入口与基建
 | 类 | 职责 |
 |---|---|
@@ -19,6 +19,16 @@
 
 ### 2. 配置类屏
 `CompatConfigScreen` (兼容模块开关) · `ClothSettingsScreen` (Cloth Config 桥: 调试/连锁采集/环境感知/右键交互/**杂项**/任务自定义入口/好感度乘区/防御塔) · `MaidOtherSettingsScreen` (其它设置) · `TaskSettingsScreen` (每任务 cloth 子屏: 该任务自己的全局默认值)
+
+**per-task 配置屏 (2026-09-21 由 `task/gui/` 迁入本层 ✓ 用户裁定"GUI 归客户端侧")** —— 屏体在本包, **菜单对偶仍留 `task/gui/`**
+(§1: `task/gui/` = 服务端菜单/工厂; `screen/` = 客户端屏 ✓; 菜单类实测 **0 处 `net.minecraft.client` import** ⇒ 不会触发
+错题 #168 式"服务端加载客户端类"炸服 ✓):
+`LmaTaskConfigScreen` (通用基类: `sendSetInt/sendAction/sendRemove` 等发送原语) ·
+`BellRingConfigScreen` (§钟) · `BlockInteractConfigScreen` (方块交互) · `CraftChainConfigScreen` (合成链) ·
+`AiControlConfigScreen` (AI 操控) · `VoidExcavationConfigScreen` (空置域) · `DamFillConfigScreen` (填坝) ·
+`ItemListConfigScreen` (黑白名单, 多任务共用) · `PassiveToggleConfigScreen` (被动任务开关)
+> 屏 ↔ 菜单 ↔ 任务 ↔ 配置键 的完整对照表仍留在 `task/gui/README.md` §一（映射不随屏体搬家 ✓）。
+
 
 **配置项归属判据 (v79.63.21 用户裁定)** — 新增任何配置项前先过这一关:
 - **任务自己的参数** ⇒ `ClothSettingsScreen`「任务自定义」→ 该任务 `TaskSettingsScreen` 子屏

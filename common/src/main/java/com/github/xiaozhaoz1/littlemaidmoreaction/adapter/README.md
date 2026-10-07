@@ -59,6 +59,7 @@ GAME 总线关键监听 (neoforge 兜底) | `LmaNeoForgeEntry` / `LmaNeoForgeCli
 **C** | **TLM 任务 UID 是跨层契约** | `lma:task/<sanitized taskType>` — 改 `taskType` 或 sanitize 规则 = **老存档任务丢失** (TLM 按 UID 存任务), 需迁移。|
 **D** | **恢复路径有两个入口** | `MaidTaskEnableEvent` 与 `EntityJoinLevelEvent` 都走恢复逻辑 (魂符/区块加载/跨 session) ⇒ 改其一要同步另一, 否则"魂符收起→放出后任务没了/重复提交"。|
 **E** | **GUI 启用条件 ≠ 运行门控** | `LmaTaskGuiHandler` 只影响"TLM 界面里能否选"; 真正的运行门控在 `TaskRegistry` 注册期 + `validate` (参 `task/pipeline/README.md` §3-F)。|
+**F** | **继承/实现宿主扩展 API 前，先读宿主的调用点实现** (错题 **#217**) | **不要信接口名称的字面语义** ✗ —— 血例: `InteractMaidEvent` 名字像"任意右键女仆"，源码 `EntityMaid.mobInteract` 实为**仅「已驯服 + 主人 + 主手」**才 fire ⇒ 按字面写测试/逻辑 = 永远测不到该路径 ✗。另有两处规划误判(唯一饰品槽假设错—`BAUBLE_INV_SIZE=30`; 双平台签名不对称)全靠读宿主源码兜住。<br>**双平台签名不对称 (本仓 sources jar 双证)**: `Item.getUseDuration` —— 1.20.1 = `(ItemStack)` (`forge-1.20.1-47.4.16-sources.jar` `Item.java:262`) vs 1.21.1 = `(ItemStack stack, LivingEntity entity)` (`neoforge-21.1.62-sources.jar` `Item.java:321`) ⇒ 跨版本实现宿主接口**必须双分支编译验证** ✓; 一般规律: 1.21 的物品/NBT/方块实体类 API 常 +`HolderLookup.Provider` 或 +实体参数 (错题 **#221** 的 javap 双版本对照法 ✓)。上游: [TouhouLittleMaid](https://github.com/TartaricAcid/TouhouLittleMaid) · 参考: [Item 1.21 API](https://maven.fabricmc.net/docs/yarn-1.21+build.9/net/minecraft/item/Item.html) |
 
 ---
 
@@ -69,3 +70,10 @@ GAME 总线关键监听 (neoforge 兜底) | `LmaNeoForgeEntry` / `LmaNeoForgeCli
 3. **补本 README 两张表** (事件→handler、注册点)。
 4. **双平台各跑一次**: 事件监听与注册是**平台相关**的, forge 通过 ≠ neoforge 通过 (反之亦然)。
 5. **改 Brain 行为前**: 确认目标任务的导航写入方唯一 (参陷阱 B)。
+
+## 陷阱 (v79.74 新增 · 错题 #366)
+
+| # | 陷阱 | 规则 |
+|---|---|---|
+**F** | **`IMaid` ≠ `EntityMaid`** ✗ | TLM 的 `IMaid` 被**其它模组的实体**实现（`touhou_little_maid_spell` 的 `MagicalWinefoxBossEntity` 星之魔女 Boss 也走 TLM 动画系统）⇒ 凡形参是 `IMaid` 的入口（如 `IMagicCastingAnimationProvider` 的两个方法）**必须先做类型守卫**：`if (!(maid.asEntity() instanceof EntityMaid m)) return null;`，之后**全程用 `m`**；**禁止** `(EntityMaid) maid.asEntity()` ✗（曾 11 处盲转 ⇒ Boss 一渲染就 ClassCastException ✗）。守护测试：`arch/IMaidDowncastGuardTest` ✓ |
+**G** | **`cleanup(IMaid)` 之类"只碰 Entity 级 API"的方法** | 只调用 `asEntity().getPersistentData()` 时**无需**守卫 ✓（`Entity` 上就有）—— 但必须在 javadoc 里写明"为何无需守卫" ✓，否则后人会误加/误删 |

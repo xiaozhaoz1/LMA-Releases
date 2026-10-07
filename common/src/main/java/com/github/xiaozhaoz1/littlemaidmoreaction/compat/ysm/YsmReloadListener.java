@@ -4,7 +4,8 @@ import com.github.tartaricacid.touhoulittlemaid.client.resource.GeckoModelLoader
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.file.AnimationFile;
 import com.github.tartaricacid.touhoulittlemaid.geckolib3.resource.GeckoLibCache;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationResourceRegistrar;
+import com.github.xiaozhaoz1.littlemaidmoreaction.client.AnimationResourceRegistrar;
+import com.github.xiaozhaoz1.littlemaidmoreaction.network.client.AnimFileSyncClientHandler;
 import com.github.xiaozhaoz1.littlemaidmoreaction.storage.StartupLoader;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.packs.resources.SimplePreparableReloadListener;
@@ -81,7 +82,7 @@ public final class YsmReloadListener extends SimplePreparableReloadListener<Void
     @OnlyIn(Dist.CLIENT)
     public static void onClientTick() {
         // 动画文件包防抖刷新 — 每 tick 检查 (2 秒无新包才执行, 渲染线程不再卡包)
-        com.github.xiaozhaoz1.littlemaidmoreaction.network.AnimFileSyncPacket.flushPending();
+        AnimFileSyncClientHandler.flushPending();
         if (complemented && sourceFilesChanged()) {
             // 运行时动画更新 (AnimSync 落盘新文件/用户手改) — P-19: 原 PARSED_SOURCES
             // 永不过期 + 补全只跑一次 → TLM geckolib 通道不更新 (YSM 磁盘注入通道会生效,

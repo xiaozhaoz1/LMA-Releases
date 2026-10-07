@@ -119,27 +119,39 @@ class ReadmeDriftGuardTest {
                 "以下 sense 类没写进 task/pipeline/sense/README.md (被动管线/触发器必须登记): " + missing);
     }
 
+    /**
+     * 配置屏 + 配置写铁律的可见性守护。
+     *
+     * <p><b>2026-09-21 契约变更</b>: 9 个 `*ConfigScreen` 已从 `task/gui/` 迁到 **`screen/`**（客户端屏层，
+     * 与其余客户端屏同层 —— 用户指正"别人的 GUI 都在 client 侧" + 本仓 §1 的分层精神 ✓）。
+     * `task/gui/` 现在只放**服务端菜单对偶**（`*ConfigMenu`/`LmaTaskConfigContainer`/工厂/树 ✓；实测 0 处
+     * `net.minecraft.client` import ⇒ 不会触发 168 式"服务端加载客户端类"炸服 ✓）。
+     * ⇒ 屏的类名覆盖检查改看 `screen/README.md`；配置写两条铁律仍在 `task/gui/README.md`（写契约随菜单/工厂层）。
+     */
     @Test
     void guiReadmeCoversEveryConfigScreenAndWriteRules() {
         Path root = ArchSource.findPackageRoot();
         Assumptions.assumeTrue(root != null, "非源码树环境");
 
-        Path readme = root.resolve(G).resolve("README.md");
-        assertTrue(readme.toFile().isFile(), "task/gui/README.md 不存在 — 配置屏目录必须有 README");
-        String doc = ArchSource.read(readme);
+        Path guiReadme = root.resolve(G).resolve("README.md");
+        Path screenReadme = root.resolve("screen").resolve("README.md");
+        assertTrue(guiReadme.toFile().isFile(), "task/gui/README.md 不存在 — 服务端菜单对偶目录必须有 README");
+        assertTrue(screenReadme.toFile().isFile(), "screen/README.md 不存在 — 客户端屏目录必须有 README");
+        String guiDoc = ArchSource.read(guiReadme);
+        String screenDoc = ArchSource.read(screenReadme);
 
         List<String> missing = new ArrayList<>();
-        List<String> screens = classNames(root.resolve(G), "Screen");
-        assertTrue(screens.size() >= 8, "扫描到的配置屏数异常 (" + screens.size() + ", 期望 ≥8)");
+        List<String> screens = classNames(root.resolve("screen"), "Screen");
+        assertTrue(screens.size() >= 8, "扫描到的屏数异常 (" + screens.size() + ", 期望 ≥8)");
         for (String s : screens) {
-            if (!"LmaTaskConfigScreen".equals(s) && !doc.contains(s)) missing.add(s);
+            if (!"LmaTaskConfigScreen".equals(s) && !screenDoc.contains(s)) missing.add(s);
         }
-        assertTrue(missing.isEmpty(), "以下配置屏没写进 task/gui/README.md: " + missing);
+        assertTrue(missing.isEmpty(), "以下屏没写进 screen/README.md: " + missing);
 
-        // 配置写入两条铁律必须在文档里 (它们是本轮两次事故的直接教训)
-        assertTrue(doc.contains("cfgOrCreate"),
+        // 配置写入两条铁律必须在文档里 (它们是两次事故的直接教训; 契约随菜单/工厂层留 task/gui)
+        assertTrue(guiDoc.contains("cfgOrCreate"),
                 "task/gui/README.md 必须写明: 写入配置必须用 MaidData.cfgOrCreate (cfg 是只读临时 tag → 静默丢写)");
-        assertTrue(doc.contains("ACTION_REMOVE"),
+        assertTrue(guiDoc.contains("ACTION_REMOVE"),
                 "task/gui/README.md 必须写明: 清除配置用 ACTION_REMOVE 才能回落全局 (写默认值 ≠ 回落)");
     }
 
@@ -160,7 +172,7 @@ class ReadmeDriftGuardTest {
         String[][] pairs = {
                 {"task/service", "服务"},
                 {"adapter", "TLM 桥接"},
-                {"defense", "防御塔"},
+                {"defense", "防御塔", "R"},   // 2026-09-21 分子包 (tower/garage/client) ⇒ 递归校验, 类明细全写 defense/README
                 {"config", "全局配置"},
                 {"screen", "客户端屏"},
                 {"task/data", "任务数据"},
@@ -184,6 +196,13 @@ class ReadmeDriftGuardTest {
                 {"vanilla/cache", "区块缓存族", "R", "vanilla"},
                 {"vanilla/execute", "跨 tick 协调器", "R", "vanilla"},
                 {"vanilla/fakeplayer", "假玩家", "R", "vanilla"},
+                // 2026-09-21 审计补齐 (精算"有类 + 无自己 README + 父条目非递归"的洞 ⇒ 恰好 2 处 11 类):
+                //   明细已写在父 README (network §客户端 handler / task/service §子包), 故不作递归父条目,
+                //   而是按既有第 4 位模式逐子包登记 ⇒ 这 11 类从此纳入守护 (防再漂) ✓
+                {"network/client", "网络客户端 handler", "R", "network"},
+                // 注: 原 `{"task/service/token", …}` 条目已于同日**移除** —— token 家族按用户裁定回迁 `bauble/token/`
+                //   (饰品家族归 bauble; 见 bauble/README §家族归属判据), 而 `bauble` 条目本就是 "R" 递归
+                //   ⇒ token 6 类由父递归条目覆盖 ✓ (本条目的移除正是本守护自身报 "task/service/token 下无 java 文件" 后所为 ✓)
                 // 最后一批 (小包 + 顶层)
                 {"chatbubble", "气泡与表情"},
                 {"ai", "AI 上下文", "R"},

@@ -22,7 +22,7 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.task.sense.Signals;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.search.EntityScanner;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.service.AnimExecute;
 import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.movement.BrainHelper;
-import com.github.xiaozhaoz1.littlemaidmoreaction.compat.ysm.YsmOutput;
+import com.github.xiaozhaoz1.littlemaidmoreaction.api.output.YsmAnimationProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -128,7 +128,7 @@ public final class HaqiPipeline implements PassiveSignalSkeleton, TaskConfigurab
     @Override
     public void onCleanup(EntityMaid maid) {
         // YSM 动画停止 (cancelPassive 先调 onCleanup, 覆盖全部退出路径)
-        YsmOutput.stopRoulette(maid);
+        YsmAnimationProvider.stopRoulette(maid);
         // AnimExecute fallback freezeAI=true 置 IS_PANICKING — 结束必须解除 (Brain memory 闭环)
         BrainHelper.unfreeze(maid);
         // 动画键闭环 — 清 ANIM_MODE 并同步 → 客户端 provider 返回 null →

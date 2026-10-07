@@ -195,6 +195,23 @@ public final class ActiveTaskConfig {
     public static final ModConfigSpec.IntValue BELL_RING_INTERVAL;
 //?}
 
+    // ── v79.66o 偷吃 Token (用户裁定 2026-09-20: 6000t 掷 5% · 主人 8 格内 · 背包放不下不偷) ──
+//? if 1.20.1 {
+    public static final ForgeConfigSpec.BooleanValue TOKEN_STEAL_ENABLED;
+//?} else {
+    public static final ModConfigSpec.BooleanValue TOKEN_STEAL_ENABLED;
+//?}
+//? if 1.20.1 {
+    public static final ForgeConfigSpec.IntValue TOKEN_STEAL_INTERVAL;
+//?} else {
+    public static final ModConfigSpec.IntValue TOKEN_STEAL_INTERVAL;
+//?}
+//? if 1.20.1 {
+    public static final ForgeConfigSpec.DoubleValue TOKEN_STEAL_CHANCE;
+//?} else {
+    public static final ModConfigSpec.DoubleValue TOKEN_STEAL_CHANCE;
+//?}
+
     // ── AI 操控 ──
 //? if 1.20.1 {
     public static final ForgeConfigSpec.ConfigValue<String> AI_LLM_PROVIDER;
@@ -383,6 +400,19 @@ public final class ActiveTaskConfig {
                 .defineInRange("ring_interval_ticks", 30, 30, 12000);
         b.pop();
 
+        // ── v79.66o 偷吃 Token (用户裁定: 6000t 掷 5% · 计时从**上次判定**起算 ✓) ──
+        b.push("token_steal");
+        TOKEN_STEAL_ENABLED = b
+                .comment("女仆是否会自动偷吃主人身上的 Token (每 interval 掷一次 chance)")
+                .define("enabled", true);
+        TOKEN_STEAL_INTERVAL = b
+                .comment("概率判定间隔 (tick, 6000 = 5 分钟) — 从**上次判定**起算: cd 一转完立即判定 ✓")
+                .defineInRange("interval_ticks", 6000, 20, 240000);
+        TOKEN_STEAL_CHANCE = b
+                .comment("每次判定的偷取概率 (0.05 = 5%; ≤0 永不 / ≥1 必中)")
+                .defineInRange("chance", 0.05, 0.0, 1.0);
+        b.pop();
+
         b.push("ai_control");
         AI_LLM_PROVIDER = b
                 .comment("AI 操控默认 LLM 模型名称 (Numen G 面板创建的模型条目名, 空=不绑定; per-maid 覆盖见 TLM 任务设置)")
@@ -434,6 +464,10 @@ public final class ActiveTaskConfig {
         MoreActionConfig.reg(ACTIVE_VALUES, "active", BELL_RING_INTERVAL);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", AI_LLM_PROVIDER);
         MoreActionConfig.reg(ACTIVE_VALUES, "active", AI_VOICE);
+        // v79.66o 偷吃 Token
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", TOKEN_STEAL_ENABLED);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", TOKEN_STEAL_INTERVAL);
+        MoreActionConfig.reg(ACTIVE_VALUES, "active", TOKEN_STEAL_CHANCE);
     }
 
     private ActiveTaskConfig() {}

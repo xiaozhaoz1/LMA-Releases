@@ -20,6 +20,18 @@
 **动画** | `AnimFileSyncPacket` (大包, 分片) · `LmaAnimSyncMessage` |
 **其它** | `MaidGomokuStatePacket`/`MaidGomokuTogglePacket` · `MaidEnvSenseTogglePacket` · `HaqiOwnerVoicePacket` · `PatPatReactionPacket` · `MaidChatBubblePacket` |
 
+### 客户端 handler (`network/client/`, 5 类 — 2026-09-21 审计补录)
+> **维护约定**: 本子包**无独立 README**, 明细集中在本节 (同 `compat/` 的子包做法 ✓)。全部只在**客户端**加载 (屏/UI/声音),
+> 入口统一是 `PacketRegistry.DEFS` 里对应包的 `ctx.enqueueWork` 回调 ⇒ **新增/改签名必须同步 `PacketRegistry` 与平台 registrar** ✓
+
+| 类 | 入口签名 | 干什么 |
+|---|---|---|
+`AnimFileSyncClientHandler` | `handle(String fileName, byte[] content)` + `flushPending()` | 接**分片**动画文件 → 重组落缓存 (配套 `AnimFileSyncPacket` 大包分片; 另被 `compat/ysm/YsmReloadListener` 消费做热合并 ✓) |
+`AnimSyncClientHandler` | `apply(int maidId, CompoundTag animData)` | 女仆动画状态同步 (客户端应用动画数据) |
+`HaqiVoiceClientHandler` | `play(int maidId, float volume)` | 播放「哈气」音效 (配 `HaqiOwnerVoicePacket`) |
+`MaidBubbleClientHandler` | `apply(int maidId, byte emojiType)` | 头顶表情气泡 (配 `MaidChatBubblePacket`) |
+`TaskConfigReplyClientHandler` | `apply(int maidId, CompoundTag config)` | per-task 配置回包 → 刷新配置屏 (配 `ReplyTaskConfigPacket`) |
+
 ## 三、连接链
 ```
 发送: 客户端/服务端 → SimpleChannelSender → 平台 channel (PacketRegistry 注册的包)
@@ -37,3 +49,4 @@
 **C** | **侧别处理别搞反** | 服务端 handler 里不要碰客户端类 (Screen/Minecraft), 反之亦然; 跨侧统一走 `ctx.enqueueWork`。|
 **D** | **大包要分片/限流** | 资源类同步 (动画文件) 参考 `AnimFileSyncPacket` 的分片; 客户端发起的重复包走 `C2SThrottle`。|
 **E** | **写数据的包必须幂等** | 可能重发/乱序 ⇒ 以"最终状态"为单位写, 不要写"增量" (或用版本号/序号)。|
+**F** | **每个 C2S 解码点 = 信任边界** (错题 **#194**) | `decode` 里的 `readNbt()` / `readUtf()` 等反序列化入口**必须判空/校验** —— 损坏包或恶意包可构造任意字节 ⇒ 空 NBT 直传 handler = **崩服** ✗。既有修法: `readNbt()==null → new CompoundTag()` 兜底 + handler 侧二次判空 (双保险)。<br>跨版本: 两版 `FriendlyByteBuf` **形态相同** (`readNbt()` + `readNbt(NbtAccounter)` 重载并存) —— [1.20.1](https://lexxie.dev/forge/1.20.1/net/minecraft/network/FriendlyByteBuf.html) · [1.21.1](https://lexxie.dev/neoforge/1.21.1/net/minecraft/network/FriendlyByteBuf.html); 本项目 **#194 实证的是 1.20.1 `readNbt()` 可返回 `null`** (空 NBT) ⇒ **两版都判空** (防御性, 不依赖版本行为) ✓ |

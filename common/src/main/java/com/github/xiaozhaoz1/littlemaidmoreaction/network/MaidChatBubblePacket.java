@@ -1,20 +1,8 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction.network;
 
-import com.github.xiaozhaoz1.littlemaidmoreaction.LmaNetwork;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidEmojiBubbleData;
-import com.github.xiaozhaoz1.littlemaidmoreaction.chatbubble.MaidEmojiType;
-import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
+import com.github.xiaozhaoz1.littlemaidmoreaction.network.client.MaidBubbleClientHandler;
 import net.minecraft.network.FriendlyByteBuf;
-//? if 1.20.1 {
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-//?} else {
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-//?}
 //? if 1.20.1 {
 import net.minecraftforge.network.NetworkEvent;
 //?}
@@ -55,7 +43,7 @@ public record MaidChatBubblePacket(int maidId, byte emojiType) implements Custom
 
 //? if 1.20.1 {
     public static void handle(MaidChatBubblePacket msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> handleClient(msg));
+        ctx.get().enqueueWork(() -> MaidBubbleClientHandler.apply(msg.maidId(), msg.emojiType()));
         ctx.get().setPacketHandled(true);
     }
 //?}
@@ -70,23 +58,12 @@ public record MaidChatBubblePacket(int maidId, byte emojiType) implements Custom
         PacketCodecs.wrap(MaidChatBubblePacket::encode, MaidChatBubblePacket::decode);
 
     public static void handlePayload(MaidChatBubblePacket msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> handleClient(msg));
+        ctx.enqueueWork(() -> MaidBubbleClientHandler.apply(msg.maidId(), msg.emojiType()));
     }
 //?}
 
-    /** 客户端: 在目标女仆实体上直接加表情气泡 (渲染走 TLM ChatBubbleRenderer) */
-    @OnlyIn(Dist.CLIENT)
-    private static void handleClient(MaidChatBubblePacket msg) {
-        ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) return;
-        if (level.getEntity(msg.maidId()) instanceof EntityMaid maid) {
-            maid.getChatBubbleManager().addChatBubble(MaidEmojiBubbleData.create(MaidEmojiType.byId(msg.emojiType())));
-        }
-    }
-
-    /** 向追踪指定女仆的所有客户端发送表情气泡请求 (通用入口, 任意管道可调) */
-    public static void sendToTracking(EntityMaid maid, MaidEmojiType type) {
-        if (maid.level().isClientSide()) return;
-        LmaNetwork.sender.sendToTrackingEntity(maid, new MaidChatBubblePacket(maid.getId(), type.id()));
-    }
+    // 2026-09-21 架构修环 (铁律 §1): 本包**不再引用 chatbubble 层** ——
+    //   原 sendToTracking(EntityMaid, MaidEmojiType) 已删 (全仓 0 调用方 = 死方法; 活入口是
+    //   chatbubble/MaidEmojiApi.send(...), 方向 chatbubble→network 才是 §1 允许的 ✓)。
+    //   客户端落地改由 chatbubble 侧注册 sink (MaidEmojiClientSink) ⇒ 本层不 import 表现层 ✓
 }

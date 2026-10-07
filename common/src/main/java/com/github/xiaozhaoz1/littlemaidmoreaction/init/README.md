@@ -3,11 +3,13 @@
 **作用**: 把 LMA 的方块/物品/方块实体/配方序列化器/音效/创造栏/能力 注册进游戏; 统一入口 `LmaRegistrar`。
 **依赖方向**: 原版注册 API + config + api; 被**平台入口** (`LmaForgeEntry` / `LmaNeoForgeEntry` 构造器) 调用。
 
-## 一、组成 (10 类)
+## 一、组成 (12 类)
 | 类 | 注册内容 |
 |---|---|
 `LmaRegistrar` | **统一注册入口** (平台入口调它; 内部按序调下面各组) |
-`LmaBlocks` | 方块 (部分**门控**: 依赖 compat 时可能为 null, 用前必须判) |
+`LmaTaskBinding` | **能力装配** (2026-09-21 接口倒置): 实现 `api/input/StickBindProvider` (读 `ActiveTaskConfig.BI_MARK_ITEM/BI_BIND_ITEM` + 委托 `task/api/TaskTypeUid`), 由 `LmaRegistrar.init()` 注入 `StickBindAccess` — 供下沉后的 `vanilla/input/world/StickBindUtil` 取用 (纯值+纯函数 ⇒ 无注册时序约束) |
+`LittleMaidMoreActionExtension` | **TLM 扩展点实现** (2026-09-21 由 `api/` 迁入): `implements ILittleMaid` + `@LittleMaidExtension` ⇒ 由 TLM 在初始化期经**注解扫描 + Class.forName** 实例化 (不看包路径; TLM 侧证据 `util/AnnotatedInstanceUtil.getInstances`); 职责 = 装配 TLM 钩子 (brain memory / 施法 provider / 任务类型 / 背包与饰品 / 提示气泡); 陷阱 = **必须保持 public 无参构造 + 注解在位**, 且 `ModClientEvents` 内层类只在客户端 setup 生效 (服务端不跑) |
+| `LmaBlocks` | 方块 (部分**门控**: 依赖 compat 时可能为 null, 用前必须判) |
 `LmaItems` | 物品 |
 `LmaBlockEntityTypes` | 方块实体类型 |
 `LmaRecipeSerializers` | 配方序列化器 |

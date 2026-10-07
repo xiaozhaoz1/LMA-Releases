@@ -11,6 +11,7 @@
 `MaidEmojiType` | 61 | 表情类型枚举 (与资源对应) |
 `MaidEmojiChatBubbleRenderer` | 89 | 客户端渲染 (头顶表情气泡) |
 `MaidEmojiApi` | 46 | 表情 API (播放指定表情) |
+`MaidEmojiClientSink` | 39 | **客户端落地实现** (2026-09-21 修环引入): 客户端初始化时 `install()` 注册进 `network/client/MaidBubbleClientHandler.Sink` ⇒ 网络层只持 `byte` 转发接口, **不再 import 本层** ⇒ 消除 `network⇄chatbubble` 包级环 ✓ |
 `package-info` | 16 | 包说明 |
 
 ## 二、连接链

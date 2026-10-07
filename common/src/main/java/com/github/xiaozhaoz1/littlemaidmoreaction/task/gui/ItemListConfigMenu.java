@@ -6,7 +6,7 @@ import net.minecraft.world.entity.player.Inventory;
 /**
  * v67.3: 通用黑白名单配置容器 — 一个 MenuType 服务 furnace/jukebox/arm_transfer。
  *
- * <p>屏幕 ({@link ItemListConfigScreen}) 通过 getTaskType() 区分任务,
+ * <p>屏幕 ({@link com.github.xiaozhaoz1.littlemaidmoreaction.screen.ItemListConfigScreen}) 通过 getTaskType() 区分任务,
  * 配置存各任务 pipelineConfig (lma_cfg_&lt;taskType&gt;) 的 blacklist/whitelist 键。
  */
 public class ItemListConfigMenu extends LmaTaskConfigContainer {

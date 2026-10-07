@@ -84,6 +84,7 @@
   "item.littlemaidmoreaction.wild_dogmilk": "Wild Kitsune Milk",
   "item.littlemaidmoreaction.token": "Token",
   "bubble.littlemaidmoreaction.token_feed": "Token is delicious~",
+  "bubble.littlemaidmoreaction.token_steal": "Token is so tasty!",
   "overlay.littlemaidmoreaction.token.tips": "Sneak + right-click maid to feed Token (+2 hunger · +5 HP · Regen I 30s) | plain right-click = open GUI",
   "itemGroup.littlemaidmoreaction": "Little Maid More Action",
   "key.categories.lma": "Little Maid Actions",

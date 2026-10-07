@@ -2,7 +2,7 @@
 
 车万女仆 (Touhou Little Maid) 附属模组 — 管线 + API 任务系统 (代码注册任务/连锁采集/环境感知/哈气动画/女仆 GUI/缓存体系/调试选区)。
 
-Stonecutter 多版本架构: **forge 1.20.1** (0.9.72) + **neoforge 1.21.1** (0.9.72)。
+Stonecutter 多版本架构: **forge 1.20.1** + **neoforge 1.21.1** — 当前版本 **0.9.78** (版本号唯一真相源: `versions/<mc>/gradle.properties`; 测试基线见 `docs/ARCHITECTURE.md` 顶部基线表)。
 
 当前形态: **管线 + API** — TaskRegistryManifest 规格表注册 **主动 21** (双平台同表: ALWAYS 13 + Create 6 + Numen 1 + CBC 1; v79.62.2 +dam_fill 填坝排水) + **被动 5 管线 + 纯触发 3** (三形态: 纯触发 PassiveDispatcher / 跨 tick 独立心跳 / GMPM 真管线; v79.62 铲雪删 — TLM 原版清雪覆盖, 天气检出保留给 LLM 对话) + LMAT 扩展点 + 寻路 (走路全 TLM + 头顶挖穿 digUp + 危险堵护 + 卡方块自救; v79.57 脚下挖穿退役) + **缓存体系 (StructureScanCache 静态层 / EntityScanCache 区块实体 / BlockPatternCache 单区块方块 / WorldInfoCache 世界分区)** + 独立域 (防御塔 garage_kit / 五子棋判赢 / 任务树)。**数字一律以 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) 顶部实测基线表为准**。
 
@@ -76,6 +76,28 @@ Stonecutter 多版本架构: **forge 1.20.1** (0.9.72) + **neoforge 1.21.1** (0.
 - `build-logs/` — 构建/测试日志落盘处 (编译/单测/gametest 各一份)
 - `scripts/` `resources-tlm-reference/` — 排障脚本与 TLM 参考资源 (非构建必需)
 - `fabric/` — 空目录 (Stonecutter 脚手架预留, 当前无 fabric 节点)
+
+## 近期成果 (0.9.75 → 0.9.78, 2026-09-21)
+
+* **女仆偷吃 Token** (0.9.76) — 每 6000t 掷 5%: 把主人身上一组 Token 搬进女仆背包
+  (**不满一组也全拿** · **背包放不下就一点不拿** · 主人 **8 格内** · **偷到即吃 1 个** + 气泡);
+  配置 `active.token_steal.{enabled,interval_ticks,chance}`; 调试命令 **`/lma token info | steal [count]`**
+* **防御塔手办动作 + 显示弓** (0.9.75+) — 手办按模型自动判弓: 瞄准循环 `use_mainhand:bow` + 开火;
+  手里**显示弓**(武器镜像随更新包下发, **无需打开 GUI**, 重进游戏也在);
+  配置 `defense_tower.{anim_enabled,aim_anim,fire_anim,anim_ticks,show_weapon}`
+  * ⚠ 手办动画名**禁用 `iss:` 前缀**（施法动画会让手办播"施法动作"）—— 代码已自动拒绝并回退安全默认 ✓
+* **御币塔修正** (0.9.77) — 御币不再被防御塔当作武器（`weaponMode` 归 `NONE`）✓
+* **心跳性能修复** (0.9.75) — `MaidIndex` 在册索引替代每 tick 全实体扫描；
+  **0.9.78 修掉其"活女仆被 `EntityLeaveLevelEvent` 误除名 ⇒ 心跳停摆、任务永远不动"**
+  （此前记录的采矿类 gametest flake 家族真因 ✓）
+* **gametest 夹具提速** — 空置域挖空改为 2 层限深 + 每区块小块铺石 + 销毁名单 + 下界合金工具 ⇒
+  套件 **5~12 分钟 → neoforge ~75s / forge ~150s** ✓
+
+### ⚠ 已知"非缺陷"行为（玩家常误报）
+* **创造模式 + 手持博丽的御币 + 右键手办/雕像 = 把玩家模型复制到手办上** —— 这是
+  **车万女仆 (TLM 2.4.0) 官方联动功能** ✓ 不是 LMA 的缺陷 ✗。
+  想换回原模型：用手办的**刷怪蛋**改样式 ✓ / 重新合成 ✓。
+* 御币的"发射"由 TLM 客户端施法系统负责；LMA 只保证**防御塔不会把御币当武器** ✓。
 
 ## 支持节点
 

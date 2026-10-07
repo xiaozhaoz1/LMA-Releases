@@ -105,9 +105,9 @@ public final class LittleMaidMoreAction {
         MENU_TYPES.register("void_excavation_config",
             () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu(id, inv, buf.readInt())));
     /** v79.62.3: 防御塔 GUI (弹药槽 + 范围/伤害/模式; buf = BlockPos) */
-    public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu>> DEFENSE_TOWER_MENU =
+    public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.tower.DefenseTowerMenu>> DEFENSE_TOWER_MENU =
         MENU_TYPES.register("defense_tower",
-            () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu(id, inv, buf)));
+            () -> IForgeMenuType.create((id, inv, buf) -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.tower.DefenseTowerMenu(id, inv, buf)));
     /** AI 操控配置菜单 (LLM 模型/声线名称) */
     public static final RegistryObject<MenuType<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigMenu>> AI_CONTROL_CONFIG_MENU =
         MENU_TYPES.register("ai_control_config",
@@ -158,7 +158,7 @@ public final class LittleMaidMoreAction {
         // v79.18 实证注解 auto-scan 对该事件失效 (neoforge GAME bus 收不到), 双注册 = 每事件双执行)
         // ⚠ 禁 modBus (MOD 总线) 注册 — 仅收 IModBusEvent, DefaultGeckoAnimationEvent 非 → 崩溃 (neoforge 实测 14:42; forge 同限制)
         MinecraftForge.EVENT_BUS.addListener((com.github.tartaricacid.touhoulittlemaid.api.event.client.DefaultGeckoAnimationEvent event)
-                -> com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationResourceRegistrar.registerCustomAnimations(event));
+                -> com.github.xiaozhaoz1.littlemaidmoreaction.client.AnimationResourceRegistrar.registerCustomAnimations(event));
 
         // 主人成就完成感知 (v79.63 用户裁定: 事件直连反应) — AdvancementEarnEvent 双平台同名,
         // 差异只在取 id: 1.20.1 getAdvancement() 返回 Advancement / 1.21.1 返回 AdvancementHolder

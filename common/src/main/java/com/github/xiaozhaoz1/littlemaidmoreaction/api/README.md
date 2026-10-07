@@ -3,15 +3,13 @@
 **作用**: LMA 对外**稳定接口**: 门面、扩展点、常量、纯数据与注册钩子。**改动 = 破坏兼容**, 必须谨慎。
 **依赖方向**: 仅 task/(只读) + vanilla/ + 原版; **被** 平台入口、外部 mod、KubeJS 脚本消费。
 
-## 一、组成 (11 类)
+## 一、组成 (11 根包类 + 4 子包接口/访问点 = 本表 15 项; api 树合计 26 类)
 | 类 | 对外契约 |
 |---|---|
 `LMAT` | **统一门面** (外部注册任务/被动任务/查询任务类型等; `register(...)` 系列) |
-`LittleMaidMoreActionExtension` | **TLM 扩展点实现** (初始化期被 TLM 调; 注册 brain memory / 施法 provider 等) |
 `MoreActionAPI` | 次级门面 (供脚本/外部读状态) |
 `AdvancementSenseApi` | 成就感知 API (注册/查询) |
-`AnimationResourceRegistrar` | 注册自定义 TLM/Gecko 动画 (与 `AnimationDurationManager` 配套: 时长查询) |
-`AnimationDurationManager` | 动画时长表 (读侧) — 含 DEBUG 自检表 `FALLBACK_ANIMATIONS` (v79.70: 只校验 haqi/maimeng) |
+`AnimationDurationManager` | 动画时长表 (读侧) — 含 DEBUG 自检表 `FALLBACK_ANIMATIONS` (v79.70: 只校验 haqi/maimeng); 注册侧 `AnimationResourceRegistrar` 已于 2026-09-21 迁入 `client/` (纯客户端专用) |
 `AnimationPresetNames` | **动画预设清单 + config 目录对照 JAR 清理** (v79.70, 错题 #356): `SHIPPED` (随包 2 个: haqi/maimeng) + `syncConfigDir(Path)` (删除目录里**不在 JAR 内**的 `*.animation.json` — config 该目录为 LMA 专属 ⇒ 用户裁定直接删) — 纯常量类 (零 MC/FML 依赖, 供单元测试断言"清单 ↔ resources 一致"与清理幂等) ✓ |
 `VanillaConstants` | **常量** (到达距离 `ARRIVE_DIST_SQR` 等 — vanilla 层唯一允许依赖的 api 项) |
 `VanillaOutputRegistry` | **Output 注册中心** (聚合 `ItemOutputProvider`, 对标原版 `BrewingRecipeRegistry` 的 Registry 模式) |
@@ -19,11 +17,15 @@
 `SlotLayout` | 槽位布局常量 (熔炉等容器槽位编号) |
 `TaskResult` | 任务结果枚举 (`SUCCESS/FAILED/CONTINUE`) |
 `MaidCodexScreenOpener` | 屏打开钩子 (平台入口赋值, 避免 api→screen 硬依赖) |
+`NavigationMemoryProvider` | **导航 Memory 类型供应接口** (2026-09-21 接口倒置): 职责 = 给 `api/navigation/NavigationMemory` 提供 NAV_TARGET / NAV_START_TICK 两个 `MemoryModuleType` 的**延迟取值器**; 输入 = 无 (实现方自持 holder); 输出 = `Supplier<MemoryModuleType<BlockPos>>` + `Supplier<MemoryModuleType<Long>>`; 连接 = 实现方 `adapter.LmaMemoryModuleRegistry`, 在 `register(modBus)` 内调 `NavigationMemory.install(PROVIDER)` 注入; 陷阱 = ① 必须传 **Supplier** 而非取好值的类型 (注入发生在 mod 构造期, 注册尚未发生 ⇒ 构造期取值必炸), 取值留到调用点 (项目统一「holder/supplier 共享」纪律); ② 未注入时 `NavigationMemory` 抛 `IllegalStateException` 显式报错 (不静默) ✓ |
+`YsmAnimationProvider` | **YSM 动画输出门面** (2026-09-21 接口倒置): 职责 = 让核心层 (HaqiPipeline / AnimExecute) 播放/停止 YSM 轮盘动画而不 import compat; 输入 = `EntityMaid` + 动画名; 输出 = 无 (世界副作用: TLM `playRouletteAnim`/`stopRouletteAnim`); 连接 = 实现方 `compat.ysm.YsmOutput` (静态块自注册), 未注入 = **静默 no-op** (兼容层缺席属正常状态, 与 `MaidCodexScreenOpener` 同模式); 陷阱 = ① 语义依赖调用方先判 `maid.isYsmModel()` (非 YSM 模型不播); ② 停止语义是 no-op 而非回退到 ISS 动画 — 停 ISS 仍由调用方清 `lma_anim_mode` 闭环 (见 HaqiPipeline.onCleanup) ✓ |
+`StickBindProvider` | **木棍标记/绑定能力 SPI** (2026-09-21 接口倒置, 住 `api/input/`): 3 方法 = `markItemId()` / `bindItemId()` (config 原始串, 消费方自行回退木棍) + `taskTypeOf(uidPath)` (纯函数); 实现方 = `init.LmaTaskBinding`; 消费方 = `vanilla/input/world/StickBindUtil` |
+`StickBindAccess` | `StickBindProvider` 的**静态访问点** (同包成对): `install(provider)` (幂等; 注入在 `LmaRegistrar.init()`, 双平台单点) + 3 委托; **未注入 ⇒ 抛 `IllegalStateException`** (用户裁定 fail-fast, 不静默 — 缺失 = 注册链断裂, 应暴露); 陷阱 = 它是 `vanilla → api` 的**已登记契约例外** (见 `ArchGuardTest.ALLOWED_API`) ✓ |
 
 ## 二、连接链
 ```
 外部 mod / KubeJS ──→ LMAT (门面) ──→ TaskRegistry (任务注册)
-平台入口 ──→ LittleMaidMoreActionExtension (TLM 扩展点) / MaidCodexScreenOpener (钩子赋值)
+平台入口 ──→ NavigationMemoryProvider (实现方 adapter 注册期注入) / MaidCodexScreenOpener (钩子赋值)
 内部层 ──→ VanillaConstants / VanillaInputRegistry / SlotLayout / TaskResult (只读常量与结果类型)
 ```
 **边界**: api **不反向依赖**业务层实现; 需要"上层能力"时用**钩子/接口**(如 `MaidCodexScreenOpener`) 由入口注入。

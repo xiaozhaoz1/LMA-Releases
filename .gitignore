@@ -30,3 +30,5 @@ resources-tlm-reference/
 build-logs/
 *.log
 AGENTS.md
+.tmp-add-274.js
+HANDOFF-*.md

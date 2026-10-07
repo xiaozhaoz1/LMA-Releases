@@ -75,6 +75,11 @@ public final class DebugSelectionCoordinator {
      * 判定本质需要 config (哪个物品算木棒), 而 vanilla 层不得读 config/event → 改为**注入**:
      * 认识两边的客户端入口 ({@code LmaForgeClientEntry} / {@code LmaNeoForgeClientEntry}) 在 setup 时注入一次。
      *
+     * <p><b>2026-09-21 追加注记</b>: {@code StickBindUtil} 已由 {@code event/} 下沉到
+     * {@code vanilla/input/world/} (配置/任务类型能力改经 {@code api/input/StickBindAccess} 注入) ⇒
+     * **本类如今已可与其同层直连**; 但**保留注入不解耦改造** — 注入使本调试工具零依赖木棒配置,
+     * 且改回直连会把"调试工具"焊死到木棒工具类 (非必要耦合)。
+     *
      * <p>未注入时默认 false → 选区调试功能静默禁用 (纯调试工具, 不影响玩法)。
      */
     private static java.util.function.Predicate<ItemStack> stickCheck = stack -> false;

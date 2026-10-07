@@ -159,7 +159,7 @@ final class FarmRegionContainers {
         // ② 纯产物: cropId 非空 → 存对应产物; 空 → 存不匹配其他区域的产物
         for (int i = 0; i < inv.getSlots(); i++) {
             ItemStack s = inv.getStackInSlot(i);
-            if (com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isMarkItem(s)) continue;
+            if (com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StickBindUtil.isMarkItem(s)) continue;
             if (FarmItems.isSeedItem(s)) continue;
             if (!FarmItems.isHarvestProduct(s, seedItems)) continue;
             if (expectedProduct != null) {

@@ -1,6 +1,11 @@
 # task/service — 业务算法层 (决策 + 单拍编排)
 
-> **子包**: [harvest/](harvest/README.md) — 采集/导航安全/自救/空置域**四域协调器** (12 类, V5 2026-09-11 自 `vanilla/execute` 整簇迁入; io 原语仍在 vanilla)。
+> **子包**: [harvest/](harvest/README.md) — 采集/导航安全/自救/空置域**四域协调器** (12 类, V5 2026-09-11 自 `vanilla/execute` 整簇迁入; io 原语仍在 vanilla)
+>
+> **⭐ 家族归属判据 (2026-09-21 用户裁定, 与 `bauble/README` 成对)**: **饰品家族回 `bauble/<名>/`** ✓ ——
+> 判据 = **家族形态**（饰品 + 绑定 + 物品 + 交互事件成套 ⇒ `bauble/`），**不是**"谁驱动" ✗。
+> **驱动方式不是归属理由**: 家族的周期性行为另设**触发口**（`task/pipeline/sense/<X>Trigger`，同 `SelfRescueTrigger`/`HaqiTrigger` ✓）
+> ⇒ `token/` 已于 2026-09-21 由本层**回迁** `bauble/token/`（驱动 = `sense/TokenStealTrigger` ✓）。
 
 **作用**: 有**业务语义**的算法 (与 "io 原语" 的分界: 有业务语义 → 这里; 单纯读世界/写背包 → `vanilla/input|output`)。
 **不持有 tick 相位机** (那是 `task/pipeline`); 服务通常是**无状态**或**自管状态 + 自注册清理**。
@@ -79,6 +84,7 @@ AI 权限 | `AiControlGate` | 管线 `onCleanup` (**键删除闭环**) |
 **A** | **validate 与运行时不一致** | `FurnaceService.validateSmelt` 支持"空 target = 烧任何可烧的", 而 `resolveSmeltIngredient` 遇空 target 直接 `return ""` ⇒ **女仆走到炉子前站着不烧** (用户实机)。⇒ 改校验分支必须同步改执行分支 (反之亦然)。|
 **B** | **服务里读配置要 `cfgOrCreate` 语义** | 读用 `pipelineConfig(maid)` (已改走 `cfgOrCreate`, 写才落盘); **写配置的服务/屏幕**必须确认拿到落盘引用, 否则静默丢 (钟间隔事故, 见 `task/gui/README.md`)。|
 **C** | **static 状态必须可清** | 池/缓存/协调器挂 `MaidUnloadRegistry` 或有 `reset*` 并被入口调用; 新增 static Map 前先看 `task/data/README.md` 的缓存纪律 (per-maid 键 = UUID; 区块键 = `clearDimension`)。|
+**D** | **`token/` → `init/` 是已知依赖, 非违规** (用户裁定 2026-09-21) | `task/service/token` 有 **2 处** import `init` (例 `TokenBaubleRegistry` 读注册结果)。裁定理由: ① `init/` 是"注册与初始化", 不是实现层 —— 业务**查询**注册表是合理的运行时需求; ② 仅 2 处、影响面小; ③ 更干净的接口倒置 (抽 `TokenRegistry` 面) 不值该工程成本 ⇒ **登记为已知依赖** ✓。⚠ **若这几处膨胀** (token 家族再扩) ⇒ 届时改接口倒置 ✓ |
 **D** | **服务不做 tick 决策** | 节拍/相位/门在 `task/pipeline`; 服务里出现 `gameTime % N` 节流应改为"调用方按节拍调用, 服务内部只做冷却判定 (如 `ThrottleUtil`)"。|
 **E** | **调用方统计会骗人** | `_audit/extractServiceFacts.js` 的 "0 调用方" 可能是**类型引用/跨行全限定** (本轮实测 2 例都不是死代码) ⇒ 删任何类前用**全仓 grep (含类型位置)**复核。|
 

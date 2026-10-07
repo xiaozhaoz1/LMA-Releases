@@ -69,11 +69,11 @@ public final class LmaItems {
     //? if 1.20.1 {
     public static final RegistryObject<Item> GARAGE_KIT_DEFENSE =
             ITEMS.register("garage_kit_defense",
-                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitItem::new);
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitItem::new);
     //?} else {
     public static final Supplier<Item> GARAGE_KIT_DEFENSE =
             ITEMS.register("garage_kit_defense",
-                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitItem::new);
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitItem::new);
     //?}
 
     public static void register(IEventBus bus) {

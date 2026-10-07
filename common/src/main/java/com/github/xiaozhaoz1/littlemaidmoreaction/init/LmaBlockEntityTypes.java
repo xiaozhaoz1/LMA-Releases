@@ -38,16 +38,16 @@ public final class LmaBlockEntityTypes {
 
     /** v79.62.3: 防御塔方块实体 — 继承 TLM TileEntityGarageKit (渲染/NBT 复用) */
 //? if 1.20.1 {
-    public static final RegistryObject<BlockEntityType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlockEntity>> GARAGE_KIT_DEFENSE =
+    public static final RegistryObject<BlockEntityType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitBlockEntity>> GARAGE_KIT_DEFENSE =
             TYPES.register("garage_kit_defense",
                     () -> BlockEntityType.Builder.of(
-                            com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlockEntity::new,
+                            com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitBlockEntity::new,
                             LmaBlocks.GARAGE_KIT_DEFENSE.get()).build(null));
 //?} else {
-    public static final Supplier<BlockEntityType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlockEntity>> GARAGE_KIT_DEFENSE =
+    public static final Supplier<BlockEntityType<com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitBlockEntity>> GARAGE_KIT_DEFENSE =
             TYPES.register("garage_kit_defense",
                     () -> BlockEntityType.Builder.of(
-                            com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitBlockEntity::new,
+                            com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitBlockEntity::new,
                             LmaBlocks.GARAGE_KIT_DEFENSE.get()).build(null));
 //?}
 

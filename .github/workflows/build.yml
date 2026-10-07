@@ -1,4 +1,15 @@
-name: Build All Versions
+name: Build & Test (Stonecutter)
+
+# 2026-09-21 重写: 原工作流是**旧生成器时代**遗留 (调用 `just build-loader` / `just test` 配方, 但 justfile
+# (266 行) 里没有这两个配方 ⇒ 一跑就失败; 且 `working-directory: ${{matrix.version}}` +
+# `$version/$loader/build.gradle` 的路径假设与本仓 Stonecutter 布局不符 ✗)。现在按**实测**的真实入口重写:
+#   · 节点表 = `just list-nodes` 实测 (1.20.1-forge · 1.21.1-neoforge) ⇒ 新增节点时同步下面 matrix
+#   · 构建 = `just build <node>` = `./gradlew --configure-on-demand ":<loader>:<mc>:build"` (含单测 + 出 jar)
+#   · 单测 = `:<loader>:<mc>:test` (独立作业, 失败可一眼定位; neo 端无单测源 = NO-SOURCE 属正常)
+#   · gametest = `:<loader>:<mc>:runGameTestServer` (端到端) + **必须 grep 判定行** —— mod 加载失败时
+#     Gradle 仍可能 BUILD SUCCESSFUL = 假绿形态之一 (见 docs/ARCHITECTURE.md 基线表备注) ✗
+#   · CI 有网 ⇒ 不传 --offline; build-java = 21 (两节点 `versions/*/gradle.properties` 实测)
+#   · 不引用 docs/ scripts/ build-logs/ (均未受 git 跟踪); 发版仍由用户手动上传 Release ✓
 
 on:
   push:
@@ -11,164 +22,112 @@ permissions:
   contents: read
 
 jobs:
-  detect-changes:
+  build:
+    name: build ${{ matrix.node }}
     runs-on: ubuntu-latest
-    outputs:
-      versions: ${{ steps.set-versions.outputs.versions }}
-      build-matrix: ${{ steps.set-versions.outputs.build-matrix }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: "1.20.1-forge"
+            loader: forge
+            mc: "1.20.1"
+            java: "21"
+          - node: "1.21.1-neoforge"
+            loader: neoforge
+            mc: "1.21.1"
+            java: "21"
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      
-      - name: Detect changed versions
-        id: set-versions
-        run: |
-          all_versions=$(find . -maxdepth 1 -type d -regex '\./[0-9]+\.[0-9]+.*' | sed 's|./||' | sort)
-
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            changed=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -oP '^[0-9]+\.[0-9]+[^/]*' | sort -u || true)
-            versions=$(comm -12 <(echo "$all_versions") <(echo "$changed"))
-          elif [ "${{ github.event_name }}" == "push" ]; then
-            if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
-              versions="$all_versions"
-            else
-              changed=$(git diff --name-only ${{ github.event.before }}...${{ github.sha }} | grep -oP '^[0-9]+\.[0-9]+[^/]*' | sort -u || true)
-              versions=$(comm -12 <(echo "$all_versions") <(echo "$changed"))
-            fi
-          else
-            versions="$all_versions"
-          fi
-
-          versions_json=$(echo "$versions" | jq -R -s -c 'split("\n") | map(select(length > 0))')
-          build_matrix=$(printf '%s\n' "$versions" | while IFS= read -r version; do
-            [ -n "$version" ] || continue
-            props="$version/gradle.properties"
-            enabled_loaders=$(sed -nE 's/^project\.enabled-loaders=(.*)$/\1/p' "$props" | head -n1)
-
-            for loader in fabric forge neoforge; do
-              [ -f "$version/$loader/build.gradle" ] || continue
-
-              if [ -z "$enabled_loaders" ] || printf '%s\n' "$enabled_loaders" | tr ',' '\n' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//' | grep -Fxq "$loader"; then
-                jq -cn --arg version "$version" --arg loader "$loader" '{version: $version, loader: $loader}'
-              fi
-            done
-          done | jq -s -c '.')
-
-          echo "versions=$versions_json" >> "$GITHUB_OUTPUT"
-          echo "build-matrix=$build_matrix" >> "$GITHUB_OUTPUT"
-          echo "Building versions: $versions_json"
-          echo "Build matrix: $build_matrix"
-
-  build:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.build-matrix != '[]'
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        include: ${{ fromJson(needs.detect-changes.outputs.build-matrix) }}
-      fail-fast: false
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Detect Java version
-        id: java
-        run: |
-          v=$(sed -nE 's/^project\.build-java=([0-9]+).*/\1/p' "${{ matrix.version }}/gradle.properties" | head -n1)
-          if [ -z "$v" ]; then
-            v=$(sed -nE 's/^project\.java=([0-9]+).*/\1/p' "${{ matrix.version }}/gradle.properties" | head -n1)
-          fi
-          if [ -z "$v" ]; then
-            echo "project.build-java/project.java not found in ${{ matrix.version }}/gradle.properties" >&2
-            exit 1
-          fi
-          echo "version=$v" >> $GITHUB_OUTPUT
-          echo "Using build Java $v for ${{ matrix.version }}"
-
-      - name: Setup Java
+      - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "${{ steps.java.outputs.version }}"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Setup just
-        uses: taiki-e/install-action@just
-
+          distribution: temurin
+          java-version: "${{ matrix.java }}"
+      - uses: gradle/actions/setup-gradle@v3
+      - uses: taiki-e/install-action@just
       - name: Make gradlew executable
-        working-directory: ${{ matrix.version }}
         run: chmod +x gradlew
-
-      - name: Build ${{ matrix.loader }}
-        run: just build-loader ${{ matrix.version }} ${{ matrix.loader }}
-
-      - name: Upload artifacts
+      - name: Build (compile + unit tests + jar) — just build ${{ matrix.node }}
+        run: just build "${{ matrix.node }}"
+      - name: Upload jars
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ github.event.repository.name }}-${{ matrix.version }}-${{ matrix.loader }}
-          path: ${{ matrix.version }}/${{ matrix.loader }}/build/libs/*.jar
+          name: ${{ github.event.repository.name }}-${{ matrix.mc }}-${{ matrix.loader }}
+          path: ${{ matrix.loader }}/versions/${{ matrix.mc }}/build/libs/*.jar
           if-no-files-found: error
 
-      - name: Capture build scan
-        run: just build-loader ${{ matrix.version }} ${{ matrix.loader }} --scan
-
-  test:
-    needs: detect-changes
-    if: needs.detect-changes.outputs.versions != '[]'
+  unit-tests:
+    name: unit tests ${{ matrix.node }}
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
-        version: ${{ fromJson(needs.detect-changes.outputs.versions) }}
-
+        include:
+          - node: "1.20.1-forge"
+            loader: forge
+            mc: "1.20.1"
+            java: "21"
+          - node: "1.21.1-neoforge"
+            loader: neoforge
+            mc: "1.21.1"
+            java: "21"
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Detect Java version
-        id: java
-        run: |
-          v=$(sed -nE 's/^project\.build-java=([0-9]+).*/\1/p' "${{ matrix.version }}/gradle.properties" | head -n1)
-          if [ -z "$v" ]; then
-            v=$(sed -nE 's/^project\.java=([0-9]+).*/\1/p' "${{ matrix.version }}/gradle.properties" | head -n1)
-          fi
-          if [ -z "$v" ]; then
-            echo "project.build-java/project.java not found in ${{ matrix.version }}/gradle.properties" >&2
-            exit 1
-          fi
-          echo "version=$v" >> "$GITHUB_OUTPUT"
-          echo "Using build Java $v for ${{ matrix.version }}"
-
-      - name: Setup Java
+      - uses: actions/checkout@v4
+      - name: Setup Java ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
-          distribution: "temurin"
-          java-version: "${{ steps.java.outputs.version }}"
-
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v3
-
-      - name: Setup just
-        uses: taiki-e/install-action@just
-
+          distribution: temurin
+          java-version: "${{ matrix.java }}"
+      - uses: gradle/actions/setup-gradle@v3
       - name: Make gradlew executable
-        working-directory: ${{ matrix.version }}
         run: chmod +x gradlew
+      - name: Unit tests (含 ArchGuard / ReadmeDrift / TaskRegistryDrift 守护)
+        run: ./gradlew --configure-on-demand ":${{ matrix.loader }}:${{ matrix.mc }}:test" --console=plain
 
-      - name: Run tests
-        run: just test ${{ matrix.version }}
-
-  summary:
-    needs: [build, test]
-    if: always()
+  gametest:
+    name: gametest ${{ matrix.node }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - node: "1.20.1-forge"
+            loader: forge
+            mc: "1.20.1"
+            java: "21"
+          - node: "1.21.1-neoforge"
+            loader: neoforge
+            mc: "1.21.1"
+            java: "21"
     steps:
-      - name: Build Summary
+      - uses: actions/checkout@v4
+      - name: Setup Java ${{ matrix.java }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "${{ matrix.java }}"
+      - uses: gradle/actions/setup-gradle@v3
+      - name: Make gradlew executable
+        run: chmod +x gradlew
+      - name: Clean gametest world (必须; 残留状态会污染)
+        run: rm -rf "${{ matrix.loader }}/versions/${{ matrix.mc }}/run/gametest"
+      - name: Run gametest server
         run: |
-          echo "## Build Results" >> "$GITHUB_STEP_SUMMARY"
-          echo "" >> "$GITHUB_STEP_SUMMARY"
-          echo "Build status: ${{ needs.build.result }}" >> "$GITHUB_STEP_SUMMARY"
-          echo "Test status: ${{ needs.test.result }}" >> "$GITHUB_STEP_SUMMARY"
+          set -o pipefail
+          ./gradlew --configure-on-demand ":${{ matrix.loader }}:${{ matrix.mc }}:runGameTestServer" --console=plain 2>&1 | tee gametest.log
+      - name: Verify verdict line (防假绿)
+        run: |
+          if ! grep -qE "All [0-9]+ required tests passed" gametest.log; then
+            echo "::error::未找到 'All N required tests passed' 判定行 — 视为失败 (可能 mod 加载失败/有用例红)"
+            grep -nE "required tests failed|failed!" gametest.log | head -20 || true
+            tail -n 80 gametest.log
+            exit 1
+          fi
+      - name: Upload gametest log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gametest-log-${{ matrix.mc }}-${{ matrix.loader }}
+          path: gametest.log
+          if-no-files-found: ignore

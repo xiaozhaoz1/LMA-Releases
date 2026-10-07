@@ -41,6 +41,23 @@ public final class ScanBudget {
         refresh(tick);
     }
 
+    /**
+     * 测试钩子 (2026-09-21) — 覆写本 tick 的**墙钟死线**。
+     *
+     * <p><b>⚠ 仅测试用; 生产路径不得调用</b> (生产死线一律由 {@link #refresh(int)} 写 `now + MAX_NANOS_PER_TICK`)。
+     * 用途: 让单测能把"池计数"与"墙钟门"**分开确定性验证** —
+     * 传 {@code Long.MAX_VALUE} = 不设死线(纯池计数); 传"已过期值" = 只验时间门。
+     *
+     * <p><b>调用时序</b>: 必须在 {@link #resetForTick(int)} / {@link #refresh(int)} **之后**调用,
+     * 否则会被其覆写 (二者都会重写 `deadlineNanos`)。若将来 `refresh` 逻辑改为不写 `deadlineNanos`, 需复查本钩子。
+     *
+     * <p>为什么需要: 原 `while (trySectionScan())` 同时受两条门影响 ⇒ 繁忙机器上 256 次跨 4ms 即早停
+     * (`expected: <256> but was: <245>`, 见 build-logs/PLAN-scanbudget-flake.md)。
+     */
+    void overrideDeadlineForTest(long deadlineNanos) {
+        this.deadlineNanos = deadlineNanos;
+    }
+
     /** 候选检查 — 消耗 1 池 (超时/池空 → false) */
     public boolean tryCheck() {
         if (poolChecks <= 0 || System.nanoTime() >= deadlineNanos) return false;

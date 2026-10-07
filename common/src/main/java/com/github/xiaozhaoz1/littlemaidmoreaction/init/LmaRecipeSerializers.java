@@ -32,11 +32,11 @@ public final class LmaRecipeSerializers {
     //? if 1.20.1 {
     public static final RegistryObject<net.minecraft.world.item.crafting.RecipeSerializer<?>> GARAGE_KIT_DEFENSE =
             SERIALIZERS.register("garage_kit_defense_recipe",
-                    () -> com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitRecipeSerializer.INSTANCE);
+                    () -> com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitRecipeSerializer.INSTANCE);
     //?} else {
     public static final Supplier<net.minecraft.world.item.crafting.RecipeSerializer<?>> GARAGE_KIT_DEFENSE =
             SERIALIZERS.register("garage_kit_defense_recipe",
-                    () -> com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseGarageKitRecipeSerializer.INSTANCE);
+                    () -> com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitRecipeSerializer.INSTANCE);
     //?}
 
     public static void register(IEventBus bus) {

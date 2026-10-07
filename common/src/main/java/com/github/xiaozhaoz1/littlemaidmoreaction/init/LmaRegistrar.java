@@ -29,6 +29,9 @@ public final class LmaRegistrar {
         com.github.xiaozhaoz1.littlemaidmoreaction.storage.FestivalLoader.load();
         // v79.51 (KeyTrigger): 通用按键触发注册表 — 首个消费者 block_interact (引擎级任务分发)
         com.github.xiaozhaoz1.littlemaidmoreaction.network.KeyTriggerRegistry.init();
+        // 2026-09-21 接口倒置: 木棍标记/绑定能力注入 (StickBindUtil 下沉 vanilla 后经 api/input 访问点取用;
+        // 纯值+纯函数 ⇒ 无注册时序约束; 双平台入口都走本 init() ⇒ 单点注入, 幂等)
+        LmaTaskBinding.install();
     }
 
     /** 服务端初始化 (DocGenerator 随条件栈删除 — 空实现保留签名) */

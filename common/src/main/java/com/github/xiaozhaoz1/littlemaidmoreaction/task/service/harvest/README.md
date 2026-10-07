@@ -30,13 +30,13 @@
 > · 详见 `docs/MINING-NEAREST-SEARCH-PLAN.md` §8 与 `docs/lessons-learned.md` #334 ✓
 | **导航安全** | `DangerGuardCoordinator` (111) · `DigThroughCoordinator` (85) | 危险堵护状态机 · 头顶挖穿 (digUp 深度 6) |
 | **自救** | `SelfRescueCoordinator` (70) · `SelfRescueState` · `MlgRescueCoordinator` | 卡方块自救 · 自救上下文 · MLG 摔落自救 (五射线 + 水桶/软方块双通道) |
-| **空置域** | `VoidExcavationService` (227) · `VoidExcavationChunkManager` · `VoidExcavationContainerService` · **`VoidExcavationPool`** (225, v79.63 自 `VoidExcavationPipeline` 抽出) | 区块工作制推进 · setChunkForced 管理 · 输入/输出箱与扩展搜索 · **认领池/扫描共享缓存/超时自愈** (多女仆共享运行时状态; 锁封闭池内, 启动 `resetPool`, 卸载 `onMaidUnload`) |
+| **空置域** | `VoidExcavationService` (403) · `VoidExcavationChunkManager` · `VoidExcavationContainerService` · **`VoidExcavationPool`** (225, v79.63 自 `VoidExcavationPipeline` 抽出) | 区块工作制推进 · setChunkForced 管理 · 输入/输出箱与扩展搜索 · **认领池/扫描共享缓存/超时自愈** (多女仆共享运行时状态; 锁封闭池内, 启动 `resetPool`, 卸载 `onMaidUnload`) · **2026-09-21 迁入 8 个单拍编排** (大文件瘦身): `ensureLandingClear` (第一层净空) / `clearLiquidAt` + `clearAdjacentLiquids` (液体清理) / `sealBoundaryLiquid` (边界密封) / `handleContainers` + `flushOutput` (箱转存) / `hasToolInInv` / `remindPlayer` (+ `WAIT_TICKS` 常量, 单一来源) |
 
 ### ⚠ 空置域「传送前第一层检查」(v79.65.1, 用户实测)
 
 `VoidExcavationService.teleportToVoid` **允许站空气** (挖空后落下层), 但**没有"落点净空"保证** ⇒ 调用方
-(`VoidExcavationPipeline`) 必须**传送前**用 `ensureLandingClear` 把落点挖成 **2 格净空**
-(**头位 `y+1` → 本体 `y`**, 用户裁定顺序) ✓。理由:
+(`VoidExcavationPipeline`) 必须**传送前**用 `VoidExcavationService.ensureLandingClear` 把落点挖成 **2 格净空**
+(**头位 `y+1` → 本体 `y`**, 用户裁定顺序) ✓ (2026-09-21 该法由 pipeline 迁入本 service)。理由:
 女仆站姿 = 脚在落点格 + 头在其上 1 格; 逐步下挖时**后续层头位**已在上一层挖空 ⇒ 安全,
 但**第一层 (标记层) 的头位是未开挖地表** ⇒ 直接传送 = **头埋实心方块 ⇒ 窒息持续掉血** ✗ ⇒ 两条传送路径
 (关导航的区块中间 / 导航超时的 `target.above()`) 都先清落点再传 ✓。回归: gametest `lmaVoidFirstLayerLandingClear`。

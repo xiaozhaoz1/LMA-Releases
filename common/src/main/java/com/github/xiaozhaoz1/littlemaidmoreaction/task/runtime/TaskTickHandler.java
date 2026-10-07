@@ -41,6 +41,9 @@ public final class TaskTickHandler {
     /** 上次广播 tick — per-dimension 节流 (静态单值多维度共享 = 轮替饥饿) */
     private static final java.util.Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, Long>
             NEXT_BROADCAST = new java.util.HashMap<>();
+    /** 对账节流: 维度 → 上次全量补册的 gameTime (每 100t 一次, 见 onServerTick 注释) */
+    private static final java.util.Map<net.minecraft.resources.ResourceKey<net.minecraft.world.level.Level>, Long> lastReconcileTick =
+            new java.util.concurrent.ConcurrentHashMap<>();
 
     private TaskTickHandler() {}
 
@@ -60,8 +63,17 @@ public final class TaskTickHandler {
             long now = sl.getGameTime();
             // 被动清单每 level hoist 一次 (原每女仆新建 Stream 过滤)
             var passives = TaskRegistry.passiveTasksList();
-            for (var e : sl.getAllEntities()) {
-                if (!(e instanceof EntityMaid maid)) continue;
+            // ★ v79.66 性能修复 (线程转储实证卡死): 原 `sl.getAllEntities()` 按实体 section 遍历全实体 —
+            //   实体多/分散时 (实测 gametest 118 结构相距数百万格) 主线程 RUNNABLE 烧 CPU 数分钟 ⇒ 套件卡死 ✗
+            //   ⇒ 改为只遍历**在册女仆** (MaidIndex, O(女仆)) ✓ 真实服务器同样受益 (实体越多 mod 越卡 → 已修)
+            // ★ v79.66g 补齐 (漏册回归): 索引靠 join 事件维护, 实测有生成路径会漏 ⇒ 漏册女仆**不被 tick**
+            //   ⇒ 其用例只能跑到满超时 (整轮从 50s 涨到 8 分钟+) ✗ ⇒ **每 600t(30s) 全量对账一次**补册
+            //   (每 tick 全扫是卡死主因; 1/100 频率的开销可接受 ✓; 漏册最坏晚 5s 被补齐)
+            if (lastReconcileTick.getOrDefault(sl.dimension(), 0L) + 600L <= now) {
+                lastReconcileTick.put(sl.dimension(), now);
+                MaidIndex.reconcile(sl);
+            }
+            for (EntityMaid maid : MaidIndex.snapshot(sl)) {
                 // 主动+被动合并单次遍历 (原双循环 — 无跨女仆耦合, 行为等价)
                 GameTickPipelineManager.tickActive(sl, maid, now);
                 GameTickPipelineManager.tickPassiveFor(sl, maid, passives, now);
@@ -70,6 +82,11 @@ public final class TaskTickHandler {
                 // v79.61x 摔落自救预触发 (掉血事件通道外 — 摔落中启动, 落地掉血前放水;
                 // 便宜判定先行零背包扫描, 主循环内联零额外遍历)
                 com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.SelfRescueTrigger.tryTrigger(maid);
+                // v79.66o 偷吃 Token (用户裁定): 每 6000t 掷 5% 偷主人身上整组 Token —
+                //   门控从最便宜开始 (配置 → 冷却)；冷却未到时**零世界访问** ✓
+                // 2026-09-21 家族归位配套: 引擎不再点名 bauble 家族, 改走 sense 触发口
+                //   (token 家族已归位 `bauble/token/`; 与 SelfRescueTrigger/HaqiTrigger 同款形态 ✓)
+                com.github.xiaozhaoz1.littlemaidmoreaction.task.pipeline.sense.TokenStealTrigger.tick(sl, maid, now);
                 // 拉拽看门狗 (NavWatchdog) 删 — 只用 TLM 寻路, 不干预导航
             }
             // 走路全 TLM — 无自研执行器 (PathExecutor.sweep 退役)
@@ -106,6 +123,9 @@ public final class TaskTickHandler {
         // EnvSense 广播节流跨 session 残留修复 — 重启后 gameTime 归零, 旧值会把
         // 广播压到数天 (旧值追平); 停止时清空, 新会话立即恢复广播节奏
         NEXT_BROADCAST.clear();
+        // v79.66: 停服清在册女仆索引 (防跨世界/跨 session 残留)
+        MaidIndex.clearAll();
+        lastReconcileTick.clear();
     }
 
     /** EnvSense 广播 — 按 config 间隔节流 (每维度独立节流, 防跨维度共享压榨) */

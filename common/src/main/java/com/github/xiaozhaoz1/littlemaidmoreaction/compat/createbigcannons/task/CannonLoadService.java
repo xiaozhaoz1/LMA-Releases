@@ -39,6 +39,37 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * CBC 火炮装填域服务 — 扫描 / 清膛 / 装填 / 推弹的**单拍算法族** (无 tick 状态)。
+ *
+ * <p><b>职责边界</b>: 本类只做「给定装配体 + 炮闩, 现在能做什么」的判定与一次性动作;
+ * 相位推进 (MOVING/LOADING/…) 与超时/跳过集全在 {@code CannonLoadPipeline} 的 FSM 里
+ * (CBC 域合法折叠: 状态在管线, 单拍动作在 service — 见 compat/README)。
+ *
+ * <p><b>调用方</b>: {@code compat.createbigcannons.task.CannonLoadPipeline} (唯一调用方)。
+ * <b>依赖</b>: CBC API ({@code rbasamoyai.createbigcannons.*}) + Create {@code Contraption}
+ * ⇒ 必须住 compat 层。
+ *
+ * <p><b>三个核心记录</b>:
+ * <ul>
+ *   <li>{@link BreechInfo} — 炮闩的**装配体本地坐标** + 方块实体 + 推弹方向 (跨方法传递的上下文)</li>
+ *   <li>{@link CannonState} — 膛内待发计数 (弹丸/发射药/合计) + 能否在炮闩装填</li>
+ *   <li>{@link AmmoSlot} — 膛内单个槽位 (位置 + 类型 + 方块类型名), 供顺序校验与诊断日志</li>
+ * </ul>
+ *
+ * <p><b>装填顺序判据</b> ({@link #isLoadOrderCorrect}): **发射药在前、弹丸在后** —
+ * 从炮闩往里扫, 遇到第一个 EMPTY 停; 发射药出现在弹丸之后 ⇒ 错; 出现第二发弹丸 ⇒ 错
+ * (CBC 物理语义: 发射药在弹丸后方)。
+ *
+ * <p><b>关键常量语义</b>: {@code SEARCH_RANGE}=8 (找炮架/炮闩的搜索半径) ·
+ * {@code PUSH_STRENGTH}/{@code PUSH_REACH} (推弹杆参数);
+ * {@link #getStandPos} = 炮架朝向**反方向 2 格** (女仆站定装填位)。
+ *
+ * <p><b>陷阱</b>: ① 坐标/朝向可能是**装配体本地**语义 ({@code BreechInfo.localPos}) —
+ * 与绝对世界坐标混用会打偏, 转换走 {@code entity.toGlobalVector}/Contraption;
+ * ② 装配体会被玩家拆解/移动 ⇒ 每个动作前重新取 BE, 不要跨 tick 缓存 BreechInfo;
+ * ③ 本类不查 ModList — 门控由注册侧 (TaskRegistryManifest CBC + CompatToggle) 负责。
+ */
 public final class CannonLoadService {
 
     private static final int SEARCH_RANGE = 8;

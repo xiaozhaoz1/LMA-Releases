@@ -23,7 +23,8 @@ import net.neoforged.fml.common.EventBusSubscriber;
  *
  * <p>v79.48: 12 委托 + findMaidById 全删 (0 引用实证) — 3 活方法 (loadServerDurations/
  * registerCustomAnimations/scanCustomAnimations) 调用方已改直调
- * {@link AnimationDurationManager} / {@link AnimationResourceRegistrar}。
+ * {@link AnimationDurationManager} / {@code client.AnimationResourceRegistrar}
+ * (后者 2026-09-21 由 api 迁入 client — 纯客户端专用; 此处只作文本引用, 不建 import)。
  * 委托存根历史: v7 拆分后仅剩此监听器。
  */
 //? if 1.20.1 {

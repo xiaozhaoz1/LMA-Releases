@@ -9,12 +9,13 @@
 `TaskDispatcher` | 223 | 状态机: `submit`(validate→init→setTask) / `complete` / `fail` / `cancel` / 被动 `submitPassive/cancelPassive` — **唯一任务生命周期入口** |
 `TaskStateManager` | 41 | 状态写入收敛: `init`(写 FlowTaskData + 设 TLM 任务) / `heartbeat` / `clearAll` |
 `TaskStateMachine` | 275 | **FSM 基类**: `stateClass/initialState/transitions` + switch 分派; `workStationGated` 让 FSM 复用 `WorkStationPipeline.gate` |
-`TaskTickHandler` | 120 | per-maid tick 补充 (GUI 启动标记消费等) |
+`TaskTickHandler` | 128 | per-maid tick 补充 (GUI 启动标记消费 · 摔落自救预触发 · **在册女仆遍历** · **偷吃 Token** `TokenStealService.tick` — 门控从最便宜开始: 配置 → 冷却 ⇒ 冷却未到**零世界访问** ✓) |
 `EngineGuard` | 127 | **引擎隔离**: 管线连续异常 3 次 → `fail(maid, "管线连续异常 (3 次) — 引擎隔离")` |
 `RecoveryLadder` | 113 | 降级/恢复阶梯 |
 `WatchdogMath` | 34 | 看门狗**纯函数** (单测覆盖) |
 `MaidUnloadRegistry` | 83 | **卸载清理注册表**: 实体/区块卸载时回调 (static 状态必须注册, 防泄漏) |
-`EntityCleanupListener` | 43 | 实体移除事件 → 触发上面的清理 |
+`EntityCleanupListener` | 43 | 实体移除/加入事件 → 触发上面的清理 + **在册女仆索引**维护 |
+`MaidIndex` | 121 | **在册女仆索引 (v79.66)**: 心跳只遍历在册女仆 (**O(女仆)** 而非 `getAllEntities()` 的 O(全实体)) — 起因 = 线程转储实证实体多/分散时主线程 RUNNABLE 烧 CPU ⇒ 整套跑测卡死 ✗。维护 = `EntityJoinLevelEvent` 加入 · `EntityLeaveLevelEvent` 移除 (**⚠ v79.66p 起只在 `maid.isRemoved() \|\| !maid.isAlive()` 时**真除名 — `leave` 事件对**活体也会触发**(传送/卸载) ⇒ 无条件除名会让她**心跳停摆**、任务永远不动 ✗; 实测 = `lmaChainOreNeighbourChunk` "扫到矿却零位移" 的**真因**, 探针 `在册=false 任务=collect_ore`) · 停服 `clearAll` · 每 600t `reconcile` 补漏 (⚠ 相距数百万格时 `getAllEntities()` 可能扫不到 ⇒ **不能依赖它兜底**) |
 `LmaTaskProgressDisplay` | 113 | 进度显示 (`friendlyName` 覆盖 manifest 全部任务 — `TaskRegistryDriftTest` 守护) |
 
 ## 二、连接链

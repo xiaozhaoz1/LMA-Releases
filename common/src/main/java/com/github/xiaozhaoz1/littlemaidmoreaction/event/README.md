@@ -17,7 +17,9 @@
 `MaidCodexKillListener` | `LivingDeathEvent` | 自动 @GAME | 击杀 → 图鉴解锁计数 |
 `MaidCreeperAvoidHandler` | `EntityJoinLevelEvent` | 自动 @GAME | 女仆避苦力怕 (上线时贴行为) |
 `MaidDamageListener` | `MaidDamageEvent`(TLM) | 自动 @GAME | 女仆受伤 → 自救状态记录 (`SelfRescueState`) |
-`StickBindUtil` | — **(工具类, 非 handler)** | 工具 (被平台入口引用) | 木棍/标记物判定 + 任务类型校验 + 容器判定; **`isMarkItem`/`isBindItem` 是"配置驱动的判定"** (本会话已改为由客户端入口注入给 `DebugSelectionCoordinator`, 断掉 vanilla→event 越层) |
+> **2026-09-21 迁出**: `StickBindUtil` (木棍标记/绑定工具, 非 handler) 已迁 `vanilla/input/world/` —
+> 它不碰事件、被 event/network/task 三处共用; 配置与任务类型能力改经 `api/input/StickBindAccess` 注入
+> ⇒ 本包各 SetupHandler 现在 import vanilla 侧 (event→vanilla 允许)。
 
 ## 二、连接链
 ```
@@ -26,7 +28,7 @@
 服务端 InteractMaidEvent → 同一 handler 的服务端分支 ←──┘  → TaskDispatcher.submit(maid, task, target, count)
    ↑ 两侧**成对**: 客户端判"能不能点", 服务端判"点了做什么" — 改一个必须同步另一个
 【被动/信息类】事件 → 直接写数据 (图鉴计数/伤害状态) 或调 service
-【工具类】StickBindUtil 被平台入口 (client/forge/neoforge) 与本包各 SetupHandler 共用
+【工具类】StickBindUtil 已迁 vanilla/input/world/ (2026-09-21) — 本包 SetupHandler 与平台入口/网络包/服务共用之
 ```
 
 ## 三、已知陷阱 (每条附事故)

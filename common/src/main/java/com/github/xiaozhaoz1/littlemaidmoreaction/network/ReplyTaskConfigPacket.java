@@ -2,8 +2,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.network;
 
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
 
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.LmaTaskConfigContainer;
-import net.minecraft.client.Minecraft;
+import com.github.xiaozhaoz1.littlemaidmoreaction.network.client.TaskConfigReplyClientHandler;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 //? if 1.20.1 {
@@ -42,20 +41,19 @@ public record ReplyTaskConfigPacket(int maidId, String taskType, CompoundTag con
         int maidId = buf.readInt();
         String taskType = buf.readUtf();
         CompoundTag config = buf.readNbt();
+        // 输入防御 (2026-09-21 守则 §3): readNbt 可返回 null (空 NBT / 跨版本载荷形状不符) ⇒ 直传 handler 会
+        //   NPE 或静默错 ✗ (同源错题 #194 的 S2C 侧变体) ⇒ 兜底成空 tag + 统一前缀 warn ⇒ 一条 grep 可查 ✓
+        if (config == null) {
+            LittleMaidMoreAction.LOGGER.warn("[NET-GUARD] reply_task_config 的 NBT 为空 (空包/跨版本载荷) ⇒ 用空配置兜底: maid={} task={}",
+                    maidId, taskType);
+            config = new CompoundTag();
+        }
         return new ReplyTaskConfigPacket(maidId, taskType, config);
     }
 
 //? if 1.20.1 {
     public static void handle(ReplyTaskConfigPacket msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> {
-            var player = Minecraft.getInstance().player;
-            if (player == null) return;
-            if (player.containerMenu instanceof LmaTaskConfigContainer menu
-                && menu.getMaid() != null
-                && menu.getMaid().getId() == msg.maidId) {
-                menu.updateConfig(msg.config);
-            }
-        });
+        ctx.get().enqueueWork(() -> TaskConfigReplyClientHandler.apply(msg.maidId, msg.config));
         ctx.get().setPacketHandled(true);
     }
 //?}
@@ -70,15 +68,7 @@ public record ReplyTaskConfigPacket(int maidId, String taskType, CompoundTag con
         PacketCodecs.wrap(ReplyTaskConfigPacket::encode, ReplyTaskConfigPacket::decode);
 
     public static void handlePayload(ReplyTaskConfigPacket msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> {
-            var player = Minecraft.getInstance().player;
-            if (player == null) return;
-            if (player.containerMenu instanceof LmaTaskConfigContainer menu
-                && menu.getMaid() != null
-                && menu.getMaid().getId() == msg.maidId) {
-                menu.updateConfig(msg.config);
-            }
-        });
+        ctx.enqueueWork(() -> TaskConfigReplyClientHandler.apply(msg.maidId, msg.config));
     }
 //?}
 }

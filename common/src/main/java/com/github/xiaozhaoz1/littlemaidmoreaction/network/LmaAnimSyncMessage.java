@@ -3,20 +3,9 @@ import com.github.xiaozhaoz1.littlemaidmoreaction.LmaNetwork;
 
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
+import com.github.xiaozhaoz1.littlemaidmoreaction.network.client.AnimSyncClientHandler;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
-//? if 1.20.1 {
-import net.minecraftforge.api.distmarker.Dist;
-//?} else {
-import net.neoforged.api.distmarker.Dist;
-//?}
-//? if 1.20.1 {
-import net.minecraftforge.api.distmarker.OnlyIn;
-//?} else {
-import net.neoforged.api.distmarker.OnlyIn;
-//?}
 //? if 1.20.1 {
 import net.minecraftforge.network.NetworkEvent;
 //?}
@@ -61,12 +50,19 @@ public final class LmaAnimSyncMessage implements CustomPacketPayload {
     }
 
     public static LmaAnimSyncMessage decode(FriendlyByteBuf buf) {
-        return new LmaAnimSyncMessage(buf.readInt(), buf.readNbt());
+        int maidId = buf.readInt();
+        net.minecraft.nbt.CompoundTag animData = buf.readNbt();
+        // 输入防御 (2026-09-21 守则 §3): readNbt 可返回 null ⇒ 直传客户端 handler 会 NPE/静默错 ✗ (错题 #194 同族) ⇒ 兜底 + warn ✓
+        if (animData == null) {
+            LittleMaidMoreAction.LOGGER.warn("[NET-GUARD] anim_sync 的 NBT 为空 (空包/跨版本载荷) ⇒ 忽略本次同步: maid={}", maidId);
+            animData = new net.minecraft.nbt.CompoundTag();
+        }
+        return new LmaAnimSyncMessage(maidId, animData);
     }
 
 //? if 1.20.1 {
     public static void handle(LmaAnimSyncMessage msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> handleClient(msg));
+        ctx.get().enqueueWork(() -> AnimSyncClientHandler.apply(msg.maidId, msg.animData));
         ctx.get().setPacketHandled(true);
     }
 //?}
@@ -81,23 +77,9 @@ public final class LmaAnimSyncMessage implements CustomPacketPayload {
         PacketCodecs.wrap(LmaAnimSyncMessage::encode, LmaAnimSyncMessage::decode);
 
     public static void handlePayload(LmaAnimSyncMessage msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> handleClient(msg));
+        ctx.enqueueWork(() -> AnimSyncClientHandler.apply(msg.maidId, msg.animData));
     }
 //?}
-
-    @OnlyIn(Dist.CLIENT)
-    private static void handleClient(LmaAnimSyncMessage msg) {
-        ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) return;
-        if (level.getEntity(msg.maidId) instanceof EntityMaid maid) {
-            if (msg.animData == null) return;   // 恶意/损坏包: 空 NBT 忽略 (客户端信任边界)
-            CompoundTag clientData = maid.getPersistentData();
-            // 合并服务端动画数据到客户端
-            for (String key : msg.animData.getAllKeys()) {
-                clientData.put(key, msg.animData.get(key).copy());
-            }
-        }
-    }
 
     /**
      * 向追踪指定女仆的所有客户端发送 v7 动画数据。

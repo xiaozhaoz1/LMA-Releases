@@ -250,7 +250,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
                 return false;
             }
             Block b = net.minecraft.world.level.block.Block.byItem(block.getItem());
-            world.setBlock(new BlockPos(colPos.getX(), topY, colPos.getZ()), b.defaultBlockState(), 3);
+                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.place(world, new BlockPos(colPos.getX(), topY, colPos.getZ()), b.defaultBlockState());
             maid.swing(InteractionHand.MAIN_HAND);
             placedAny++;
             col++;
@@ -322,7 +322,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
             ItemStack block = takeGravityBlock(world, maid, cfg);   // cfg 读 input (标记配置)
             if (block == null || block.isEmpty()) return placed > 0;   // 无沙 → 已放的落下, 卡住等补给
             Block b = net.minecraft.world.level.block.Block.byItem(block.getItem());   // 双平台 Item→Block
-            world.setBlock(new BlockPos(p.getX(), y, p.getZ()), b.defaultBlockState(), 3);   // 放置后自然下落 (有声音)
+                        com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.place(world, new BlockPos(p.getX(), y, p.getZ()), b.defaultBlockState());   // 放置后自然下落 (有声音)
             maid.swing(InteractionHand.MAIN_HAND);   // 挥手
             placed++;
             if (placed >= OP_BUDGET) break;   // 预算封顶, 下 tick 继续本列
@@ -413,7 +413,7 @@ public final class DamFillPipeline extends TaskStateMachine<DamFillPipeline.Phas
             if (!world.hasChunk(p.getX() >> 4, p.getZ() >> 4)) continue;
             BlockState st = world.getBlockState(p);
             if (st.getFluidState().isEmpty()) continue;
-            world.setBlock(p, Blocks.AIR.defaultBlockState(), 3);
+                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.clear(world, p);
             world.levelEvent(2001, p, Block.getId(st));   // 破坏粒子
             world.playSound(null, p, SoundEvents.BUCKET_FILL, SoundSource.BLOCKS, 1.0F, 1.0F);   // 舀水声
             world.gameEvent(maid, GameEvent.FLUID_PICKUP, p);

@@ -158,7 +158,7 @@ public final class MlgRescueCoordinator {
         if (!taken.is(Items.WATER_BUCKET)) return false;
         ItemStack rest = inv.insertItem(bucketSlot, new ItemStack(Items.BUCKET), false);
         if (!rest.isEmpty()) HandSwap.stashOrDrop(maid, rest);
-        world.setBlock(placed, net.minecraft.world.level.block.Blocks.WATER.defaultBlockState(), 3);
+                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.place(world, placed, net.minecraft.world.level.block.Blocks.WATER.defaultBlockState());
         return true;
     }
 
@@ -172,7 +172,7 @@ public final class MlgRescueCoordinator {
                 ? net.minecraft.world.level.block.Blocks.HAY_BLOCK
                 : net.minecraft.world.level.block.Blocks.SLIME_BLOCK;
         inv.extractItem(softSlot, 1, false);
-        world.setBlock(placed, b.defaultBlockState(), 3);
+                    com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.place(world, placed, b.defaultBlockState());
     }
 
     /** 收水判定: 那格还是水源, 且手上有空桶 (水桶在放水时已变空桶回手) */
@@ -191,7 +191,7 @@ public final class MlgRescueCoordinator {
         if (!taken.is(Items.BUCKET)) return;
         ItemStack rest = inv.insertItem(empty, new ItemStack(Items.WATER_BUCKET), false);
         if (!rest.isEmpty()) HandSwap.stashOrDrop(maid, rest);
-        world.setBlock(placed, net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 3);
+                com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.output.BlockWriter.clear(world, placed);
     }
 
     // ── 落点探测 ──

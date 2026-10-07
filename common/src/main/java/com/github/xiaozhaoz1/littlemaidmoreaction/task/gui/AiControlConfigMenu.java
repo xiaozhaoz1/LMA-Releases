@@ -7,7 +7,7 @@ import net.minecraft.world.entity.player.Inventory;
  * AI 操控 (ai_control) 配置容器 (v74) — LLM 模型/声线名称设置。
  *
  * <p>仅提供容器类型注册 (容器契约见基类 LmaTaskConfigContainer)。
- * 屏幕通过 {@link AiControlConfigScreen} 直接读写 maid pipelineConfig (lma_cfg_ai_control)。
+ * 屏幕通过 {@link com.github.xiaozhaoz1.littlemaidmoreaction.screen.AiControlConfigScreen} 直接读写 maid pipelineConfig (lma_cfg_ai_control)。
  */
 public class AiControlConfigMenu extends LmaTaskConfigContainer {
 

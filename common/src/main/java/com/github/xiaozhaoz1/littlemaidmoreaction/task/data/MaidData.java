@@ -92,19 +92,44 @@ public final class MaidData {
 
     // ── CFG 分区 (直读, 低频) ──
 
+    /**
+     * 读 per-task 配置 (只读视图)。
+     *
+     * <p><b>输入防御 (2026-09-21 用户要求, 对齐 Cloth Config 式"读入即校验")</b>: 键在但**类型不是 Compound**
+     * (坏存档 / 跨版本载荷 / 手工改档) 时, MC 的 `getCompound` 会**静默**返回一个临时空 tag ✗ ⇒ 上层读到的
+     * 是"配置全空"且**看不出原因** ✗。本方法改为: **warn 一次 (带 uuid/task/实际类型) + 就地自愈成空 Compound** ✓
+     * ⇒ 报错可查 (`[NBT-GUARD]` 前缀) 且后续写路径不再踩同一个坏值 ✓。
+     */
     public static CompoundTag cfg(EntityMaid maid, String taskType) {
-        return root(maid).getCompound(TaskKeys.CFG_PREFIX + taskType);
+        var root = root(maid);
+        String key = TaskKeys.CFG_PREFIX + taskType;
+        if (root.contains(key) && !(root.get(key) instanceof CompoundTag)) {
+            com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.warn("[NBT-GUARD] cfg 类型异常 (期望 Compound, 实际 {}) ⇒ 视为空并自愈: maid={} task={}",
+                    root.get(key) == null ? "null" : root.get(key).getClass().getSimpleName(),
+                    maid.getUUID(), taskType);
+            root.put(key, new CompoundTag());
+        }
+        return root.getCompound(key);
     }
 
     /**
      * 取配置引用, 不存在则先创建再返回 — 修复 2026-08-16 绑定不生效:
      * {@code getCompound} 对不存在的 key 返回临时空 tag (非引用), 修改不落盘 →
      * 首次绑定写进临时 tag 丢失 → GUI/按键读不到。写入路径必须用本方法。
+     *
+     * <p><b>输入防御 (2026-09-21 补)</b>: 原判据只有 `contains(key)` ✗ —— 键在但**类型不是 Compound** 时
+     * 会跳过创建并返回**临时 tag** ⇒ **写入静默丢失** ✗ (= 2026-08-16 事故的"坏类型"变体)。
+     * 现改为**按类型判在不在**: 非 Compound ⇒ warn + 覆盖成新 Compound ✓ (自愈, 保证写入必落盘 ✓)。
      */
     public static CompoundTag cfgOrCreate(EntityMaid maid, String taskType) {
         var root = root(maid);
         String key = TaskKeys.CFG_PREFIX + taskType;
-        if (!root.contains(key)) {
+        if (!(root.get(key) instanceof CompoundTag)) {
+            if (root.contains(key)) {
+                com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.warn("[NBT-GUARD] cfgOrCreate 覆盖坏类型 (期望 Compound, 实际 {}) — 否则写入会静默丢失 ✗: maid={} task={}",
+                        root.get(key) == null ? "null" : root.get(key).getClass().getSimpleName(),
+                        maid.getUUID(), taskType);
+            }
             root.put(key, new CompoundTag());
         }
         return root.getCompound(key);

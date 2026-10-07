@@ -1,15 +1,16 @@
 package com.github.xiaozhaoz1.littlemaidmoreaction;
 
+import net.minecraft.client.gui.screens.MenuScreens;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigMenu;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.AiControlConfigScreen;
+import com.github.xiaozhaoz1.littlemaidmoreaction.screen.AiControlConfigScreen;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BellRingConfigMenu;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BellRingConfigScreen;
+import com.github.xiaozhaoz1.littlemaidmoreaction.screen.BellRingConfigScreen;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BlockInteractConfigMenu;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.BlockInteractConfigScreen;
+import com.github.xiaozhaoz1.littlemaidmoreaction.screen.BlockInteractConfigScreen;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.CraftChainConfigMenu;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.CraftChainConfigScreen;
+import com.github.xiaozhaoz1.littlemaidmoreaction.screen.CraftChainConfigScreen;
 import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.ItemListConfigMenu;
-import com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.ItemListConfigScreen;
+import com.github.xiaozhaoz1.littlemaidmoreaction.screen.ItemListConfigScreen;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -30,8 +31,8 @@ public final class LmaNeoForgeClientEntry {
     public LmaNeoForgeClientEntry(IEventBus modBus, ModContainer modContainer) {
             // v79.63 (A4): 选区调试的木棒判定由客户端注入 (vanilla 层不得 import event.StickBindUtil)
             com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.DebugSelectionCoordinator.bindStickCheck(
-                    stack -> com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isMarkItem(stack)
-                            || com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isBindItem(stack));
+                    stack -> com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StickBindUtil.isMarkItem(stack)
+                            || com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StickBindUtil.isBindItem(stack));
         // v79.51: 打开入口收敛 ScreenRegistry "lma_config"
         modContainer.registerExtensionPoint(IConfigScreenFactory.class,
                 (modContainer1, parent) -> com.github.xiaozhaoz1.littlemaidmoreaction.screen.ScreenRegistry
@@ -43,7 +44,7 @@ public final class LmaNeoForgeClientEntry {
         // IllegalStateException (实测崩溃 14:42; 文档"MOD 总线"为 forge 时代旧说法, 不适用于 neoforge)
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
                 com.github.tartaricacid.touhoulittlemaid.api.event.client.DefaultGeckoAnimationEvent.class,
-                event -> com.github.xiaozhaoz1.littlemaidmoreaction.api.AnimationResourceRegistrar
+                event -> com.github.xiaozhaoz1.littlemaidmoreaction.client.AnimationResourceRegistrar
                         .registerCustomAnimations(event));
         com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.LOGGER.info(
                 "[LMA/Registrar] GAME bus DefaultGeckoAnimationEvent listener 已手动注册 (构造器)");
@@ -54,7 +55,7 @@ public final class LmaNeoForgeClientEntry {
         modBus.addListener(net.neoforged.neoforge.client.event.EntityRenderersEvent.RegisterRenderers.class,
                 event -> event.registerBlockEntityRenderer(
                         com.github.xiaozhaoz1.littlemaidmoreaction.init.LmaBlockEntityTypes.GARAGE_KIT_DEFENSE.get(),
-                        com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerRenderer::new));
+                        com.github.xiaozhaoz1.littlemaidmoreaction.defense.tower.DefenseTowerRenderer::new));
         // v79.18: tick 延迟补全 — TLM 模型异步加载晚于 reload listener (ClientTickEvent.Post 是具体类, 可监听)
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
                 net.neoforged.neoforge.client.event.ClientTickEvent.Post.class,
@@ -63,6 +64,11 @@ public final class LmaNeoForgeClientEntry {
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
                 net.neoforged.neoforge.client.event.ClientTickEvent.Post.class,
                 event -> com.github.xiaozhaoz1.littlemaidmoreaction.compat.patpat.PatPatReactionClient.onClientTick());
+        // v79.65: 防御塔手办动作 (YSM 通道) — 瞄准循环 + 开火触发; 原生 gecko 由 LmaMagicCastingProvider 走 ISS
+        net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
+                net.neoforged.neoforge.client.event.ClientTickEvent.Post.class,
+                event -> com.github.xiaozhaoz1.littlemaidmoreaction.defense.client.TowerStatueAnimationDriver
+                        .onClientTick());
         // M-3: 客户端断开 → 清 MaidListResponsePacket 静态缓存 (防跨世界 stale 列表; LoggingOut 是具体类, 可监听)
         //      + PatPat 客户端节流表
         net.neoforged.neoforge.common.NeoForge.EVENT_BUS.addListener(
@@ -70,6 +76,8 @@ public final class LmaNeoForgeClientEntry {
                 event -> {
                     com.github.xiaozhaoz1.littlemaidmoreaction.network.MaidListResponsePacket.clearCache();
                     com.github.xiaozhaoz1.littlemaidmoreaction.compat.patpat.PatPatReactionClient.clearCache();
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.client.TowerStatueAnimationDriver.clearCache();
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.client.YsmAnimAvailability.clearCache();
                     com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.execute.DebugSelectionCoordinator.clear();
                 });
         // v79.51 (KeyTrigger): 通用按键触发 — 注册全部绑定 (MOD bus, RegisterKeyMappingsEvent 是 IModBusEvent)
@@ -108,8 +116,8 @@ public final class LmaNeoForgeClientEntry {
                 event -> {
                     if (!event.getLevel().isClientSide()) return;
                     if (event.getEntity().isShiftKeyDown()) return; // shift 留给选区标记
-                    if (!com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isMarkItem(event.getItemStack())) return;
-                    if (!com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isContainer(event.getLevel(), event.getPos())) return;
+                    if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StickBindUtil.isMarkItem(event.getItemStack())) return;
+                    if (!com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StickBindUtil.isContainer(event.getLevel(), event.getPos())) return;
                     net.minecraft.client.Minecraft.getInstance().setScreen(
                             new com.github.xiaozhaoz1.littlemaidmoreaction.screen.FarmContainerScreen(event.getPos()));
                     event.setCanceled(true);
@@ -125,8 +133,8 @@ public final class LmaNeoForgeClientEntry {
                     if (!event.getLevel().isClientSide()) return;
                     if (!(event.getTarget() instanceof com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid maid)) return;
                     var player = event.getEntity();
-                    if (!(com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isMarkItem(player.getMainHandItem())
-                            || com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil.isBindItem(player.getMainHandItem()))) return;
+                    if (!(com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StickBindUtil.isMarkItem(player.getMainHandItem())
+                            || com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StickBindUtil.isBindItem(player.getMainHandItem()))) return;
                     // v79.63: 记住"当前交付目标" ⇒ 之后右键容器时菜单只列该任务需要的角色 (用户裁定 B)
                     com.github.xiaozhaoz1.littlemaidmoreaction.screen.MarkTarget.set(
                             com.github.xiaozhaoz1.littlemaidmoreaction.adapter.LmaTaskTypeRegistry
@@ -160,27 +168,21 @@ public final class LmaNeoForgeClientEntry {
         @SubscribeEvent
         public static void clientSetup(RegisterMenuScreensEvent event) {
             // 直取 DeferredRegister Supplier (已绑定) — 不依赖 LmaMenus 注入时序
-            event.<BlockInteractConfigMenu, BlockInteractConfigScreen>register(LmaNeoForgeEntry.BLOCK_INTERACT_CONFIG_MENU.get(), (menu, inv, title) -> new BlockInteractConfigScreen(menu, inv, title));
-            event.<ItemListConfigMenu, ItemListConfigScreen>register(LmaNeoForgeEntry.ITEM_LIST_CONFIG_MENU.get(), (menu, inv, title) -> new ItemListConfigScreen(menu, inv, title));
-            event.<CraftChainConfigMenu, CraftChainConfigScreen>register(LmaNeoForgeEntry.CRAFT_CHAIN_CONFIG_MENU.get(), (menu, inv, title) -> new CraftChainConfigScreen(menu, inv, title));
-            event.<BellRingConfigMenu, BellRingConfigScreen>register(LmaNeoForgeEntry.BELL_RING_CONFIG_MENU.get(), (menu, inv, title) -> new BellRingConfigScreen(menu, inv, title));
-            // v79.62.2: 填坝排水配置 (排水开关)
-            event.<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigMenu,
-                    com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigScreen>register(
-                    LmaNeoForgeEntry.DAM_FILL_CONFIG_MENU.get(),
-                    (menu, inv, title) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.DamFillConfigScreen(menu, inv, title));
-            // v79.62: 挖空置域区块数配置
-            event.<com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigMenu,
-                    com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigScreen>register(
-                    LmaNeoForgeEntry.VOID_EXCAVATION_CONFIG_MENU.get(),
-                    (menu, inv, title) -> new com.github.xiaozhaoz1.littlemaidmoreaction.task.gui.VoidExcavationConfigScreen(menu, inv, title));
-            event.<AiControlConfigMenu, AiControlConfigScreen>register(LmaNeoForgeEntry.AI_CONTROL_CONFIG_MENU.get(), (menu, inv, title) -> new AiControlConfigScreen(menu, inv, title));
-            // v79.62.5 锻造任务已删 (用户裁定) — Screen 绑定移除
-            // v79.62.3: 防御塔 GUI (弹药槽 + 范围/伤害/模式)
-            event.<com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerMenu,
-                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerScreen>register(
-                    LmaNeoForgeEntry.DEFENSE_TOWER_MENU.get(),
-                    (menu, inv, title) -> new com.github.xiaozhaoz1.littlemaidmoreaction.defense.DefenseTowerScreen(menu, inv, title));
+            // 2026-09-21 表驱动 (用户批准): 屏侧唯一事实源 = com.github.xiaozhaoz1.littlemaidmoreaction.client.GuiScreenBindings.DEFS ✓
+            //   原 8 条手写注册 (含 FQN 汤) ⇒ 1 个循环 ✓; 菜单侧类型化字段与其 257 处消费者**保持原样** ✓
+            var cfgMenus = java.util.Map.<String, net.minecraft.world.inventory.MenuType<?>>of(
+                    "block_interact_config", LmaNeoForgeEntry.BLOCK_INTERACT_CONFIG_MENU.get(),
+                    "item_list_config", LmaNeoForgeEntry.ITEM_LIST_CONFIG_MENU.get(),
+                    "craft_chain_config", LmaNeoForgeEntry.CRAFT_CHAIN_CONFIG_MENU.get(),
+                    "bell_ring_config", LmaNeoForgeEntry.BELL_RING_CONFIG_MENU.get(),
+                    "dam_fill_config", LmaNeoForgeEntry.DAM_FILL_CONFIG_MENU.get(),
+                    "void_excavation_config", LmaNeoForgeEntry.VOID_EXCAVATION_CONFIG_MENU.get(),
+                    "ai_control_config", LmaNeoForgeEntry.AI_CONTROL_CONFIG_MENU.get(),
+                    "defense_tower", LmaNeoForgeEntry.DEFENSE_TOWER_MENU.get());
+            for (com.github.xiaozhaoz1.littlemaidmoreaction.client.GuiScreenBindings.Binding<?, ?> b : com.github.xiaozhaoz1.littlemaidmoreaction.client.GuiScreenBindings.DEFS) {
+                event.register((net.minecraft.world.inventory.MenuType) cfgMenus.get(b.id()),
+                        (MenuScreens.ScreenConstructor) com.github.xiaozhaoz1.littlemaidmoreaction.client.GuiScreenBindings.screenOf(b));
+            }
         }
 
     }

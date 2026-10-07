@@ -2,7 +2,7 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.network;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LmaNetwork;
 
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.event.StickBindUtil;
+import com.github.xiaozhaoz1.littlemaidmoreaction.vanilla.input.world.StickBindUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;

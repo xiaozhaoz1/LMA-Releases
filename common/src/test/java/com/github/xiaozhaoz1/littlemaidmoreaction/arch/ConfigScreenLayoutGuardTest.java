@@ -24,14 +24,14 @@ class ConfigScreenLayoutGuardTest {
 
     /** 必须遵守规范的屏 (继承 LmaTaskConfigScreen 的具体屏) */
     private static final List<String> SCREENS = List.of(
-            "task/gui/AiControlConfigScreen.java",
-            "task/gui/BellRingConfigScreen.java",
-            "task/gui/BlockInteractConfigScreen.java",
-            "task/gui/CraftChainConfigScreen.java",
-            "task/gui/DamFillConfigScreen.java",
-            "task/gui/ItemListConfigScreen.java",
-            "task/gui/PassiveToggleConfigScreen.java",
-            "task/gui/VoidExcavationConfigScreen.java");
+            "screen/AiControlConfigScreen.java",
+            "screen/BellRingConfigScreen.java",
+            "screen/BlockInteractConfigScreen.java",
+            "screen/CraftChainConfigScreen.java",
+            "screen/DamFillConfigScreen.java",
+            "screen/ItemListConfigScreen.java",
+            "screen/PassiveToggleConfigScreen.java",
+            "screen/VoidExcavationConfigScreen.java");
 
     @Test
     void layoutUsesSharedHelpersOnly() throws IOException {

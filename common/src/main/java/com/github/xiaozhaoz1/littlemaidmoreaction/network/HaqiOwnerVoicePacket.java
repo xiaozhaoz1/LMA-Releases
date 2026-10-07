@@ -3,17 +3,8 @@ package com.github.xiaozhaoz1.littlemaidmoreaction.network;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LmaNetwork;
 import com.github.tartaricacid.touhoulittlemaid.entity.passive.EntityMaid;
 import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
-import com.github.xiaozhaoz1.littlemaidmoreaction.client.PecoHaqiSoundPlayer;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientLevel;
+import com.github.xiaozhaoz1.littlemaidmoreaction.network.client.HaqiVoiceClientHandler;
 import net.minecraft.network.FriendlyByteBuf;
-//? if 1.20.1 {
-import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.api.distmarker.OnlyIn;
-//?} else {
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.api.distmarker.OnlyIn;
-//?}
 //? if 1.20.1 {
 import net.minecraftforge.network.NetworkEvent;
 //?}
@@ -31,7 +22,7 @@ import java.util.function.Supplier;
  *
  * <p>服务端不能直接播 peco 包声音 (ogg 只在客户端文件系统, TLM 自定义声音包机制),
  * 也无法指定文件 (TLM {@code SoundCache.getBuffer} 全随机)。因此只传 maidId + volume,
- * 客户端 {@link PecoHaqiSoundPlayer} 按 11 文件子集随机读取并播放。
+ * 客户端 {@link HaqiVoiceClientHandler} 按 11 文件子集随机读取并播放。
  */
 //? if 1.20.1 {
 public record HaqiOwnerVoicePacket(int maidId, float volume) {
@@ -50,7 +41,7 @@ public record HaqiOwnerVoicePacket(int maidId, float volume) implements CustomPa
 
 //? if 1.20.1 {
     public static void handle(HaqiOwnerVoicePacket msg, Supplier<NetworkEvent.Context> ctx) {
-        ctx.get().enqueueWork(() -> handleClient(msg));
+        ctx.get().enqueueWork(() -> HaqiVoiceClientHandler.play(msg.maidId(), msg.volume()));
         ctx.get().setPacketHandled(true);
     }
 //?}
@@ -65,18 +56,9 @@ public record HaqiOwnerVoicePacket(int maidId, float volume) implements CustomPa
         PacketCodecs.wrap(HaqiOwnerVoicePacket::encode, HaqiOwnerVoicePacket::decode);
 
     public static void handlePayload(HaqiOwnerVoicePacket msg, IPayloadContext ctx) {
-        ctx.enqueueWork(() -> handleClient(msg));
+        ctx.enqueueWork(() -> HaqiVoiceClientHandler.play(msg.maidId(), msg.volume()));
     }
 //?}
-
-    @OnlyIn(Dist.CLIENT)
-    private static void handleClient(HaqiOwnerVoicePacket msg) {
-        ClientLevel level = Minecraft.getInstance().level;
-        if (level == null) return;
-        if (level.getEntity(msg.maidId()) instanceof EntityMaid maid) {
-            PecoHaqiSoundPlayer.play(maid, msg.volume());
-        }
-    }
 
     /** 向追踪指定女仆的所有客户端发送对主人哈气语音请求 */
     public static void sendToTracking(EntityMaid maid, float volume) {
