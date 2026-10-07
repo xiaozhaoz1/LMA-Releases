@@ -1,3 +1,4 @@
+> **CI 说明 (2026-09-18)**: GitHub Actions 已停用并移除 —— 根因: 干净检出缺 `libs/` 与 `libs-maven/` (编译期必红 ✗, 该 workflow 从未绿过)。**验证改用本地门禁** `just gate` / `just gate-jar`; 原 workflow 可从 git 历史取回: `git show 431a5f4:.github/workflows/build.yml` ↗
 # Changelog
 
 All notable changes to this project will be documented in this file.
