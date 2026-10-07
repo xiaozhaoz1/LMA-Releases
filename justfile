@@ -264,3 +264,18 @@ boot-check-all timeout="80":
     echo "==> $node"; \
     just boot-check "$node" "{{timeout}}"; \
   done
+
+# ── 本地门禁 (CI 停用后的唯一门禁, 2026-09-18 用户裁定) ──
+# 用法: just gate            = 双平台编译 + 单测(全量)
+#       just gate-jar        = 上面 + 出两端 jar
+gate:
+    @echo "── [1/2] 双平台编译 ──"
+    ./gradlew --no-build-cache :forge:1.20.1:compileJava :neoforge:1.21.1:compileJava
+    @echo "── [2/2] 单测 (forge 节点; 全量 XML) ──"
+    ./gradlew --rerun-tasks :forge:1.20.1:test
+    @echo "✅ gate 通过 (编译 + 单测)"
+
+gate-jar: gate
+    ./gradlew -x javadoc :forge:1.20.1:jar :neoforge:1.21.1:jar
+    @echo "✅ jar 已出: forge/versions/1.20.1/build/libs + neoforge/versions/1.21.1/build/libs"
+    @echo "   部署请用: bash build-logs/deploy-lma.sh <版本>  (含三方 md5 门禁)"
