@@ -20,7 +20,7 @@ for f in versions/1.20.1/gradle.properties versions/1.21.1/gradle.properties; do
   [ "$v" = "$VER" ] || { echo "[FAIL] 版本不一致: $f=$v 但目标=$VER (先统一版本号再部署 ✓)"; exit 1; }
 done
 for f in forge/src/main/resources/META-INF/mods.toml neoforge/src/main/resources/META-INF/neoforge.mods.toml; do
-  v=$(grep -m1 '^version = ' "$f" | sed 's/.*"//; s/".*//')
+  v=$(grep -m1 -E '^[[:space:]]*version[[:space:]]*=' "$f" | sed -E 's/^[^=]*=[[:space:]]*"//; s/".*$//')
   [ "$v" = "$VER" ] || { echo "[FAIL] 版本不一致: $f=$v 但目标=$VER"; exit 1; }
 done
 echo "[gate] 版本号一致 = $VER ✓ (真相源 versions/*/gradle.properties)"
