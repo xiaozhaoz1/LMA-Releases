@@ -46,11 +46,13 @@ class ScreenLangGuardTest {
     @DisplayName("screen/ 与 task/ 里禁止写死中文文案（必须走语言键）")
     void noHardcodedChineseInUiSources() {
         Path main = ArchSource.findMainRoot();
-        assertTrue(main != null, "定位主源根失败（守护自身失效 ⇒ 必须修）");
+        // ★ 必须用**包根**（main/com/github/xiaozhaoz1/littlemaidmoreaction）✓ —— 首版误用主源根 ⇒ 扫到 0 文件 ✗
+        Path pkg = ArchSource.findPackageRoot();
+        assertTrue(main != null && pkg != null, "定位主源根/包根失败（守护自身失效 ⇒ 必须修）");
         List<String> offenders = new ArrayList<>();
         int scanned = 0;
         for (String dir : UI_DIRS) {
-            List<Path> files = ArchSource.javaFiles(main.resolve(dir));
+            List<Path> files = ArchSource.javaFiles(pkg.resolve(dir));
             scanned += files.size();
             for (Path f : files) {
                 List<String> lines = ArchSource.read(f).lines().toList();
@@ -90,11 +92,13 @@ class ScreenLangGuardTest {
         Map<String, String> zh = loadLang(repo, "zh_cn.json");
         Map<String, String> en = loadLang(repo, "en_us.json");
         Path main = ArchSource.findMainRoot();
+        Path pkg = ArchSource.findPackageRoot();     // ★ 包根 ✓（同测试①的修正 ✗→✓）
+        assertTrue(pkg != null, "定位包根失败（守护自身失效 ⇒ 必须修）");
         List<String> missingZh = new ArrayList<>();
         List<String> missingEn = new ArrayList<>();
         int keys = 0;
         for (String dir : UI_DIRS) {
-            for (Path f : ArchSource.javaFiles(main.resolve(dir))) {
+            for (Path f : ArchSource.javaFiles(pkg.resolve(dir))) {
                 String text = ArchSource.read(f);
                 int idx = 0;
                 while ((idx = text.indexOf("translatable(", idx)) >= 0) {
