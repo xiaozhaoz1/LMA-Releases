@@ -293,7 +293,6 @@
   "screen.littlemaidmoreaction.farm_region.field.coords": "坐标: (%s,%s,%s) ~ (%s,%s,%s)",
   "screen.littlemaidmoreaction.farm_region.field.seed_box": "种子箱: %s",
   "screen.littlemaidmoreaction.farm_region.field.harvest_box": "收获箱: %s",
-  "screen.littlemaidmoreaction.farm_region.detail": "详情",
   "screen.littlemaidmoreaction.farm_region.delete": "删",
   "screen.littlemaidmoreaction.farm_region.crop_prefix": "种: %s",
   "screen.littlemaidmoreaction.farm_region.crop_none": "只收不种",

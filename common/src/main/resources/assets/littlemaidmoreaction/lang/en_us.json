@@ -293,7 +293,6 @@
   "screen.littlemaidmoreaction.farm_region.field.coords": "Coords: (%s,%s,%s) ~ (%s,%s,%s)",
   "screen.littlemaidmoreaction.farm_region.field.seed_box": "Seed chest: %s",
   "screen.littlemaidmoreaction.farm_region.field.harvest_box": "Harvest chest: %s",
-  "screen.littlemaidmoreaction.farm_region.detail": "Details",
   "screen.littlemaidmoreaction.farm_region.delete": "Del",
   "screen.littlemaidmoreaction.farm_region.crop_prefix": "Crop: %s",
   "screen.littlemaidmoreaction.farm_region.crop_none": "Harvest only",
