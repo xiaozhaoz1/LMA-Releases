@@ -66,6 +66,17 @@ public final class CreateCompatClient {
         //   (与 LmaNeoForgeClientEntry.Screens 同款; 装配屏此前是唯一漏改的屏 ⇒ 注入未完成时
         //    register(null,...) 静默落在 null 键上 ⇒ 打开时报 "Failed to create screen")
         var assemblyMenu = LittleMaidMoreAction.MAID_ASSEMBLY_MENU.get();
+        // ★★ v79.78 崩溃修复 (错题 #368, 用户日志 L90 实证 ✓): **物理门控必须放最前** ✗→✓
+        //   病因链: ① `MaidAssemblyScreen extends Create 的 AbstractSimiContainerScreen` ✗ (父类是第三方类 ✓)
+        //          ② `MAID_ASSEMBLY_MENU` 在 LmaForgeEntry/LmaNeoForgeEntry 是**无条件注册**的 ✗
+        //             ⇒ 未装 Create 时 `.get()` **仍非 null** ✗ ⇒ 下面 `assemblyMenu != null` 门控**照样成立** ✗
+        //          ③ ⇒ `MaidAssemblyScreen::new` 被解析 ⇒ 连带加载其父类 (Create 的类 ✗) ⇒ NoClassDefFoundError ✓
+        //   ⇒ 唯一正确的物理前提 = `isLoaded("create")` ✓ (此处 ModList 已就绪 ✓, 不存在 v79.63 那时的时序问题 ✓)
+        //     并且**门控不成立必须留痕** ✓ (不能静默少屏 ✓)
+        if (!net.minecraftforge.fml.ModList.get().isLoaded("create")) {
+            LittleMaidMoreAction.LOGGER.warn("[MaidAssembly] 跳过装配屏注册 — Create 未安装 (物理前提不成立 ✓; 这是预期行为, 不是缺失 ✗)");
+            return;
+        }
         if (assemblyMenu != null) {
             event.enqueueWork(() -> MenuScreens.register(
                 assemblyMenu, MaidAssemblyScreen::new));
@@ -86,6 +97,13 @@ public final class CreateCompatClient {
         // v79.63 修**装配屏不注册** (同 forge 分支): 前提改为"菜单类型已注册" (物理前提, 与时序无关)
         // ★ 直取 DeferredRegister Supplier (已绑定) — 不依赖 LmaMenus 注入时序 (同 forge 分支说明)
         var assemblyMenu = com.github.xiaozhaoz1.littlemaidmoreaction.LmaNeoForgeEntry.MAID_ASSEMBLY_MENU.get();
+        // ★★ v79.78 崩溃修复 (错题 #368) — 同 forge 分支: 物理门控 `isLoaded("create")` 必须放最前 ✗→✓
+        //   (无 Create 时 MAID_ASSEMBLY_MENU 仍非 null ✗ ⇒ 菜单非 null 不是物理前提 ✗; 解析 MaidAssemblyScreen
+        //    会连带加载其父类 AbstractSimiContainerScreen (Create 的类 ✗) ⇒ NoClassDefFoundError ✓)
+        if (!net.neoforged.fml.ModList.get().isLoaded("create")) {
+            LittleMaidMoreAction.LOGGER.warn("[MaidAssembly] 跳过装配屏注册 — Create 未安装 (物理前提不成立 ✓; 预期行为 ✓)");
+            return;
+        }
         if (assemblyMenu != null) {
             event.register(assemblyMenu, MaidAssemblyScreen::new);
             if (!com.github.xiaozhaoz1.littlemaidmoreaction.compat.CompatToggle.isModuleEnabled("create")) {

@@ -1,4 +1,4 @@
-> **CI 说明 (2026-09-18)**: GitHub Actions 已停用并移除 —— 根因: 干净检出缺 `libs/` 与 `libs-maven/` (编译期必红 ✗, 该 workflow 从未绿过)。**验证改用本地门禁** `just gate` / `just gate-jar`; 原 workflow 可从 git 历史取回: `git show 431a5f4:.github/workflows/build.yml` ↗
+> **CI 说明 (2026-09-18)**: GitHub Actions 已停用并移除 —— 根因: 干净检出缺 `libs/` (238MB) 与 `libs-maven/` (71MB) ⇒ 编译期必红 ✗ (该 workflow 从未绿过)。**验证改用本地门禁** `just gate` (双平台编译 + 全量单测) 与 `just gate-jar` (+出两端 jar); 部署用本机脚本 `build-logs/deploy-lma.sh <版本>` (先建后换 + 构建/交付/mods 三方 md5 ✓, 缺省版本号从 `versions/*/gradle.properties` 读 ✓)。原 workflow 可从 git 历史取回: `git show 431a5f4:.github/workflows/build.yml` ↗
 # Changelog
 
 All notable changes to this project will be documented in this file.

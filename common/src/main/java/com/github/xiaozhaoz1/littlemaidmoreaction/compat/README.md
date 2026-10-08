@@ -92,3 +92,11 @@
 `task/CannonLoadPipeline` | 483 | **装填相位机** (SEARCHING/MOVING/OPENING/CLEARING/LOADING/CLOSING 6 态) |
 `task/CannonLoadService` | 430 | 炮架识别 / 开合闩 / 弹药装载 / 清理残留炮弹 |
 > ⚠ **CBC 运行期依赖**: 其强制前置 `ritchiesprojectilelib` **不在 libs/** 时, 开 compatRuntime 会 **Mod Loading 失败** (已记录: 需从游戏目录复制; 见 `compat/README.md` §三)。
+
+## 陷阱 (v79.78 新增 · 错题 #368)
+
+| # | 陷阱 | 规则 |
+|---|---|---|
+**X** | **门控拦得住"执行"，拦不住"类加载"** ✗ | 只要某段代码**引用**了第三方类（**含其父类** ✓），一旦该代码被执行，JVM 会解析并加载那个类（父类也一起 ✗）⇒ 未装该 mod 时 **NoClassDefFoundError** ✓。**例**：`MaidAssemblyScreen extends Create 的 AbstractSimiContainerScreen` ✗，而 `event.register(menu, MaidAssemblyScreen::new)` 在 `@EventBusSubscriber`（**无条件注册** ✗）里执行 ⇒ 未装 Create 时必崩 ✓ |
+**Y** | **"菜单类型非 null" 不是物理前提** ✗ | `MENU_TYPES.register(...)` 是**无条件**注册的 ⇒ 未装 Create 时 `.get()` **仍非 null** ✗ ⇒ 用它当门控等于没有门控 ✓。**物理前提只能问 `ModList.get().isLoaded("<modid>")`** ✓（在事件回调里调用是安全的 ✓，不存在早期时序问题 ✓） |
+**Z** | **门控不成立必须留痕** | 跳过注册要 `LOGGER.warn` 写清"因缺 X mod 而跳过" ✓ —— 否则用户看到的是"功能静默消失" ✗ |
