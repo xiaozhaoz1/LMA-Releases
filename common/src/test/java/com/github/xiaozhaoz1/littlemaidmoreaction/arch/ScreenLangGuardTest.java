@@ -114,6 +114,9 @@ class ScreenLangGuardTest {
                     boolean dynamic = key.isEmpty() || key.endsWith(".")
                             || (after < text.length() && text.charAt(after) == '+');
                     if (dynamic) continue;
+                    // ★ 只查**本项目自己的键** ✓ —— 原版/其他模组的键（gui.back、item.…）由它们自己的语言文件提供 ✓
+                    //   首版要求所有键都在本项目 lang 里 ⇒ 误报 30+ 条原版键 ✗ ⇒ 收敛为前缀白名单 ✓
+                    if (!isOurKey(key)) continue;
                     keys++;
                     if (!zh.containsKey(key)) missingZh.add(ArchSource.rel(main, f) + " → " + key);
                     if (!en.containsKey(key)) missingEn.add(ArchSource.rel(main, f) + " → " + key);
@@ -166,6 +169,18 @@ class ScreenLangGuardTest {
         Map<String, String> m = new Gson().fromJson(json, new TypeToken<Map<String, String>>() { }.getType());
         assertTrue(m != null && !m.isEmpty(), "语言文件解析为空: " + p);
         return m;
+    }
+
+    /** 本项目自有键前缀（只有这些才必须出现在我们的 zh_cn/en_us 里 ✓） */
+    private static boolean isOurKey(String key) {
+        return key.startsWith("screen.littlemaidmoreaction.")
+                || key.startsWith("lma.")
+                || key.startsWith("message.lma.")
+                || key.startsWith("overlay.littlemaidmoreaction.")
+                || key.startsWith("bubble.littlemaidmoreaction.")
+                || key.startsWith("task.littlemaidmoreaction.")
+                || key.startsWith("gui.littlemaidmoreaction.")
+                || key.startsWith("tip.littlemaidmoreaction.");
     }
 
     private static boolean hasCjk(String s) {
