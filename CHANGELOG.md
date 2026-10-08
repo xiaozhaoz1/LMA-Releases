@@ -6,7 +6,35 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 0.9.78 (2026-09-21) — 结案: "手办变模型"= TLM 官方联动 (非缺陷) + 用例/文档增强
+## 0.9.79 (2026-09-18) — UI 文案全量 i18n: **中文就中文、英文就英文** + 两条可执行守护
+
+### Changed — 界面文案全部走语言文件（用户裁定 ✓）
+- **根因**: 切英文后设置界面仍是中文 ✗ —— 不是语言文件的问题 ✗（`en_us` 本就没有中文 ✓），
+  而是屏幕里用 `Component.literal("中文")` **写死** ✗ ⇒ 不查语言文件 ⇒ 切语言也翻不动 ✓
+- **全量范围**: **211 处 / 13 个文件** 全部改为 `Component.translatable("…")` ✓
+  · 设置屏 `ClothSettingsScreen` **96 处** → `lma.cfg.*` ✓
+  · 任务子屏 `TaskSettingsScreen` **80 处** → `lma.task.*` ✓（含 12 个任务分支）
+  · 任务树 11 · 农场区域详情 8 · 成就树 5 · 农场区域 5 · 空置域配置 5 · 事件提示 4 · 其余 4 ✓
+- **键表**: `zh_cn.json` 填**中文原文** ✓ / `en_us.json` 填**地道英译** ✓ ⇒ 两侧 **495 键对称** ✓
+  · 专名不翻 ✓（`Token` 中英皆 `Token` ✓，为你的裁定 ✓）
+- **验收口径**: `en_us.json` 内含中文值 = **0** ✓（jar 内实测 ✓）；每个屏幕**整屏做完** ✓，不留半中半英 ✗
+
+### Added — 两条守护测试（把规则变成可执行约束 ✓）
+- `arch/ScreenLangGuardTest` ✓（3 项）
+  ① `screen/**`、`task/**` 禁"含中文的 `literal(...)`" ✗（注释行豁免 ✓；**三元/拼接写法也覆盖** ✓）
+  ② UI 引用的**本项目键**必须 `zh_cn` + `en_us` 双文件都有 ✓（动态拼接键自动跳过 ✓）
+  ③ 两个语言文件**禁重复键** ✓（Gson 遇重复判整个文件非法 ⇒ 全屏文案失效 ✗）
+  · **探针实证** ✓: 注入 `literal("探针中文")` ⇒ 守护**准确报出该行** ✓；还原后绿 ✓
+- 同步记录: 错题 **#367**（打包/部署前必须从 `versions/*/gradle.properties` 读版本真相源 ✗）
+  · 起因: 我按上下文旧版本号（0.9.74）打包 ⇒ **误降级**并出现"双活跃 jar" ✗
+  · 现在 `build-logs/deploy-local.sh` **自动读真相源 + 校验 4 个版本文件全等** ✓（写死版本号的旧脚本已改名禁用 ✓）
+
+### Fixed — 两处被门禁当场抓住的本轮失误（留档 ✓）
+- 插入语言键时**未先查重** ✗ ⇒ 撞上已存在的 `farm_region.detail` ⇒ `LangConsistencyTest` 3 项红 ✓
+  ⇒ **部署被门禁正确拦下** ✓（"红了不部署"纪律生效 ✓）
+- 误调**写出写死 0.9.74** 的旧部署脚本 ✗ ⇒ 一度把旧版装成活跃包 ✗ ⇒ 已隔离错版并重新部署正确版本 ✓
+
+
 
 ### 结案 — 手办被"御币右键"改成玩家模型: **TLM 官方功能，不是 LMA 缺陷** ✓
 - **现象**: 创造模式手持**博丽的御币**右键手办 ⇒ 手办外观变成**玩家的模型**（空手/持弓不会 x）

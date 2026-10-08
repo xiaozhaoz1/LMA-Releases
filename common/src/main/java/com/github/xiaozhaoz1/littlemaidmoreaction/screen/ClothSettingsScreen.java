@@ -48,6 +48,12 @@ public final class ClothSettingsScreen {
                 .setTitle(t("title"))
                 // ★ v79.72 修 (错题 #361): **Cloth 屏必须挂 setSavingRunnable** —— 原来只给每个条目设了
                 //   `setSaveConsumer` (那只把值写进**内存 spec** ✗, 不落盘), 于是用户改完设置**重启即回默认** ✓
+                // ★ v79.72 修 (错题 #361): **Cloth 屏必须挂 setSavingRunnable** —— 原来只给每个条目设了
+                //   `setSaveConsumer` (那只把值写进**内存 spec** ✗, 不落盘), 于是用户改完设置**重启即回默认** ✓
+                //   实测: 用户把「杂项 → 发电皮带应力」改成 100000, 当次会话日志里确实是 100000 ✓, 但
+                //   `config/littlemaidmoreaction-*.toml` 里**根本没有这个键** ✗ ⇒ 重启读回 -1 ⇒ 应力永远 1024 ✗
+                //   (`TaskSettingsScreen` 早就挂了 ✓ — 本屏漏了 ⇒ 凡本屏可改的设置此前都不落盘 ✗)
+                //   ⚠ 并对齐 TaskSettingsScreen 的写法: 多人游戏时还要**把值同步到服务端** (否则只存本地 ✗)
                 .setSavingRunnable(() -> {
                     MoreActionConfig.saveAll();
                     if (!net.minecraft.client.Minecraft.getInstance().hasSingleplayerServer()) {
@@ -89,12 +95,15 @@ public final class ClothSettingsScreen {
                 .setMin(4).setMax(128)
                 .setTooltip(t("chain.max_distance.tip"))
                 .setSaveConsumer(ActiveTaskConfig.CHAIN_MAX_DISTANCE::set).build());
+        // 挖矿兜底行为参数 (原行内魔法数/类内常量 → 配置)
         chain.addEntry(eb.startIntField(t("chain.dig_down_depth"),
                         ActiveTaskConfig.CHAIN_DIG_DOWN_DEPTH.get())
                 .setDefaultValue(ActiveTaskConfig.CHAIN_DIG_DOWN_DEPTH.getDefault())
                 .setMin(1).setMax(8)
                 .setTooltip(t("chain.dig_down_depth.tip"))
                 .setSaveConsumer(ActiveTaskConfig.CHAIN_DIG_DOWN_DEPTH::set).build());
+        // 垫柱触发高度/面前挖穿距离 GUI 删除 — 垫柱链/面前挖穿退役
+        // (用户裁定 "不用垫方块了, 只要挖上下能挖到的就行了"), 桥/阶梯固定逻辑无配置
         chain.addEntry(eb.startIntField(t("chain.nav_timeout"),
                         ActiveTaskConfig.CHAIN_NAV_TIMEOUT.get())
                 .setDefaultValue(ActiveTaskConfig.CHAIN_NAV_TIMEOUT.getDefault())
@@ -102,6 +111,7 @@ public final class ClothSettingsScreen {
                 .setTooltip(t("chain.nav_timeout.tip"))
                 .setSaveConsumer(ActiveTaskConfig.CHAIN_NAV_TIMEOUT::set).build());
 
+        // 跳过集有效期 GUI 删除 — 分档死值 (TLM 60t / 激进 1s, 用户裁定)
         // ── 环境感知 ──
         ConfigCategory env = root.getOrCreateCategory(t("cat.env"));
         env.addEntry(eb.startBooleanToggle(t("env.enabled"),
@@ -206,6 +216,7 @@ public final class ClothSettingsScreen {
                 .setMin(1).setMax(10)
                 .setTooltip(t("env.structure_refresh_max.tip"))
                 .setSaveConsumer(PassiveTaskConfig.ENV_STRUCTURE_REFRESH_MAX::set).build());
+        // v79.63.21 补缺口 (用户裁定: 感知域参数归本分类): 稀有群系通报 3 键此前**无任何 GUI 入口**
         env.addEntry(eb.startBooleanToggle(t("env.rare_biome"),
                         PassiveTaskConfig.ENV_RARE_BIOME_ENABLED.get())
                 .setDefaultValue(PassiveTaskConfig.ENV_RARE_BIOME_ENABLED.getDefault())
