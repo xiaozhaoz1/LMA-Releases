@@ -11,7 +11,10 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import static org.junit.jupiter.api.Assertions.assertTrue;
-import org.junit.jupiter.api.Assumptions;
+// (Assumptions 已移除 ✗) —— 原来用 Assumptions.assumeTrue(源码树不可见 ⇒ 跳过) ✗ ⇒ 守护**静默失效** ✓
+// 真相: 该守护写死找 gametest/LmaGameTests.java ✗, 而它**早已被拆成** LmaCore/LmaHarvest/LmaPassive/LmaCompat ✗
+//       ⇒ 文件找不到 ⇒ 每轮静默跳过 ⇒ 相当于**从来没有守过** ✓（错题口径: 不能静默跳过 ✓）
+// 现改为 fail-closed: 目录/文件缺失 ⇒ 直接断言失败 ✓, 并扫描**全部** gametest 源 ✓
 
 /**
  * gametest **时序自洽**守护 (v79.63.6 — 错题 #326 的直接教训)。
@@ -25,9 +28,25 @@ import org.junit.jupiter.api.Assumptions;
  */
 class GameTestTimeoutGuardTest {
 
-    /** 源码包根 (与其它 arch guard 同源 ✓) — 结果: <pkgRoot>/gametest/LmaGameTests.java */
-    private static Path testFile() {
-        return ArchSource.findPackageRoot().resolve("gametest").resolve("LmaGameTests.java");
+    /** gametest 源**目录**（可能被拆成多个文件 ✓ —— 不再写死单文件名 ✗） */
+    private static Path testDir() {
+        return ArchSource.findPackageRoot().resolve("gametest");
+    }
+
+    /**
+     * 读**全部** gametest 源并拼接（按文件名排序 ✓）。
+     *
+     * <p>⚠ fail-closed ✓：目录不存在/没有 java 源 ⇒ **断言失败** ✗（绝不跳过 ✗）——
+     * 这正是本测试此前"静默失效"的教训 ✓：写死文件名 + assumeTrue 跳过 ⇒ 文件被拆分后无声无息失效 ✓
+     */
+    private static String readAllTestSources() {
+        Path dir = testDir();
+        assertTrue(Files.isDirectory(dir), "gametest 源目录不存在: " + dir + " ⇒ 守护失效, 必须修 ✗");
+        List<Path> files = ArchSource.javaFiles(dir);
+        assertTrue(!files.isEmpty(), "gametest 下没有任何 java 源: " + dir + " ⇒ 守护失效, 必须修 ✗");
+        StringBuilder sb = new StringBuilder();
+        files.stream().sorted().forEach(p -> sb.append(ArchSource.read(p)).append('\n'));
+        return sb.toString();
     }
     /** 断言执行余量 (tick) — 等待触发后 lambda 还要跑断言/写日志 */
     private static final int MARGIN = 10;
@@ -37,9 +56,7 @@ class GameTestTimeoutGuardTest {
 
     @Test
     void everyDelayFitsWithinTimeout() throws IOException {
-        Path f = testFile();
-        Assumptions.assumeTrue(Files.isRegularFile(f), "源码树不可见 (打包环境) — 跳过");
-        String src = Files.readString(f);
+        String src = readAllTestSources();
         Matcher m = TEST_ANNOTATION.matcher(src);
         List<String> bad = new ArrayList<>();
         int checked = 0;
@@ -72,9 +89,7 @@ class GameTestTimeoutGuardTest {
 
     @Test
     void sensitiveFamiliesStayInOwnBatches() throws IOException {
-        Path f = testFile();
-        Assumptions.assumeTrue(Files.isRegularFile(f), "源码树不可见 (打包环境) — 跳过");
-        String src = Files.readString(f);
+        String src = readAllTestSources();
         // 挖矿家族 (走路 + 蓄力 + 掉落) 与 农家/刷子/熔炉寻路家族 — 必须独占批次, 不与 defaultBatch 抢并发
         List<String> oreFamily = List.of("lmaChainOreBuriedSkipped", "lmaChainOreWallForceDigUp",
                 "lmaChainOreStackedVein", "lmaChainOreWallDropCollect", "lmaChainOreFar", "lmaChainOreSwapNextVein");
