@@ -1,0 +1,45 @@
+package com.github.xiaozhaoz1.littlemaidmoreaction.task.sense;
+
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.entity.LivingEntity;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * 环境感知快照 (v37→v63) — 一次环境扫描的不可变结果。
+ *
+ * <p>由 {@link EnvSenseBroadcaster} 每 200 tick 生成并缓存，
+ * 任意代码可经 {@code EnvSenseBroadcaster.getSnapshot(maid)} O(1) 读取。
+ *
+ * <p><b>实体引用警告</b>：{@code entityHits} 持有的 {@link LivingEntity}
+ * 可能在两次扫描间死亡/卸载，消费方使用前必须 {@code isAlive()} 复核。
+ *
+ * @param gameTime      扫描时的 gameTime
+ * @param entityHits    分类id → 命中实体（按距离排序）
+ * @param world         世界状态快照
+ */
+public record EnvSnapshot(long gameTime,
+                          Map<String, List<LivingEntity>> entityHits,
+                          WorldInfo world) {
+
+    /**
+     * 世界状态快照 — 温度档经 TLM {@code IMaid.getAtBiomeTemp()} 读 (v79.62.5 删 LMA 自采集/
+     * tempCategory+temperature 字段 — 用户裁定: TLM 温度机制已覆盖)。
+     *
+     * @param precipitation 女仆位置降水类型: NONE / RAIN / SNOW
+     * @param dayTime       当日时间 0-23999
+     * @param timeSegment   时间段: DAY(0-11999) / DUSK(12000-13799) / NIGHT(13800-22199) / DAWN(22200-23999)
+     * @param biomeId       生物群系 registry id (namespace:path; 未知 "unknown")
+     * @param structuresAt  站立点所在结构 registry id (排序逗号连接; 空串 = 不在任何结构)
+     */
+    public record WorldInfo(boolean day, boolean raining, boolean thundering,
+                            int moonPhase, int lightAtMaid, String dimension,
+                            String precipitation, long dayTime, String timeSegment,
+                            String biomeId, String structuresAt) {}
+
+    /** 指定分类的命中实体（无命中返回空列表） — blockHits/worldSignals 死字段已删 */
+    public List<LivingEntity> entities(String category) {
+        return entityHits != null ? entityHits.getOrDefault(category, List.of()) : List.of();
+    }
+}

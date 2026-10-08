@@ -1,0 +1,127 @@
+plugins {
+    id 'com.iamkaf.multiloader.neoforge'
+}
+
+def minecraftVersion = project.name
+def libs = catalogFor(project, minecraftVersion)
+
+repositories {
+    // v79.63: 本地 maven repo (与 forge 节点同款) — compat 运行期开关的坐标从这里解析;
+    // 关键: maven 坐标的 mod 依赖会被 ModDevGradle 重映射, 松散 files() 不会 → 第三方 mod 的
+    // SRG refmap 在 dev 下会 "Mixin apply failed ... @Shadow m_xxxxx_ was not located" (错题 #288)
+    maven { url = uri(rootProject.file('libs-maven').toURI()) }
+    maven {
+        name = "Modrinth"
+        url = "https://api.modrinth.com/maven"
+        content {
+            includeGroup "maven.modrinth"
+        }
+    }
+    maven { url "https://maven.shedaniel.me/" }
+}
+
+dependencies {
+    // TLM 1.21.1 (libs 本地 jar, 官方名直发)
+    compileOnly files(rootProject.file('libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar'))
+    // TLM 运行时 mod (LMA mods.toml 声明 required; TLM 自身 neoforge 范围 [21,) 开区间, 21.1.62 满足)
+    runtimeOnly files(rootProject.file('libs/touhoulittlemaid-1.5.3-neoforge+mc1.21.1.jar'))
+    // Cloth Config 15.0.140 (neoforge)
+    implementation 'maven.modrinth:cloth-config:15.0.140+neoforge'
+    // ClassGraph
+    implementation 'io.github.classgraph:classgraph:4.8.168'
+    // v79.47 农历节日: 农历换算库 — 2026-08-11c jar-in-jar 内置 (Maven Central, 部署零额外 jar)
+    jarJar(implementation('cn.6tail:lunar:1.7.7'))
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ["-Xlint:-removal"]
+}
+
+// 1.21.1 compat 前置 (compileOnly — compat 源码已排除编译, 运行时勿加载:
+// create 6.0.10/aero/sable 生态要求 neoforge ≥21.1.219-228, 本地 21.1.62 版本检查不过 → 冒烟崩溃)
+dependencies {
+    compileOnly files(
+            rootProject.file("libs/create-1.21.1-6.0.10.jar"),
+            rootProject.file("libs/create-aeronautics-bundled-1.21.1-1.3.0.jar"),
+            rootProject.file("libs/createbigcannons-5.11.7-mc.1.21.1-neoforge.jar"),
+            rootProject.file("libs/sable-neoforge-1.21.1-2.0.3.jar"),
+            rootProject.file("libs/ysm-2.6.5-neoforge+mc1.21.1-release.jar"),
+            rootProject.file("libs/openysm-neoforge-1.21.1-2.6.6-r5-neoforge+mc1.21.1.jar"),   // v75.3: OpenYSM 开源 API (假人模型直接设置)
+            rootProject.file("libs/patpat-1.2.4+1.21.1+neoforge.jar"),                        // v79.61x: PatPat 抚摸兼容 (运行时门控)
+            rootProject.file("libs/flywheel-neoforge-1.21.1.jar"),
+            rootProject.file("libs/catnip-neoforge-1.21.1.jar"),
+            // v73: ponder 从 create jar 内嵌提取 (jarjar/ponder-neoforge-1.0.82) — BlockEntity 继承链接口
+            rootProject.file("libs/ponder-neoforge-1.0.82+mc1.21.1.jar"),
+            // v74: numen-api 从 numen mod jarjar 提取 (MIT) — Numen 假人桥 (女仆 AI 宿主)
+            rootProject.file("libs/numen-api-neoforge-1.21.1-0.0.8-SNAPSHOT.jar")
+    )
+}
+
+// v73: neoforge 21.1.247 ≥ 21.1.228 (create 生态要求) — create 4 基础管线双平台编译 (common)
+
+// ModDevGradle userdev: FML UserdevLocator 将 classes/java/main 作为 mod 目录候选, 必须含 META-INF/neoforge.mods.toml
+// 否则 "is not a valid mod file" 崩溃。multiloader 插件覆盖了 processResources 输出目录,
+// 故用独立 Copy 任务把处理后的资源灌入 classes (官方 MDG 布局)
+// 另: 插件 filesMatching 对 mods.toml 做 expand — Windows 默认编码(GBK)读 UTF-8 中文注释会写坏
+// (实测 0xa8 孤立字节插入) → 显式 UTF-8
+tasks.named('processResources') {
+    filteringCharset = 'UTF-8'
+}
+tasks.register('copyResourcesToClasses', Copy) {
+    from(layout.buildDirectory.dir('resources/main'))
+    into(layout.buildDirectory.dir('classes/java/main'))
+    dependsOn('processResources')
+}
+tasks.named('runClient') {
+    dependsOn('copyResourcesToClasses')
+}
+// runGameTestServer 也需结构/资源 (game_test.nbt 在 resources) — clean 后 classes 无资源
+// 否则模板未加载 → 结构错位坐标 (gametest 基建, 2026-08-18 实测)
+// matching/configureEach: NeoGradle run 任务延迟注册, tasks.named 过早会 not found
+tasks.matching { it.name == 'runGameTestServer' }.configureEach {
+    dependsOn('copyResourcesToClasses')
+}
+
+// classes 含 copyResourcesToClasses 灌入的资源 → jar 与 resources/main 来源重复 (pack.mcmeta 等)
+tasks.named('jar') {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// gametest run (neoforge 节点, 同 forge: gameTestServer 模式 — 客户端单机 /test 命令不注册)
+neoForge {
+    runs {
+        gameTestServer {
+            type = "gameTestServer"
+            gameDirectory = project.file('run/gametest')
+            systemProperty 'neoforge.enabledGameTestNamespaces', 'littlemaidmoreaction'
+            // v79.50: NeoGradle run classpath 不含 libs/ files() 依赖 → additionalRuntimeClasspath 显式追加;
+            // 2026-08-11c: lunar 改 maven 坐标 (jar-in-jar 内置, dev 运行 classpath 用 maven 缓存)
+            additionalRuntimeClasspathConfiguration.dependencies.add(
+                    project.dependencies.create('cn.6tail:lunar:1.7.7'))
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v79.63 compat 运行期开关 (neoforge) — **默认关**, 开关关时零副作用。
+// 实现在独立脚本里 (gradle/compat-runtime.gradle): 探测 mod 配置名 + 加运行期 mod jar。
+// 为什么独立 + 放在**文件末尾顶层**: 上一版把依赖块插进既有 dependencies{} 闭包内部 →
+// Groovy 解析错 (Unexpected input { @ line 21) 把构建改坏 (错题 #286 §3)。
+// 用法: ./gradlew -PcompatRuntime=true :neoforge:1.21.1:runGameTestServer
+// ─────────────────────────────────────────────────────────────────────────────
+ext.compatRuntimeJars = [
+        rootProject.file('libs/create-1.21.1-6.0.10.jar'),
+        rootProject.file('libs/ponder-neoforge-1.0.82+mc1.21.1.jar'),
+        rootProject.file('libs/flywheel-neoforge-1.21.1.jar'),
+        rootProject.file('libs/createbigcannons-5.11.7-mc.1.21.1-neoforge.jar'),
+        rootProject.file('libs/ritchiesprojectilelib-2.1.2+mc.1.21.1-neoforge.jar')
+]
+apply from: rootProject.file('gradle/compat-runtime.gradle')
+
+
+// v79.63: javadoc 读 UTF-8 源 — Windows 默认 GBK 会让中文注释报
+//   "编码 GBK 的不可映射字符" (100 条诊断/2 个文件), 导致 `build` 挂在 javadoc 任务。
+//   common/build.gradle 早有同款配置, 两个节点脚本此前漏了 (本次打包时发现)。
+tasks.withType(Javadoc).configureEach {
+    options.encoding = "UTF-8"
+}

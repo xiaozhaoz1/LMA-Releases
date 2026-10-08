@@ -1,0 +1,120 @@
+plugins {
+    id 'com.iamkaf.multiloader.forge'
+    id 'java-library'
+}
+
+def minecraftVersion = project.name
+def useTeaKit = providers.systemProperty('template.withTeaKit')
+    .orElse(providers.gradleProperty('template.withTeaKit'))
+    .map { it.toBoolean() }
+    .orElse(false)
+    .get()
+def libs = catalogFor(project, minecraftVersion)
+
+repositories {
+    maven { url "https://maven.shedaniel.me/" }
+    // 本地 maven repo: TLM jar (modImplementation 坐标重映射 mixin refmap — 对齐 cloth 处理)
+    maven { url = uri(rootProject.file('libs-maven').toURI()) }
+}
+
+// 2026-08-11c: lunar jar-in-jar 内置 (forge JarInJar 机制)
+dependencies {
+    // TLM 1.20.1 (本地 maven repo, modImplementation 自动重映射)
+    modImplementation 'com.github.tartaricacid:touhoulittlemaid:1.5.3'
+    // Cloth Config
+    modImplementation 'me.shedaniel.cloth:cloth-config-forge:11.1.136'
+    // ClassGraph (mod 运行时依赖 — dev runClient 类路径可见)
+    modImplementation 'io.github.classgraph:classgraph:4.8.168'
+    // v79.47 农历节日: 农历换算库 — 2026-08-11c jar-in-jar 内置 (Maven Central, 部署零额外 jar)
+    jarJar(implementation('cn.6tail:lunar:1.7.7'))
+
+    if (useTeaKit && minecraftVersion != '1.16.5' && !useLegacyForgeRunPath) {
+        runtimeOnly library(libs, 'teakit-forge')
+    }
+}
+
+dependencies {
+    // 1.20.1 compat 前置 (compileOnly, 运行时门控)
+    compileOnly files(
+            rootProject.file('libs/create-1.20.1-6.0.8.jar'),
+            rootProject.file('libs/Ponder-Forge-1.20.1-1.0.91.jar'),
+            rootProject.file('libs/flywheel-forge-1.20.1-1.0.5.jar'),
+            rootProject.file('libs/createbigcannons-5.11.4-mc.1.20.1-forge.jar'),
+            // v79.62: SlashBlade 依赖清理 (用户裁定: 只留动画资产, 无逻辑联动 — 全项目零代码引用实证)
+            rootProject.file('libs/True_POWER-1.20.1-1.1.8.jar'),
+            rootProject.file('libs/True_POWER_of_Maid-1.20.1-1.2.2.jar'),
+            // v79.61x: PatPat 抚摸兼容 (fabric 1.2.1 jar — forge 无 PatPat 构建, 仅编译期签名, 运行时门控恒关)
+            rootProject.file('libs/patpat-1.2.1+1.20.1.jar')
+    )
+}
+
+// 抑制 JDK 21 对 MC 已过时 API 的 removal 警告 (视为错误)
+tasks.withType(JavaCompile).configureEach {
+    options.compilerArgs += ["-Xlint:-removal"]
+}
+
+// multiloader 插件 filesMatching expand 用 Windows 默认编码(GBK)读 UTF-8 中文注释写坏 mods.toml
+// (forge FML 47.x GBK 容忍不炸但产物损坏, 与 neoforge 节点同源问题) — 显式 UTF-8
+tasks.named('processResources') {
+    filteringCharset = 'UTF-8'
+}
+
+// 测试源: 复用 common 测试 (loader 类路径含 Forge) — common 节点独立编译缺 forge 类路径, 测试跑在 forge 节点
+sourceSets.test.java.srcDirs = [rootProject.file('common/src/test/java')]
+// stonecutter 合成节点 test 源集未自动继承 main 类路径 (MC/forge 依赖) — 显式继承
+sourceSets.test.compileClasspath += sourceSets.main.compileClasspath
+sourceSets.test.runtimeClasspath += sourceSets.main.runtimeClasspath
+test {
+    useJUnitPlatform()
+}
+
+dependencies {
+    testImplementation 'org.junit.jupiter:junit-jupiter:5.9.3'
+    // 任务系统状态机单元测试 (mock EntityMaid — 纯 JVM)
+    testImplementation 'org.mockito:mockito-core:5.11.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.11.0'
+    // Gradle 9 要求 launcher 在测试运行时类路径
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+// gametest run (forge 节点 = ModDevGradle legacyforge, legacyForge runs DSL)
+// 参考: TLM 1.20 ForgeGradle 同款语义 (forge.gameTestServer=true + 启用 LMA 命名空间)
+legacyForge {
+    runs {
+        gameTestServer {
+            type = "gameTestServer"
+            gameDirectory = project.file('run/gametest')
+            systemProperty 'forge.enabledGameTestNamespaces', 'littlemaidmoreaction'
+            systemProperty 'forge.gameTestServer', 'true'
+            // 诊断开关 (2026-09-19, 默认关 = 零影响): -PlmaTowerDiag 打开防御塔 [TOWER-DIAG] 决策日志
+            // (实现侧读 Boolean.getBoolean("lma.towerDiag") 或环境变量 LMA_TOWER_DIAG ⇒ 这里转成系统属性)
+            if (project.hasProperty('lmaTowerDiag')) {
+                systemProperty 'lma.towerDiag', 'true'
+            }
+        }
+    }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// v79.63 compat 运行期开关 (forge) — **默认关**, 开关关时零副作用。
+// 实现在独立脚本里 (gradle/compat-runtime.gradle): 探测 mod 配置名 + 加运行期 mod jar。
+// 为什么独立 + 放在**文件末尾顶层**: 上一版把依赖块插进既有 dependencies{} 闭包内部 →
+// Groovy 解析错 (Unexpected input { @ line 21) 把构建改坏 (错题 #286 §3)。
+// 用法: ./gradlew -PcompatRuntime=true :forge:1.20.1:runGameTestServer
+// ─────────────────────────────────────────────────────────────────────────────
+ext.compatRuntimeJars = [
+        rootProject.file('libs/create-1.20.1-6.0.8.jar'),
+        rootProject.file('libs/Ponder-Forge-1.20.1-1.0.91.jar'),
+        rootProject.file('libs/flywheel-forge-1.20.1-1.0.5.jar'),
+        rootProject.file('libs/createbigcannons-5.11.4-mc.1.20.1-forge.jar'),
+        rootProject.file('libs/ritchiesprojectilelib-2.1.1+mc.1.20.1-forge.jar')
+]
+apply from: rootProject.file('gradle/compat-runtime.gradle')
+
+
+// v79.63: javadoc 读 UTF-8 源 — Windows 默认 GBK 会让中文注释报
+//   "编码 GBK 的不可映射字符" (100 条诊断/2 个文件), 导致 `build` 挂在 javadoc 任务。
+//   common/build.gradle 早有同款配置, 两个节点脚本此前漏了 (本次打包时发现)。
+tasks.withType(Javadoc).configureEach {
+    options.encoding = "UTF-8"
+}

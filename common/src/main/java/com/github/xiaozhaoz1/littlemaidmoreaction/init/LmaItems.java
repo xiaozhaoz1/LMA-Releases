@@ -1,0 +1,84 @@
+package com.github.xiaozhaoz1.littlemaidmoreaction.init;
+
+import com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction;
+import net.minecraft.world.item.Item;
+//? if 1.20.1 {
+import net.minecraftforge.eventbus.api.IEventBus;
+//?} else {
+import net.neoforged.bus.api.IEventBus;
+//?}
+//? if 1.20.1 {
+import net.minecraftforge.registries.DeferredRegister;
+//?} else {
+import net.neoforged.neoforge.registries.DeferredRegister;
+//?}
+//? if 1.20.1 {
+import net.minecraftforge.registries.ForgeRegistries;
+//?} else {
+import net.minecraft.core.registries.BuiltInRegistries;
+//?}
+//? if 1.20.1 {
+import net.minecraftforge.registries.RegistryObject;
+//?} else {
+import java.util.function.Supplier;
+//?}
+
+/**
+ * LMA 物品注册点 (v79.22 就绪) — 后续物品在此注册。
+ *
+ * <p>用法 (以饰品为例, 双平台条件化):
+ * <pre>{@code
+ * //? if 1.20.1 {
+ * public static final RegistryObject<Item> MY_ITEM = ITEMS.register("my_item", Item::new);
+ * //?} else {
+ * public static final Supplier<Item> MY_ITEM = ITEMS.register("my_item", Item::new);
+ * //?}
+ * }</pre>
+ *
+ * <p>挂载链路: {@code init.LmaRegistrar.registerItems(modBus)} → forge
+ * {@code LittleMaidMoreAction} / neoforge {@code LmaNeoForgeEntry} 构造器。
+ */
+public final class LmaItems {
+
+    public static final DeferredRegister<Item> ITEMS =
+//? if 1.20.1 {
+            DeferredRegister.create(ForgeRegistries.ITEMS, LittleMaidMoreAction.MOD_ID);
+//?} else {
+            DeferredRegister.create(BuiltInRegistries.ITEM, LittleMaidMoreAction.MOD_ID);
+//?}
+
+    /** 女仆图鉴 (v79.47) — 右键打开击杀图鉴界面 (MaidCodexScreen) */
+    //? if 1.20.1 {
+    public static final RegistryObject<Item> MAID_CODEX =
+            ITEMS.register("maid_codex", MaidCodexItem::new);
+    //?} else {
+    public static final Supplier<Item> MAID_CODEX =
+            ITEMS.register("maid_codex", MaidCodexItem::new);
+    //?}
+
+    /** v79.72: Token (女仆饰品 · 可食用) — 食用 2 点饱食度; 佩戴给「生命恢复 I」(见 bauble/token/) ✓ */
+    //? if 1.20.1 {
+    public static final RegistryObject<Item> TOKEN =
+            ITEMS.register("token", com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenItem::new);
+    //?} else {
+    public static final Supplier<Item> TOKEN =
+            ITEMS.register("token", com.github.xiaozhaoz1.littlemaidmoreaction.bauble.token.TokenItem::new);
+    //?}
+
+    /** v79.62.3: 防御塔物品 (garage_kit_defense) — 原版手办合成, NBT 继承 */
+    //? if 1.20.1 {
+    public static final RegistryObject<Item> GARAGE_KIT_DEFENSE =
+            ITEMS.register("garage_kit_defense",
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitItem::new);
+    //?} else {
+    public static final Supplier<Item> GARAGE_KIT_DEFENSE =
+            ITEMS.register("garage_kit_defense",
+                    com.github.xiaozhaoz1.littlemaidmoreaction.defense.garage.DefenseGarageKitItem::new);
+    //?}
+
+    public static void register(IEventBus bus) {
+        ITEMS.register(bus);
+    }
+
+    private LmaItems() {}
+}
