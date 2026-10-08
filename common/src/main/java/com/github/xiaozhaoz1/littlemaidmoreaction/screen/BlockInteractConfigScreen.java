@@ -106,7 +106,7 @@ public class BlockInteractConfigScreen extends LmaTaskConfigScreen<BlockInteract
 
     private Component getTimerLabel() {
         return getMenu().getConfig().getBoolean(BlockInteractPipeline.KEY_TIMER_ENABLED)
-            ? Component.literal("§a定时器: 开") : Component.literal("§7定时器: 关");
+            ? Component.translatable("message.lma.timer.on") : Component.translatable("message.lma.timer.off");
     }
 
     private String getPosText(CompoundTag cfg) {

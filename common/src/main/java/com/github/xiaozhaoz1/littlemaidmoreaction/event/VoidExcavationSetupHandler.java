@@ -68,7 +68,7 @@ public final class VoidExcavationSetupHandler {
         held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
 //?}
         event.getEntity().sendSystemMessage(
-                Component.literal("§a已标记: " + pos.toShortString()));
+                Component.translatable("message.lma.mark.void_start", pos.toShortString()));
         // 取消原版方块交互 (开箱子等)
         event.setCanceled(true);
     }

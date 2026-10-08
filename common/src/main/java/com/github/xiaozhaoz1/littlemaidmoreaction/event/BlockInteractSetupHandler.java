@@ -84,8 +84,7 @@ CompoundTag tag = _cd.copyTag();
         //   ⇒ 统一走项目编解码器 NbtCodecs (与 VoidExcavationSetupHandler 同款, 双平台对称, 错题 #183) ✓
         NbtCodecs.writeBlockPos(tag, TaskKeys.MARK1, pos);   // v79.63: 统一通用标记槽
         event.getEntity().sendSystemMessage(
-            Component.literal("§a已标记交互方块: " + pos.toShortString()
-                + " §7(右键有 block_interact 任务的女仆绑定)"));
+            Component.translatable("message.lma.mark.interact_done", pos.toShortString()));
         //? if !1.20.1 {
         held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         //?}
@@ -112,7 +111,7 @@ CompoundTag tag = _cd.copyTag();
         // v79.63: 通用槽 MARK1 优先, 旧 lma_bind_pos 兼容读
         if (!tag.contains(TaskKeys.MARK1) && !tag.contains(STICK_KEY)) {
             player.sendSystemMessage(
-                Component.literal("§c请先用木棍右键一个交互方块(按钮/拉杆/门等)"));
+                Component.translatable("message.lma.mark.stick_required"));
         //? if !1.20.1 {
         held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         //?}
@@ -140,8 +139,7 @@ CompoundTag tag = _cd.copyTag();
         tag.remove(STICK_KEY); // 清理旧键 (兼容期)
         event.setCanceled(true);
         player.sendSystemMessage(
-            Component.literal("§a女仆已绑定交互方块: " + pos.toShortString()
-                + " §7(按键手动触发)"));
+            Component.translatable("message.lma.bind.interact_done", pos.toShortString()));
         //? if !1.20.1 {
         held.set(DataComponents.CUSTOM_DATA, CustomData.of(tag));
         //?}
