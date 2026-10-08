@@ -100,7 +100,8 @@ public final class AiControlPipeline implements TaskPipeline, TaskConfigurable {
     /** 任务设置 GUI — LLM 模型/声线名称 (TLM 任务设置标签页入口) */
     @Override
     public MenuProvider getConfigGuiProvider(EntityMaid maid) {
-        return TaskConfigGuiFactory.createMenuProvider(maid, Component.literal("AI 操控设置"),
+        return TaskConfigGuiFactory.createMenuProvider(maid,
+                Component.translatable("screen.littlemaidmoreaction.ai.config_title"),
                 (cid, inv, maidId) -> new AiControlConfigMenu(cid, inv, maidId));
     }
 }

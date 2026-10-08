@@ -50,7 +50,9 @@ public class PassiveToggleConfigScreen extends LmaTaskConfigScreen<PassiveToggle
 
     private Component getToggleLabel() {
         boolean on = getMenu().getConfig().getBoolean(TaskConfigurable.KEY_ENABLED);
-        return Component.literal(on ? "§a✔ 启用" : "§c✘ 禁用");
+        return Component.translatable(on
+                ? "screen.littlemaidmoreaction.passive.toggle.on"
+                : "screen.littlemaidmoreaction.passive.toggle.off");
     }
 
     @Override

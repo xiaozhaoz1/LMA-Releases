@@ -267,7 +267,7 @@ public final class DebugSelectionCoordinator {
         int h = Math.abs(end.getY() - start.getY()) + 1;
         int d = Math.abs(end.getZ() - start.getZ()) + 1;
         gui.drawString(Minecraft.getInstance().font,
-                Component.literal("§b选区: " + w + "x" + h + "x" + d),
+                Component.translatable("screen.littlemaidmoreaction.debug.selection", w, h, d),
                 4, 4, 0xFFFFFFFF);
     }
 

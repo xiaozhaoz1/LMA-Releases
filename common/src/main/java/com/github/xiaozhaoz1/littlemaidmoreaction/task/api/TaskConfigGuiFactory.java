@@ -117,7 +117,8 @@ public final class TaskConfigGuiFactory {
             return provider;
         }
         // TLM 默认任务配置容器 (纯背包屏) — 与 TLM 自身任务行为一致
-        return createMenuProvider(maid, Component.literal("任务配置"),
+        return createMenuProvider(maid,
+                Component.translatable("screen.littlemaidmoreaction.task_config.title"),
                 (cid, inv, maidId) -> new DefaultMaidTaskConfigContainer(cid, inv, maidId));
     }
 
@@ -161,7 +162,8 @@ public final class TaskConfigGuiFactory {
      * 创建 BlockInteract 任务配置屏幕的 MenuProvider (标记/绑定、定时器间隔)。
      */
     public static MenuProvider blockInteractConfig(EntityMaid maid) {
-        return createMenuProvider(maid, Component.literal("右键交互配置"),
+        return createMenuProvider(maid,
+                Component.translatable("screen.littlemaidmoreaction.block_interact.config_title"),
             (cid, inv, maidId) -> new BlockInteractConfigMenu(cid, inv, maidId));
     }
 
