@@ -65,19 +65,20 @@ class ThirdPartyDerivedGateTest {
             }
         }
 
-        // ── 2) @EventBusSubscriber 文件里引用它们 ⇒ 必须在 isLoaded( 门控之后 ──
+        // ── 2) @EventBusSubscriber 文件里引用它们 ⇒ **每一处引用**都必须在 isLoaded( 门控之后 ──
+        //   ⚠ 首版只比较"首次出现" ✗ ⇒ 会漏检（如 forge 分支门控在前、neo 分支门控被删 ⇒ 仍判绿 ✗）
+        //     ⇒ 现按"**同一方法体内、引用之前必须有 isLoaded**"逐处判定 ✓（已用探针复核 ✓）
         List<String> offenders = new ArrayList<>();
         for (Path f : files) {
             String text = ArchSource.read(f);
             if (!text.contains("@EventBusSubscriber")) continue;
-            int gateLine = firstLineContaining(text, "isLoaded(");
             List<String> lines = text.lines().toList();
             for (Map.Entry<String, String> e : thirdPartyDerived.entrySet()) {
-                int refLine = firstLineWithWord(lines, e.getKey());
-                if (refLine < 0) continue;
-                if (gateLine < 0 || refLine < gateLine) {
-                    offenders.add(ArchSource.rel(main, f) + ":" + refLine + " 引用了第三方派生类 `" + e.getKey()
-                            + "`（" + e.getValue() + "）但**没有**先过 isLoaded( 门控 ✗");
+                for (int refLine : allRefLines(lines, e.getKey())) {
+                    if (!hasGateBeforeInSameMethod(lines, refLine)) {
+                        offenders.add(ArchSource.rel(main, f) + ":" + refLine + " 引用了第三方派生类 `" + e.getKey()
+                                + "`（" + e.getValue() + "）但**同方法内、引用之前**没有 isLoaded( 门控 ✗");
+                    }
                 }
             }
         }
@@ -108,15 +109,40 @@ class ThirdPartyDerivedGateTest {
         return -1;
     }
 
-    private static int firstLineWithWord(List<String> lines, String word) {
+    /** 所有"非注释、非 import"的引用行号 (1-based) —— 每一处都要单独过门控 ✓ */
+    private static List<Integer> allRefLines(List<String> lines, String word) {
         Pattern p = Pattern.compile("\\b" + Pattern.quote(word) + "\\b");
+        List<Integer> out = new ArrayList<>();
         for (int i = 0; i < lines.size(); i++) {
             String s = lines.get(i);
             String t = s.trim();
-            if (t.startsWith("//") || t.startsWith("*")) continue;   // 注释不算引用 ✓
-            if (t.startsWith("import ")) continue;                   // import 是编译期, 不会加载类 ✓
-            if (p.matcher(s).find()) return i + 1;
+            if (t.startsWith("//") || t.startsWith("*") || t.startsWith("/*")) continue;   // 注释不算 ✓
+            if (t.startsWith("import ")) continue;                                        // import 编译期, 不加载 ✓
+            if (p.matcher(s).find()) out.add(i + 1);
         }
-        return -1;
+        return out;
+    }
+
+    /**
+     * 判定：`refLine` 之前、**同一方法体内**是否存在 `isLoaded(` 门控 ✓
+     * （先向上找到方法签名/@SubscribeEvent，再在 [方法头, 引用) 区间里找门控 ✓ —— 不用花括号配对，简单且够用 ✓）
+     */
+    private static boolean hasGateBeforeInSameMethod(List<String> lines, int refLine) {
+        int methodStart = -1;
+        for (int i = refLine - 2; i >= 0; i--) {
+            String t = lines.get(i).trim();
+            if (t.contains("@SubscribeEvent")) { methodStart = i; break; }
+            if ((t.startsWith("public ") || t.startsWith("private ") || t.startsWith("protected ") || t.startsWith("static "))
+                    && t.endsWith("{")) {
+                methodStart = i;
+                break;
+            }
+        }
+        if (methodStart < 0) return false;      // 找不到方法边界 ⇒ 保守判失败 ✓ (fail-closed ✓)
+        for (int i = methodStart; i < refLine - 1; i++) {
+            String t = lines.get(i).trim();
+            if (t.contains("isLoaded(") && !t.startsWith("//") && !t.startsWith("*")) return true;
+        }
+        return false;
     }
 }
