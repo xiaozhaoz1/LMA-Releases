@@ -63,7 +63,7 @@ public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavati
         addRenderableWidget(destroyListBox);
 
         // 保存名单 — 下一栏 (不与输入框并排, 防超界; 空值=清空名单, 回退全局)
-        addRenderableWidget(Button.builder(Component.literal("保存名单"),
+        addRenderableWidget(Button.builder(net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.save_list"),
                 btn -> {
                     String val = destroyListBox.getValue() == null ? "" : destroyListBox.getValue();
                     sendSetList(VoidExcavationPipeline.KEY_DESTROY_LIST, val);   // 基类助手 (README §二 契约) ✓
@@ -77,12 +77,16 @@ public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavati
         // v79.62.2 导航开关 — 下一栏 (noPathfind=true=关闭导航=传送区块中间开挖; false=开启导航=TLM 走)
         boolean npCur = getMenu().getConfig().getBoolean(VoidExcavationPipeline.KEY_NO_PATHFIND);
         noPathfindBtn = addRenderableWidget(Button.builder(
-                Component.literal(npCur ? "关闭导航" : "开启导航"),
+                net.minecraft.network.chat.Component.translatable(npCur
+                        ? "screen.littlemaidmoreaction.void.nav_off"
+                        : "screen.littlemaidmoreaction.void.nav_on"),
                 btn -> {
                     sendToggle(VoidExcavationPipeline.KEY_NO_PATHFIND);   // 基类助手 ✓
                     boolean cur = getMenu().getConfig().getBoolean(VoidExcavationPipeline.KEY_NO_PATHFIND);
                     getMenu().getConfig().putBoolean(VoidExcavationPipeline.KEY_NO_PATHFIND, !cur);
-                    btn.setMessage(Component.literal(!cur ? "关闭导航" : "开启导航"));
+                    btn.setMessage(net.minecraft.network.chat.Component.translatable(!cur
+                            ? "screen.littlemaidmoreaction.void.nav_off"
+                            : "screen.littlemaidmoreaction.void.nav_on"));
                 }).pos(rowX, rowY(2) - 2).size(rowW, 20).tooltip(net.minecraft.client.gui.components.Tooltip.create(
                         net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.nav.tip"))).build());
 
@@ -93,7 +97,7 @@ public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavati
         minYBox.setMaxLength(6);
         addRenderableWidget(minYBox);
         // 保存最低高度
-        addRenderableWidget(Button.builder(Component.literal("保存高度"),
+        addRenderableWidget(Button.builder(net.minecraft.network.chat.Component.translatable("screen.littlemaidmoreaction.void.save_min_y"),
                 btn -> {
                     String val = minYBox.getValue() == null ? "" : minYBox.getValue().trim();
                     if (val.isEmpty()) {
@@ -143,7 +147,8 @@ public class VoidExcavationConfigScreen extends LmaTaskConfigScreen<VoidExcavati
         // 销毁名单提示 (在"区域"下方, 不重叠)
         String dl = listToCsv(cfg, VoidExcavationPipeline.KEY_DESTROY_LIST);
         if (!dl.isEmpty()) {
-            g.drawString(font, Component.literal("销毁名单: " + dl), leftPos + 8, topPos + 118, 0xFFFF55);
+            g.drawString(font, net.minecraft.network.chat.Component.translatable(
+                    "screen.littlemaidmoreaction.void.destroy_list_prefix", dl), leftPos + 8, topPos + 118, 0xFFFF55);
         }
         // 配置到达后一次性预填销毁名单输入框 (ReplyTaskConfigPacket 到达前为空; 空名单不预填)
         if (!listSynced && !cfg.isEmpty()) {

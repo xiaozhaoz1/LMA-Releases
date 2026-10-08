@@ -102,11 +102,11 @@ public final class MaidFarmRegionScreen extends Screen {
             if (y + ROW_H > bottomLimit) break;
             if (i < 0) continue;
             final int idx = i;
-            Button detail = Button.builder(Component.literal("详情"),
+            Button detail = Button.builder(Component.translatable("screen.littlemaidmoreaction.farm_region.detail"),
                     btn -> openDetail(idx)).pos(px + PANEL_W - 90, y).size(36, 14).build();
             this.addRenderableWidget(detail);
             detailButtons.add(detail);
-            Button del = Button.builder(Component.literal("删"),
+            Button del = Button.builder(Component.translatable("screen.littlemaidmoreaction.farm_region.delete"),
                     btn -> removeIndex(idx)).pos(px + PANEL_W - 48, y).size(34, 14).build();
             this.addRenderableWidget(del);
             delButtons.add(del);
@@ -136,20 +136,28 @@ public final class MaidFarmRegionScreen extends Screen {
                 FarmRegion r = regions.get(i);
                 g.drawString(this.font, Component.literal(r.displayName() + "  " + i),
                         px + 16, y, COLOR_TEXT, false);
-                g.drawString(this.font, Component.literal(r.isRightHarvest() ? "右键收" : "左键收"),
+                g.drawString(this.font, Component.translatable(r.isRightHarvest()
+                                ? "screen.littlemaidmoreaction.farm_region.mode_right"
+                                : "screen.littlemaidmoreaction.farm_region.mode_left"),
                         px + PANEL_W - 120, y, COLOR_SUB, false);
-                String crop = r.cropId() == null || r.cropId().isEmpty() ? "只收不种" : r.cropId();
-                g.drawString(this.font, Component.literal("种: " + crop),
+                String crop = r.cropId() == null || r.cropId().isEmpty()
+                        ? net.minecraft.client.resources.language.I18n.get("screen.littlemaidmoreaction.farm_region.crop_none")
+                        : r.cropId();
+                g.drawString(this.font, Component.translatable("screen.littlemaidmoreaction.farm_region.crop_prefix", crop),
                         px + 16, y + 11, COLOR_SUB, false);
                 // v79.64 维度归属: 区域跟着女仆走, 但记了维度 — 不在当前维度时该区域**暂停** (用户裁定),
                 //   必须在屏上可见, 否则玩家会以为"区域坏了" ✗ (取短名: minecraft:overworld → overworld)
                 String dim = r.dimension() == null ? "" : r.dimension();
-                String dimShort = dim.isEmpty() ? "任意维度" : dim.substring(dim.indexOf(':') + 1);
+                String dimShort = dim.isEmpty()
+                        ? net.minecraft.client.resources.language.I18n.get("screen.littlemaidmoreaction.farm_region.dim_any")
+                        : dim.substring(dim.indexOf(':') + 1);
                 boolean otherDim = !dim.isEmpty()
                         && Minecraft.getInstance().level != null
                         && !dim.equals(Minecraft.getInstance().level.dimension().location().toString());
                 g.drawString(this.font,
-                        Component.literal(otherDim ? "⚠ 其他维度·暂停 (" + dimShort + ")" : dimShort),
+                        otherDim
+                                ? Component.translatable("screen.littlemaidmoreaction.farm_region.dim_paused", dimShort)
+                                : Component.literal(dimShort),
                         px + PANEL_W - 120, y + 11, otherDim ? 0xFFAA00 : COLOR_SUB, false);
                 y += ROW_H;
             }

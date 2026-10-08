@@ -53,8 +53,8 @@ public final class MaidFarmRegionDetailScreen extends Screen {
         this.addRenderableWidget(this.nameBox);
         // v79.62.1 修复: 种子 id 移到收获方式下方 (下拉框不被挡)
         this.modeButton = this.addRenderableWidget(Button.builder(
-                Component.literal(this.rightHarvest ? "右键收" : "左键收"),
-                btn -> { rightHarvest = !rightHarvest; modeButton.setMessage(Component.literal(rightHarvest ? "右键收" : "左键收")); })
+                modeLabel(this.rightHarvest),
+                btn -> { rightHarvest = !rightHarvest; modeButton.setMessage(modeLabel(rightHarvest)); })
                 .pos(px + 90, py + 54).size(80, 16).build());
         this.cropBox = new EditBox(this.font, px + 90, py + 78, 170, 16, Component.literal("crop"));
         this.cropBox.setMaxLength(64);
@@ -69,6 +69,13 @@ public final class MaidFarmRegionDetailScreen extends Screen {
         this.addRenderableWidget(Button.builder(Component.translatable("gui.back"),
                 btn -> Minecraft.getInstance().setScreen(parent))
                 .pos(px + 16, py + PANEL_H - 28).size(60, 20).build());
+    }
+
+    /** 收获方式标签 (语言键 ✓ 中英分开) */
+    private static Component modeLabel(boolean right) {
+        return Component.translatable(right
+                ? "screen.littlemaidmoreaction.farm_region.mode_right"
+                : "screen.littlemaidmoreaction.farm_region.mode_left");
     }
 
     private void save() {
@@ -147,12 +154,15 @@ public final class MaidFarmRegionDetailScreen extends Screen {
         int px = (this.width - PANEL_W) / 2;
         int py = (this.height - PANEL_H) / 2;
         g.drawCenteredString(this.font, title, this.width / 2, py + 10, COLOR_TEXT);
-        g.drawString(this.font, Component.literal("区域名字"), px + 16, py + 33, COLOR_SUB, false);
-        g.drawString(this.font, Component.literal("收获方式"), px + 16, py + 57, COLOR_SUB, false);
-        g.drawString(this.font, Component.literal("种子 id"), px + 16, py + 81, COLOR_SUB, false);
-        g.drawString(this.font, Component.literal("坐标: (" + region.minX() + "," + region.minY() + "," + region.minZ() + ") ~ (" + region.maxX() + "," + region.maxY() + "," + region.maxZ() + ")"), px + 16, py + 128, COLOR_SUB, false);
-        g.drawString(this.font, Component.literal("种子箱: " + boxStr(region.seedX(), region.seedY(), region.seedZ())), px + 16, py + 142, COLOR_SUB, false);
-        g.drawString(this.font, Component.literal("收获箱: " + boxStr(region.harvestX(), region.harvestY(), region.harvestZ())), px + 16, py + 156, COLOR_SUB, false);
+        g.drawString(this.font, Component.translatable("screen.littlemaidmoreaction.farm_region.field.name"), px + 16, py + 33, COLOR_SUB, false);
+        g.drawString(this.font, Component.translatable("screen.littlemaidmoreaction.farm_region.field.mode"), px + 16, py + 57, COLOR_SUB, false);
+        g.drawString(this.font, Component.translatable("screen.littlemaidmoreaction.farm_region.field.seed_id"), px + 16, py + 81, COLOR_SUB, false);
+        g.drawString(this.font, Component.translatable("screen.littlemaidmoreaction.farm_region.field.coords",
+                region.minX(), region.minY(), region.minZ(), region.maxX(), region.maxY(), region.maxZ()), px + 16, py + 128, COLOR_SUB, false);
+        g.drawString(this.font, Component.translatable("screen.littlemaidmoreaction.farm_region.field.seed_box",
+                boxStr(region.seedX(), region.seedY(), region.seedZ())), px + 16, py + 142, COLOR_SUB, false);
+        g.drawString(this.font, Component.translatable("screen.littlemaidmoreaction.farm_region.field.harvest_box",
+                boxStr(region.harvestX(), region.harvestY(), region.harvestZ())), px + 16, py + 156, COLOR_SUB, false);
         if (dropdownOpen) {
             int listX = px + 90, listY = py + 94;
             int maxRows = Math.min(8, seeds.size());

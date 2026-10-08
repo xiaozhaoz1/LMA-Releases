@@ -26,7 +26,7 @@ public final class TaskTreeScreen extends Screen {
     private static final int ROW_H = 32, LEFT_W = 180;
 
     public TaskTreeScreen(Screen parent) {
-        super(Component.literal("LMA 任务树"));
+        super(Component.translatable("screen.littlemaidmoreaction.task_tree.title"));
         this.parent = parent;
     }
 
@@ -36,7 +36,7 @@ public final class TaskTreeScreen extends Screen {
         if (selectedIdx >= nodes.size()) selectedIdx = nodes.isEmpty() ? -1 : 0;
 
         // 关闭按钮
-        addRenderableWidget(Button.builder(Component.literal("关闭"), b -> onClose())
+        addRenderableWidget(Button.builder(Component.translatable("gui.back"), b -> onClose())
             .pos(this.width - 80, this.height - 28).size(70, 20).build());
 
         // 切换按钮 - init() 中创建(仅首次打开/resize)，非 render() 每帧创建
@@ -44,11 +44,15 @@ public final class TaskTreeScreen extends Screen {
             var n = nodes.get(selectedIdx);
             int btnY = 22 + 16 + 12 + 16 + 8; // header area: taskType + enabled + visible + gap
             addRenderableWidget(Button.builder(
-                Component.literal(n.enabled() ? "禁用" : "启用"),
+                Component.translatable(n.enabled()
+                                ? "screen.littlemaidmoreaction.task_tree.disable"
+                                : "screen.littlemaidmoreaction.task_tree.enable"),
                 b -> { TaskToggle.setEnabled(n.taskType(), !n.enabled()); clearWidgets(); init(); })
                 .pos(LEFT_W + 14, btnY).size(50, 16).build());
             addRenderableWidget(Button.builder(
-                Component.literal(n.visible() ? "隐藏" : "显示"),
+                Component.translatable(n.visible()
+                                ? "screen.littlemaidmoreaction.task_tree.hide"
+                                : "screen.littlemaidmoreaction.task_tree.show"),
                 b -> { TaskToggle.setVisible(n.taskType(), !n.visible()); clearWidgets(); init(); })
                 .pos(LEFT_W + 69, btnY).size(50, 16).build());
         }
@@ -61,10 +65,8 @@ public final class TaskTreeScreen extends Screen {
 //?} else {
         renderBackground(g, mx, my, pt);
 //?}
-        g.drawCenteredString(font, Component.literal("LMA 任务树 (")
-                .withStyle(s -> s.withColor(0xFFD700))
-                .append(Component.literal(String.valueOf(nodes.size())).withStyle(s -> s.withColor(0xAAAAAA)))
-                .append(Component.literal(")").withStyle(s -> s.withColor(0xFFD700))),
+        g.drawCenteredString(font, Component.translatable("screen.littlemaidmoreaction.task_tree.title_count", nodes.size())
+                .withStyle(s -> s.withColor(0xFFD700)),
                 this.width / 2, 6, 0xFFFFFF);
 
         int lx = 10, ly = 22, lh = this.height - 52, dx = lx + LEFT_W + 4;
@@ -88,7 +90,9 @@ public final class TaskTreeScreen extends Screen {
                     .append(Component.translatable("task." + com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.MOD_ID + "." + n.taskType())
                             .withStyle(s -> s.withColor(rowColor))),
                     lx + 8, ry + 2, 0xFFFFFF);
-            g.drawString(font, Component.literal(n.steps().size() + "步骤" + (n.visible() ? "" : " 隐藏"))
+            g.drawString(font, Component.translatable("screen.littlemaidmoreaction.task_tree.row_steps", n.steps().size())
+                    .append(n.visible() ? Component.empty()
+                            : Component.translatable("screen.littlemaidmoreaction.task_tree.hidden_suffix"))
                     .withStyle(s -> s.withColor(0xAAAAAA)), lx + 12, ry + 16, 0xFFFFFF);
             ry += ROW_H;
         }
@@ -100,14 +104,18 @@ public final class TaskTreeScreen extends Screen {
             int dy = ly;
             g.drawString(font, Component.translatable("task." + com.github.xiaozhaoz1.littlemaidmoreaction.LittleMaidMoreAction.MOD_ID + "." + n.taskType())
                     .withStyle(s -> s.withColor(0xFFD700)), dx, dy, 0xFFFFFF); dy += 16;
-            g.drawString(font, Component.literal("启用: ")
+            g.drawString(font, Component.translatable("screen.littlemaidmoreaction.task_tree.enabled_label")
                     .withStyle(s -> s.withColor(0xAAAAAA))
-                    .append(Component.literal(n.enabled() ? "是" : "否")
+                    .append(Component.translatable(n.enabled()
+                                    ? "screen.littlemaidmoreaction.task_tree.yes"
+                                    : "screen.littlemaidmoreaction.task_tree.no")
                             .withStyle(s -> s.withColor(n.enabled() ? 0x55FF55 : 0xFF5555))),
                     dx, dy, 0xFFFFFF); dy += 12;
-            g.drawString(font, Component.literal("显示在任务栏: ")
+            g.drawString(font, Component.translatable("screen.littlemaidmoreaction.task_tree.visible_label")
                     .withStyle(s -> s.withColor(0xAAAAAA))
-                    .append(Component.literal(n.visible() ? "是" : "否(被动)")
+                    .append(Component.translatable(n.visible()
+                                    ? "screen.littlemaidmoreaction.task_tree.yes"
+                                    : "screen.littlemaidmoreaction.task_tree.no_passive")
                             .withStyle(s -> s.withColor(n.visible() ? 0x55FF55 : 0x888888))),
                     dx, dy, 0xFFFFFF);
             dy += 16 + 8; // gap before buttons (buttons at dy in init())
@@ -117,7 +125,8 @@ public final class TaskTreeScreen extends Screen {
                 int stepsY = dy + 22; // buttons: 16px height + 6px gap
                 int stepsH = (ly + lh) - stepsY;
                 if (stepsH > 20) {
-                    g.drawString(font, Component.literal("步骤:").withStyle(s -> s.withColor(0xFFD700)), dx, stepsY, 0xFFFFFF); stepsY += 12;
+                    g.drawString(font, Component.translatable("screen.littlemaidmoreaction.task_tree.steps_label")
+                            .withStyle(s -> s.withColor(0xFFD700)), dx, stepsY, 0xFFFFFF); stepsY += 12;
                     g.enableScissor(dx, stepsY + 1, dx + rightW, ly + lh - 2);
                     for (var s : n.steps()) {
                         if (stepsY + 12 >= ly && stepsY <= ly + lh)

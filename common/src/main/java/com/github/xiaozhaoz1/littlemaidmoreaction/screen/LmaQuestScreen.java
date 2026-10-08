@@ -60,7 +60,7 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
     private int dragLastX, dragLastY;
 
     public LmaQuestScreen(Screen parent) {
-        super(Component.literal("LMA 成就树"));
+        super(Component.translatable("screen.littlemaidmoreaction.quest.title"));
         this.parent = parent;
     }
 
@@ -230,7 +230,7 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
             g.drawCenteredString(font, Component.literal("▶").withStyle(s -> s.withColor(0xFFD700)),
                     leftW / 2, this.height / 2, 0xFFFFFF);
         } else {
-            g.drawCenteredString(font, Component.literal("章节"), leftW / 2, 8, 0xFFD700);
+            g.drawCenteredString(font, Component.translatable("screen.littlemaidmoreaction.quest.chapters"), leftW / 2, 8, 0xFFD700);
             // 收起箭头 ◀ (点它收起)
             g.drawString(font, Component.literal("◀").withStyle(s -> s.withColor(0xFFFFFF)),
                     leftW - 16, 8, 0xFFFFFF);
@@ -265,7 +265,8 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
             // 收回箭头 ✕
             g.drawString(font, Component.literal("✕").withStyle(s -> s.withColor(0xFFFFFF)),
                     dx + RIGHT_W - 16, 8, 0xFFFFFF);
-            g.drawCenteredString(font, Component.literal("任务详情").withStyle(s -> s.withColor(0xFFD700)), dx + RIGHT_W / 2, 8, 0xFFFFFF);
+            g.drawCenteredString(font, Component.translatable("screen.littlemaidmoreaction.quest.detail_title")
+                    .withStyle(s -> s.withColor(0xFFD700)), dx + RIGHT_W / 2, 8, 0xFFFFFF);
             String title = selected.titleKey() != null ? net.minecraft.client.resources.language.I18n.get(selected.titleKey()) : selected.id();
             g.drawString(font, Component.literal(title).withStyle(s -> s.withColor(0x55FF55)), dx + 8, 28, 0xFFFFFF);
             String desc = selected.descriptionKey() != null ? net.minecraft.client.resources.language.I18n.get(selected.descriptionKey()) : "";
@@ -273,12 +274,14 @@ public final class LmaQuestScreen extends Screen implements ClientAdvancements.L
             // 进度
             AdvancementProgress p = progress.get(rl(selected.id()));
             float pct = p == null ? 0f : p.getPercent();
-            g.drawString(font, Component.literal("进度: " + (int)(pct * 100) + "%").withStyle(s -> s.withColor(0xFFD700)),
+            g.drawString(font, Component.translatable("screen.littlemaidmoreaction.quest.progress", (int) (pct * 100))
+                    .withStyle(s -> s.withColor(0xFFD700)),
                     dx + 8, 46 + 60, 0xFFFFFF);
         }
 
         // 顶部标题
-        g.drawCenteredString(font, Component.literal("LMA 成就树 (" + roots.size() + " 章)").withStyle(s -> s.withColor(0xFFD700)),
+        g.drawCenteredString(font, Component.translatable("screen.littlemaidmoreaction.quest.title_count", roots.size())
+                .withStyle(s -> s.withColor(0xFFD700)),
                 this.width / 2, 6, 0xFFFFFF);
         super.render(g, mx, my, pt);
     }
